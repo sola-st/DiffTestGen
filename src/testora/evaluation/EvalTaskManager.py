@@ -14,8 +14,8 @@ def initialize():
 
     config = {
         "user": "user_name",
-        "host": "sql141.your-server.de",
-        "database": "regression_finder_db"
+        "host": "hy2f.your-database.de",
+        "database": "regression_test_generation"
     }
     with open(".db_token", "r") as f:
         config["password"] = f.read().strip()
@@ -170,8 +170,7 @@ def fetch_results(is_classification):
         projects = [row[0] for row in cursor.fetchall()]
 
         project_to_prs_and_timestamps = current_results()
-        nb_results = sum([len(rs)
-                         for _, rs in project_to_prs_and_timestamps.items()])
+        nb_results = sum([len(rs) for _, rs in project_to_prs_and_timestamps.items()])
         print(f"Found {nb_results} existing results")
 
         for project in projects:
@@ -193,11 +192,9 @@ def fetch_results(is_classification):
                         f"SELECT result FROM {table_name} "
                         f"WHERE project = %s AND pr = %s AND timestamp = %s"
                     )
-                    cursor.execute(
-                        select_query, (project, pr, timestamp))
+                    cursor.execute(select_query, (project, pr, timestamp))
                     result = cursor.fetchone()[0]
-                    add_result(
-                        project, pr, timestamp, result, is_classification)
+                    add_result(project, pr, timestamp, result, is_classification)
                     nb_new_results += 1
 
             print(f"Added {nb_new_results} new results for {project}")

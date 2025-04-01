@@ -47,4 +47,4 @@ docker exec scipy-dev3 chmod +x /root/setup.sh
 docker exec -w /home/scipy scipy-dev3 /root/setup.sh
 echo "Done with third clone"
 
-cd ../../../Testora
+cd ../../../Testora-diff-test-gen # change the folder name here to other projects if needed

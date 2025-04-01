@@ -27,8 +27,7 @@ def write_range_of_PR_tasks_into_database(project_name, project_id, start_pr_nb,
             pr = github_repo.get_pull(next_candidate_pr_nb)
         except Exception:
             # not a valid PR number
-            print(f"Skipping number {
-                  next_candidate_pr_nb} (not a valid PR number)")
+            print(f"Skipping number {next_candidate_pr_nb} (not a valid PR number)")
             next_candidate_pr_nb += 1
             continue
         
@@ -49,14 +48,14 @@ def write_range_of_PR_tasks_into_database(project_name, project_id, start_pr_nb,
 if __name__ == "__main__":
     EvalTaskManager.initialize()
 
-    write_range_of_PR_tasks_into_database(
-        "pandas", "pandas-dev/pandas", 60322, 300)
+    # write_range_of_PR_tasks_into_database(
+    #     "pandas", "pandas-dev/pandas", 60322, 300)
 
     write_range_of_PR_tasks_into_database(
         "scipy", "scipy/scipy", 22031, 300)
 
-    write_range_of_PR_tasks_into_database(
-        "keras", "keras-team/keras", 20711, 300)
+    # write_range_of_PR_tasks_into_database(
+    #     "keras", "keras-team/keras", 20711, 300)
 
-    write_range_of_PR_tasks_into_database(
-        "marshmallow", "marshmallow-code/marshmallow", 2804, 300)
+    # write_range_of_PR_tasks_into_database(
+    #     "marshmallow", "marshmallow-code/marshmallow", 2804, 300)
