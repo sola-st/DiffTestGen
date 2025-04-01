@@ -29,10 +29,9 @@ class PullRequest:
         module_name = self.cloned_repo_manager.module_name
 
         # Python files only
-        modified_python_files = [
-            f for f in self.patch.modified_files if f.path.endswith(".py") or f.path.endswith(".pyx")]
-        self.non_test_modified_python_files = [
-            f.path for f in modified_python_files if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
+        modified_python_files = [f for f in self.patch.modified_files if f.path.endswith(".py") or f.path.endswith(".pyx")]
+        self.non_test_modified_python_files = [f.path for f in modified_python_files 
+                if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
 
         # Python and other PLs
         modified_code_files = [
@@ -43,8 +42,8 @@ class PullRequest:
             f.path.endswith(".cpp") or
             f.path.endswith(".h")
         ]
-        self.non_test_modified_code_files = [
-            f.path for f in modified_code_files if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
+        self.non_test_modified_code_files = [f.path for f in modified_code_files 
+                if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
 
     def get_modified_files(self):
         if Config.code_change_pl == "python":
@@ -56,10 +55,8 @@ class PullRequest:
         if Config.code_change_pl == "all":
             return len(self.non_test_modified_code_files) > 0
 
-        pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(
-            self.pre_commit)
-        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(
-            self.post_commit)
+        pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
 
         self.files_with_non_comment_changes = []
         for modified_file in self.non_test_modified_python_files:
@@ -80,40 +77,35 @@ class PullRequest:
         elif Config.code_change_pl == "all":
             return self.non_test_modified_code_files
         else:
-            raise Exception(
-                f"Unexpected configuration value: {Config.code_change_pl}")
+            raise Exception(f"Unexpected configuration value: {Config.code_change_pl}")
 
     def get_filtered_diff(self):
-        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(
-            self.post_commit)
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
 
         diff_parts = []
         for file_path in self._get_relevant_changed_files():
-            raw_diff = post_commit_cloned_repo.repo.git.diff(
-                self.pre_commit, self.post_commit, file_path)
+            raw_diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit, file_path)
             diff_parts.append(raw_diff)
 
         return "\n\n".join(diff_parts)
 
     def get_full_diff(self):
-        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(
-            self.post_commit)
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
 
         return post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit)
 
     def get_changed_function_names(self):
         result = []
-
-        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(
-            self.post_commit)
+        
+        # H: only the function name in new version
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
 
         for modified_file in self.patch.modified_files:
             if modified_file.path in self._get_relevant_changed_files():
                 with open(f"{post_commit_cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     new_file_content = f.read()
 
-                module_name = modified_file.path.replace(
-                    "/", ".").replace(".pyx", "").replace(".py", "")
+                module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
 
                 for hunk in modified_file:
                     start_line = hunk.target_start
@@ -133,10 +125,8 @@ class PullRequest:
         self.old_file_path_to_modified_lines = {}
         self.new_file_path_to_modified_lines = {}
 
-        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(
-            self.post_commit)
-        diff = post_commit_cloned_repo.repo.git.diff(
-            self.pre_commit, self.post_commit)
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
+        diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit)
         patch = PatchSet(diff)
 
         for patched_file in patch:
@@ -145,8 +135,6 @@ class PullRequest:
             for hunk in patched_file:
                 for line in hunk:
                     if line.is_removed:
-                        self.old_file_path_to_modified_lines[patched_file.path].add(
-                            line.source_line_no)
+                        self.old_file_path_to_modified_lines[patched_file.path].add(line.source_line_no)
                     elif line.is_added:
-                        self.new_file_path_to_modified_lines[patched_file.path].add(
-                            line.target_line_no)
+                        self.new_file_path_to_modified_lines[patched_file.path].add(line.target_line_no)

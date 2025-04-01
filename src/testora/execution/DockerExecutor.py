@@ -78,8 +78,7 @@ class DockerExecutor:
         exec_result = self.container.exec_run(command)
         output = exec_result.output.decode("utf-8")
 
-        self.copy_file_from_container(
-            "/tmp/coverage_report", ".")
+        self.copy_file_from_container("/tmp/coverage_report", ".")
         with open("coverage_report", "rb") as f:
             coverage_report = f.read()
 

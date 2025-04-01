@@ -36,8 +36,7 @@ etc.
 """
 
         return template.format(project_name=self.project_name,
-                               fut_qualified_names=", ".join(
-                                   self.fut_qualified_names),
+                               fut_qualified_names=", ".join(self.fut_qualified_names),
                                diff=self.diff)
 
     def remove_unnecessary_indentation(self, code):
@@ -61,8 +60,7 @@ etc.
                 if line.strip() == "```":
                     in_code = False
                     if next_test:
-                        next_test = self.remove_unnecessary_indentation(
-                            next_test)
+                        next_test = self.remove_unnecessary_indentation(next_test)
                         tests.append(next_test)
                         next_test = ""
                 if in_code:

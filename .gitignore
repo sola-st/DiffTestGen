@@ -20,3 +20,4 @@ candidate_projects*.csv
 coverage.json
 coverage_report
 .openrouter_token
+local

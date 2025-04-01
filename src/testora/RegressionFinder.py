@@ -1,12 +1,14 @@
 import argparse
 import glob
 import json
+from os.path import join
 from typing import List
 from github import Github, Auth
 from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
 from testora.llms.LLMCache import LLMCache
+from testora.prompts.FeedbackLoopPrompt import FeedbackTestGeneratorPrompt
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
 from testora.prompts.RegressionClassificationPromptV1 import RegressionClassificationPromptV1
@@ -27,7 +29,7 @@ from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
 from testora.util.UndefinedRefsFinder import get_undefined_references
 from testora.evaluation import EvalTaskManager
 from testora import Config
-from testora.execution.CoverageAnalyzer import summarize_coverage
+from local.CoverageAnalyzer import summarize_coverage
 
 llm = LLMCache(OpenAIGPT())
 
@@ -80,8 +82,7 @@ def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
 
     if len(test_executions) > 20:
         # split into chunks of at most 20 test executions
-        chunks = [test_executions[i:i + 20]
-                  for i in range(0, len(test_executions), 20)]
+        chunks = [test_executions[i:i + 20] for i in range(0, len(test_executions), 20)]
         all_outputs = []
         for chunk in chunks:
             all_outputs.extend(merge_tests_and_execute(chunk, docker_executor))
@@ -91,10 +92,8 @@ def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
     append_event(ErrorEvent(
         pr_nb=-1, message="Merged code", details=merged_code))
     # TODO: in case we ever revive this code, use the coverage report provided here
-    merged_outputs, coverage_report = docker_executor.execute_python_code(
-        merged_code)
-    append_event(ErrorEvent(
-        pr_nb=-1, message="Merged output", details=merged_outputs))
+    merged_outputs, coverage_report = docker_executor.execute_python_code(merged_code)
+    append_event(ErrorEvent(pr_nb=-1, message="Merged output", details=merged_outputs))
     merged_outputs = clean_output(merged_outputs)
     outputs = separate_outputs(merged_outputs)
     if len(outputs) == len(test_executions):
@@ -105,26 +104,21 @@ def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
         return [merged_outputs]
     else:
         mid = len(test_executions) // 2
-        test_executions_part1, test_executions_part2 = \
-            test_executions[:mid], test_executions[mid:]
-        outputs_part1 = merge_tests_and_execute(
-            test_executions_part1, docker_executor)
-        outputs_part2 = merge_tests_and_execute(
-            test_executions_part2, docker_executor)
+        test_executions_part1, test_executions_part2 = test_executions[:mid], test_executions[mid:]
+        outputs_part1 = merge_tests_and_execute(test_executions_part1, docker_executor)
+        outputs_part2 = merge_tests_and_execute(test_executions_part2, docker_executor)
         return outputs_part1 + outputs_part2
 
 
 def execute_test(test_execution, docker_executor):
-    output, coverage_report = docker_executor.execute_python_code(
-        test_execution.code)
+    output, coverage_report = docker_executor.execute_python_code(test_execution.code)
     output = clean_output(output)
     test_execution.output = output
     test_execution.coverage_report = coverage_report
 
 
 def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit):
-    cloned_repo = cloned_repo_manager.get_cloned_repo(
-        commit)
+    cloned_repo = cloned_repo_manager.get_cloned_repo(commit)
     container_name = cloned_repo.container_name
     docker_executor = DockerExecutor(container_name,
                                      project_name=cloned_repo_manager.repo_name,
@@ -134,8 +128,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit):
         Event(pr_nb=-1, message=f"Compiling {cloned_repo_manager.repo_name} at commit {commit} in container {container_name}"))
 
     # to trigger re-compilation (e.g., for pandas or scikit-learn)
-    docker_executor.execute_python_code(
-        f"import {cloned_repo_manager.module_name}")
+    docker_executor.execute_python_code(f"import {cloned_repo_manager.module_name}")
 
     append_event(
         Event(pr_nb=pr.number, message=f"Done with compiling {cloned_repo_manager.repo_name} at commit {commit}"))
@@ -158,8 +151,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit):
                                                 code=test_execution.code,
                                                 output=test_execution.output))
     except RecursionError as e:
-        raise TestoraException(
-            f"Exception during merge_tests_and_execute: {str(e)}")
+        raise TestoraException(f"Exception during merge_tests_and_execute: {str(e)}")
 
 
 def is_crash(output):
@@ -175,8 +167,7 @@ def generate_tests_with_prompt(pr, prompt, model, nb_samples=1):
 
     generated_tests = prompt.parse_answer(raw_answer)
     for idx, test in enumerate(generated_tests):
-        append_event(LLMEvent(pr_nb=pr.number,
-                     message=f"Generated test {idx+1}", content=test))
+        append_event(LLMEvent(pr_nb=pr.number, message=f"Generated test {idx+1}", content=test))
     return generated_tests
 
 
@@ -197,25 +188,19 @@ def generate_tests(pr, github_repo, changed_functions):
 
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
-        prompt_full_diff = RegressionTestGeneratorPrompt(
-            github_repo.name, changed_functions, full_diff)
-        all_tests.extend(generate_tests_with_prompt(
-            pr, prompt_full_diff, llm))
+        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, full_diff)
+        all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm))
 
         # full diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(
-        #     pr, prompt_full_diff, gpt35, nb_samples=10))
+        # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, nb_samples=10))
 
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
-        prompt_filtered_diff = RegressionTestGeneratorPrompt(
-            github_repo.name, changed_functions, filtered_diff)
-        all_tests.extend(generate_tests_with_prompt(
-            pr, prompt_filtered_diff, llm))
+        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff)
+        all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm))
 
         # filtered diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(
-        #     pr, prompt_filtered_diff, gpt35, nb_samples=10))
+        # all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, gpt35, nb_samples=10))
 
     # de-dup tests
     nb_tests_before_dedup_and_cleaning = len(all_tests)
@@ -228,19 +213,58 @@ def generate_tests(pr, github_repo, changed_functions):
                  message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
     return all_tests
 
+def generate_replacement_tests(pr, github_repo, changed_functions, pre_rounds_tests, fail_to_reach_change_indices):
+    '''
+    Generate replacment tests for the ones that failed to reach the changed lines, 
+    and keep different with the exisiting reached tests.
+     * Has a similar body to function generate_test, but with different inputs and prompt class.
+    ''' 
+
+    # prepare context used by one or more prompts
+    full_diff = pr.get_full_diff()
+    filtered_diff = pr.get_filtered_diff()
+
+    all_tests = []
+
+    if len(full_diff.split("\n")) <= 200:
+        # full diff with GPT4
+        prompt_full_diff = FeedbackTestGeneratorPrompt(
+            github_repo.name, changed_functions, full_diff, pre_rounds_tests, fail_to_reach_change_indices)
+        all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm))
+
+        # full diff with GPT3.5
+        # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, nb_samples=10))
+
+    if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
+        # filtered diff with GPT4
+        prompt_filtered_diff = FeedbackTestGeneratorPrompt(
+            github_repo.name, changed_functions, filtered_diff, pre_rounds_tests, fail_to_reach_change_indices)
+        all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm))
+
+        # filtered diff with GPT3.5
+        # all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, gpt35, nb_samples=10))
+
+    # de-dup tests
+    nb_tests_before_dedup_and_cleaning = len(all_tests)
+    all_tests = list(dict.fromkeys(all_tests))
+
+    # clean tests
+    all_tests = remove_tests_with_private_call(all_tests)
+
+    append_event(Event(pr_nb=pr.number,
+            message=f"RE: Generated {len(all_tests)} refined tests, for pre-round tests: {fail_to_reach_change_indices}.\n{nb_tests_before_dedup_and_cleaning} tests before deduplication and cleaning)"))
+    return all_tests
 
 def validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution):
     assert (old_execution.output is not None)
     assert (new_execution.output is not None)
 
     # re-execute test on old and new version and ignore flaky differences
-    for _ in range(10):
+    for _ in range(len(new_execution)):
         old_execution_repeated = TestExecution(old_execution.code)
-        execute_tests_on_commit(cloned_repo_manager,
-                                pr, [old_execution_repeated], pr.pre_commit)
+        execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit)
         new_execution_repeated = TestExecution(new_execution.code)
-        execute_tests_on_commit(cloned_repo_manager,
-                                pr, [new_execution_repeated], pr.post_commit)
+        execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit)
         if old_execution.output != old_execution_repeated.output:
             return False
         if new_execution.output != new_execution_repeated.output:
@@ -264,10 +288,8 @@ def reduce_test(cloned_repo_manager, pr, old_execution, new_execution):
     # execute all variants
     old_executions = [TestExecution(t) for t in increasingly_smaller_tests]
     new_executions = [TestExecution(t) for t in increasingly_smaller_tests]
-    execute_tests_on_commit(cloned_repo_manager, pr,
-                            old_executions, pr.pre_commit)
-    execute_tests_on_commit(cloned_repo_manager, pr,
-                            new_executions, pr.post_commit)
+    execute_tests_on_commit(cloned_repo_manager, pr, old_executions, pr.pre_commit)
+    execute_tests_on_commit(cloned_repo_manager, pr, new_executions, pr.post_commit)
 
     # find the last test that still shows a difference
     reduced_old_execution = old_execution
@@ -290,8 +312,7 @@ def reduce_test(cloned_repo_manager, pr, old_execution, new_execution):
 
 def check_if_present_in_main(cloned_repo_manager, pr, new_execution):
     main_execution = TestExecution(new_execution.code)
-    execute_tests_on_commit(cloned_repo_manager, pr, [
-                            main_execution], "main")
+    execute_tests_on_commit(cloned_repo_manager, pr, [main_execution], "main")
     return main_execution.output == new_execution.output
 
 
@@ -308,8 +329,7 @@ def classify_regression(project_name, pr, changed_functions, docstrings, old_exe
                            temperature=Config.classification_temp,
                            no_cache=no_cache,
                            nb_samples=nb_samples)
-    append_event(LLMEvent(pr_nb=pr.number,
-                          message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+    append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
     assert (nb_samples == len(raw_answer))
 
     all_results = []
@@ -337,8 +357,7 @@ def select_expected_behavior(project_name, pr, old_execution, new_execution, doc
     prompt = SelectExpectedBehaviorPrompt(
         project_name, old_execution.code, old_execution.output, new_execution.output, docstrings)
     raw_answer = llm.query(prompt, temperature=Config.classification_temp)
-    append_event(LLMEvent(pr_nb=pr.number,
-                          message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+    append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
     expected_behavior = prompt.parse_answer(raw_answer)
     append_event(SelectBehaviorEvent(pr_nb=pr.number,
                                      message="Selected expected behavior",
@@ -351,40 +370,112 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # nb_modified_code_files = len(pr.non_test_modified_python_files)
     nb_modified_code_files = len(pr.non_test_modified_code_files)
     if nb_modified_code_files == 0:
-        append_event(Event(
-            pr_nb=pr.github_pr.number, message="Ignoring because no non-test code files were modified"))
+        append_event(Event(pr_nb=pr.github_pr.number, message="Ignoring because no non-test code files were modified"))
         return
     if nb_modified_code_files > 3:
-        append_event(Event(
-            pr_nb=pr.number, message="Ignoring because too many non-test code files were modified"))
+        append_event(Event(pr_nb=pr.number, message="Ignoring because too many non-test code files were modified"))
         return
 
     # ignore if PR has more than one parent
     if Config.single_parent_PRs_only and len(pr.parents) != 1:
-        append_event(
-            Event(pr_nb=pr.number, message=f"Ignoring because PR has != 1 parent"))
+        append_event(Event(pr_nb=pr.number, message=f"Ignoring because PR has != 1 parent"))
         return
 
     # ignore if only comment changes
     if not pr.has_non_comment_change():
-        append_event(
-            Event(pr_nb=pr.number, message="Ignoring because only comments changed"))
+        append_event(Event(pr_nb=pr.number, message="Ignoring because only comments changed"))
         return
 
     # ignore if labeled as documentation-only change
     if pr.title.startswith("DOC"):
-        append_event(
-            Event(pr_nb=pr.number, message="Ignoring because labeled as 'DOC'"))
+        append_event(Event(pr_nb=pr.number, message="Ignoring because labeled as 'DOC'"))
         return
 
     # extract diff and names of changed functions
+    # changed_function : qualified names
+    # raw_info_changed_functions: file paths (with "/") and function names
     changed_functions = pr.get_changed_function_names()
+
+    # changed_functions, raw_info_changed_functions = pr.get_changed_function_names()
+    # # extract call gragh and dependency gragh
+    # output_dir = join("data", "results", github_repo.name)
+    # call_gragh, dependency_gragh = extract_graphs_from_specified_files(
+    #         github_repo, raw_info_changed_functions, output_dir)
+
+    # TODO extract existing tests
 
     # generate tests via LLM
     generated_tests = generate_tests(pr, github_repo, changed_functions)
-    if not generated_tests:
-        append_event(Event(pr_nb=pr.number,
-                           message="Ignoring because no tests were generated"))
+    old_executions, new_executions = run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests)
+
+    # analyze behavior of executions
+    for (old_execution, new_execution) in zip(old_executions, new_executions):
+        assert old_execution.output is not None
+        assert new_execution.output is not None
+
+        # check for behavioral differences
+        difference_found = old_execution.output != new_execution.output
+        if is_crash(old_execution.output) and is_crash(new_execution.output):
+            # ignore differences if both tests crash
+            append_event(ComparisonEvent(pr_nb=pr.number,
+                                         message=f"Both tests failed, considering them the same",
+                                         test_code=old_execution.code, old_output=old_execution.output,
+                                         new_output=new_execution.output))
+            continue
+        # if difference_found:
+        #     # double-check differences by re-executing the tests
+        #     difference_found_again = validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution)
+        #     if not difference_found_again:
+        #         difference_found = False
+
+        if not difference_found:
+            append_event(ComparisonEvent(pr_nb=pr.number,
+                                         message=f"Same output",
+                                         test_code=old_execution.code, old_output=old_execution.output,
+                                         new_output=new_execution.output))
+            continue
+
+        append_event(ComparisonEvent(pr_nb=pr.number,
+                                     message=f"Different outputs",
+                                     test_code=old_execution.code, old_output=old_execution.output,
+                                     new_output=new_execution.output))
+
+        # if difference found, reduce the test while still observing a difference
+        old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
+        assert old_execution.output != new_execution.output
+
+        # check if new output is still present in head of current main branch
+        if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
+            append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
+
+        # find docstrings
+        cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
+        docstrings = retrieve_relevant_docstrings(cloned_repo_of_new_commit, new_execution.code)
+
+        # if difference found, classify regression
+        assert old_execution.code == new_execution.code
+        is_regression_bug = classify_regression(
+            github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
+
+        # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
+        if is_regression_bug:
+            select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
+
+
+def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, \
+        changed_functions, generated_tests, old_executions:list=[], new_executions:list=[], round=0):
+    ''' 
+    A recursive function to run the generated tests and use the feedback for the next round test generation.
+    Loop ends when:
+     * reach the specified max round, or 
+     * one or more of the generated tests covers all the changed lines [may impractical], or
+     * one or more of the generated tests covers all the modified lines in a branch and all the non-branch lines, or
+     * the coverage is not raised for a fixed number of times.
+    '''
+
+    # TODO decide a max round, and util at least a full-coverage reahces.
+    if not generated_tests: # TODO does this really happen?
+        append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
         return
 
     if cloned_repo_manager.repo_name == "pandas":
@@ -405,100 +496,55 @@ def check_pr(github_repo, cloned_repo_manager, pr):
             if undefined_refs:
                 prompt = UndefinedRefsFixingPrompt(test, undefined_refs)
                 raw_answer = llm.query(prompt)[0]
-                append_event(LLMEvent(pr_nb=pr.number,
-                                      message="Raw answer", content=raw_answer))
+                append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
                 fixed_test = prompt.parse_answer(raw_answer)
-                append_event(LLMEvent(pr_nb=pr.number,
-                                      message="Fixed undefined references", content=fixed_test))
+                append_event(LLMEvent(pr_nb=pr.number, message="Fixed undefined references", content=fixed_test))
                 fixed_tests.append(fixed_test)
             else:
                 fixed_tests.append(test)
         generated_tests = fixed_tests
 
     # execute tests
-    old_executions = [TestExecution(t) for t in generated_tests]
-    new_executions = [TestExecution(t) for t in generated_tests]
+    old_executions_cur_round = [TestExecution(t) for t in generated_tests]
+    new_executions_cur_round = [TestExecution(t) for t in generated_tests]
+    old_executions.extend(old_executions_cur_round) # get the executions for all the rounds
+    new_executions.extend(new_executions_cur_round)
 
-    execute_tests_on_commit(cloned_repo_manager, pr,
-                            old_executions, pr.pre_commit)
-    execute_tests_on_commit(cloned_repo_manager, pr,
-                            new_executions, pr.post_commit)
+    execute_tests_on_commit(cloned_repo_manager, pr, old_executions_cur_round, pr.pre_commit)
+    execute_tests_on_commit(cloned_repo_manager, pr, new_executions_cur_round, pr.post_commit)
 
-    assert None not in [e.output for e in old_executions]
+    assert None not in [e.output for e in old_executions_cur_round]
 
     # analyze coverage during test execution
-    for (old_execution, new_execution) in zip(old_executions, new_executions):
+    fail_to_reach_change_indices = []
+    for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
         assert old_execution.coverage_report is not None
         assert new_execution.coverage_report is not None
-
-        diff_coverage_old = summarize_coverage(
-            pr, old_execution, is_old_version=True)
-        diff_coverage_new = summarize_coverage(
-            pr, new_execution, is_old_version=False)
+        # uncovered_modified_lines_old, uncovered_modified_lines_new
+        diff_coverage_old = summarize_coverage(pr, old_execution, is_old_version=True)
+        diff_coverage_new = summarize_coverage(pr, new_execution, is_old_version=False)
 
         details = f"Old: {diff_coverage_old}, New: {diff_coverage_new}"
         append_event(CoverageEvent(pr_nb=pr.number,
-                                   message="Diff coverage",
+                                   message=f"Diff coverage Round {round}",
                                    details=details))
+        # The loop ends refer to the uncovered modified lines in the new version.
+        # Because the deleted lines in old version also count as modified lines, and the deleted lines 
+        # this does not happen in new version, new version always get really modified and newly added lines.
+        # if uncovered_modified_lines_new:
+        if "0.00%" in diff_coverage_new:
+            # loop end criteria checking
+            fail_to_reach_change_indices.append(test_i)
 
-    # analyze behavior of executions
-    for (old_execution, new_execution) in zip(old_executions, new_executions):
-        assert old_execution.output is not None
-        assert new_execution.output is not None
+    if fail_to_reach_change_indices:
+        # feedback loop to get higher quality tests, coverage diff
+        # models has no memory, also provide the pre-round tests.
+        round+=1
+        if round < 2:
+            refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, generated_tests, fail_to_reach_change_indices)
+            run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, old_executions, new_executions, round)
 
-        # check for behavioral differences
-        difference_found = old_execution.output != new_execution.output
-        if is_crash(old_execution.output) and is_crash(new_execution.output):
-            # ignore differences if both tests crash
-            append_event(ComparisonEvent(pr_nb=pr.number,
-                                         message=f"Both tests failed, considering them the same",
-                                         test_code=old_execution.code, old_output=old_execution.output,
-                                         new_output=new_execution.output))
-            continue
-        if difference_found:
-            # double-check differences by re-executing the tests
-            difference_found_again = validate_output_difference(cloned_repo_manager,
-                                                                pr, old_execution, new_execution)
-            if not difference_found_again:
-                difference_found = False
-
-        if not difference_found:
-            append_event(ComparisonEvent(pr_nb=pr.number,
-                                         message=f"Same output",
-                                         test_code=old_execution.code, old_output=old_execution.output,
-                                         new_output=new_execution.output))
-            continue
-
-        append_event(ComparisonEvent(pr_nb=pr.number,
-                                     message=f"Different outputs",
-                                     test_code=old_execution.code, old_output=old_execution.output,
-                                     new_output=new_execution.output))
-
-        # if difference found, reduce the test while still observing a difference
-        old_execution, new_execution = reduce_test(cloned_repo_manager,
-                                                   pr, old_execution, new_execution)
-        assert old_execution.output != new_execution.output
-
-        # check if new output is still present in head of current main branch
-        if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
-            append_event(Event(pr_nb=pr.number,
-                               message="Difference not present in main anymore"))
-
-        # find docstrings
-        cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(
-            pr.post_commit)
-        docstrings = retrieve_relevant_docstrings(
-            cloned_repo_of_new_commit, new_execution.code)
-
-        # if difference found, classify regression
-        assert old_execution.code == new_execution.code
-        is_regression_bug = classify_regression(
-            github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
-
-        # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
-        if is_regression_bug:
-            select_expected_behavior(
-                github_repo.name, pr, old_execution, new_execution, docstrings)
+    return old_executions, new_executions
 
 
 def get_merged_prs(github_repo, max_prs):
@@ -538,12 +584,10 @@ def filter_and_sort_prs_by_risk(github_prs, cloned_repo_manager):
     for chunk in chunks:
         prompt = PRRegressionBugRanking(chunk, cloned_repo_manager.repo_name)
         raw_answer = llm.query(prompt)
-        append_event(LLMEvent(pr_nb=0,
-                              message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+        append_event(LLMEvent(pr_nb=0, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
         ranking_result = prompt.parse_answer(raw_answer)
         if ranking_result is None:
-            append_event(Event(pr_nb=0,
-                               message="Failed to parse ranking result; keeping them all"))
+            append_event(Event(pr_nb=0, message="Failed to parse ranking result; keeping them all"))
             all_medium_risk_prs.extend(chunk)
         else:
             high_risk_prs, medium_risk, _ = ranking_result
@@ -551,8 +595,7 @@ def filter_and_sort_prs_by_risk(github_prs, cloned_repo_manager):
             all_medium_risk_prs.extend(medium_risk)
 
     result = all_high_risk_prs + all_medium_risk_prs
-    append_event(Event(
-        pr_nb=0, message=f"Keeping {len(result)} high/medium-risk PRs out of {len(github_prs)} total PRs"))
+    append_event(Event(pr_nb=0, message=f"Keeping {len(result)} high/medium-risk PRs out of {len(github_prs)} total PRs"))
     return result
 
 
@@ -633,15 +676,12 @@ def fetch_and_check_prs():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Testora's main entry point")
-    parser.add_argument("--db", action="store_true",
-                        help="Run on PRs fetched from the database")
+    parser = argparse.ArgumentParser(description="Testora's main entry point")
+    parser.add_argument("--db", action="store_true", help="Run on PRs fetched from the database")
     parser.add_argument("--project", type=str,
                         help="Project to analyze",
                         choices=["keras", "marshmallow", "pandas", "scipy"])
-    parser.add_argument("--pr", type=int,
-                        help="PR number to analyze")
+    parser.add_argument("--pr", type=int, help="PR number to analyze")
     args = parser.parse_args()
 
     start_logging()
