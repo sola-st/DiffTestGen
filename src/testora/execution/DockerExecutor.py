@@ -55,6 +55,9 @@ class DockerExecutor:
         self.copy_code_to_container(code, "/tmp/Testora/Testora_test_code.py")
         coverage_files = ",".join(f"\"{f}\"" for f in self.coverage_files)
         # -u to avoid non-deterministic buffering
+        # coverage run: to get the coverage report.
+        # --include is a list of file name patterns. If specified, only files matching those patterns will be measured. 
+        # TODO --branch measure branch coverage
         command = (
             f"timeout 300s python -u -m coverage run "
             f"--include={coverage_files} "

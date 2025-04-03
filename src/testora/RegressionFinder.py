@@ -4,6 +4,7 @@ import json
 from os.path import join
 from typing import List
 from github import Github, Auth
+from testora.execution.CoverageAnalyzer import summarize_coverage
 from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
@@ -29,7 +30,6 @@ from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
 from testora.util.UndefinedRefsFinder import get_undefined_references
 from testora.evaluation import EvalTaskManager
 from testora import Config
-from local.CoverageAnalyzer import summarize_coverage
 
 llm = LLMCache(OpenAIGPT())
 
@@ -532,9 +532,11 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, \
         # Because the deleted lines in old version also count as modified lines, and the deleted lines 
         # this does not happen in new version, new version always get really modified and newly added lines.
         # if uncovered_modified_lines_new:
-        if "0.00%" in diff_coverage_new:
+        if " 0.0" in f"{diff_coverage_new}":
             # loop end criteria checking
-            fail_to_reach_change_indices.append(test_i)
+            # the index overall counts for full_diff tests and selected_diff
+            # e.g., 1, 2 for full_diff and 3, 4 (not another 1, 2) for selected diff
+            fail_to_reach_change_indices.append(test_i) 
 
     if fail_to_reach_change_indices:
         # feedback loop to get higher quality tests, coverage diff

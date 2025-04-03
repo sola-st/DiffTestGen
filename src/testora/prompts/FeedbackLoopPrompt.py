@@ -9,11 +9,14 @@ class FeedbackTestGeneratorPrompt:
 
     def create_prompt(self):
         template = """
-Your task is to refine the tests to achives a higher coverage of the changed code, the following diff shows the code under test and the changes:
+Your task is to refine the given tests of project {project_name} to achives a higher coverage of the changed code, the following diff shows the code under test and the changes:
 
 {diff}
 
-The following tests are generated in a pre-round test generation and Tests {fail_to_reach_change_indices} (index starts at 0) fail to execute the changed lines.
+The diff affects the following functions: {fut_qualified_names}.
+
+The following tests are generated with the same diff and function information in a pre-round test generation. 
+Tests {fail_to_reach_change_indices} (index starts at 0) fail to execute the changed lines.
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
@@ -21,16 +24,17 @@ Answer by giving a refined test for each test that failed to reach the changed l
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
-Wrap the refined test into Python code blocks by using the following output format:
+Wrap the refined test into Python code blocks by using the following output format (replace <ori> with the original prefix of the test, e.g., Refined Example 1.):
 ```python
-# Refined Example 1:
+# Refined <ori>:
 ...
 ```
+
 """
 
-        return template.format(project_name=self.project_name,
+        return template.format(diff=self.diff, project_name=self.project_name,
                                fut_qualified_names=", ".join(self.fut_qualified_names),
-                               diff=self.diff)
+                               fail_to_reach_change_indices = self.fail_to_reach_change_indices)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")
