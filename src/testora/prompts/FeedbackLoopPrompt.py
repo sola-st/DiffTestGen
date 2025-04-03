@@ -2,11 +2,10 @@ class FeedbackTestGeneratorPrompt:
     '''
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, fail_to_reach_change_indices, all_uncovered_modified_lines_info):
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_lines_info):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.fail_to_reach_change_indices = fail_to_reach_change_indices
         self.all_uncovered_modified_lines_info = all_uncovered_modified_lines_info # uncovered lines of both versions
         self.use_json_output = False
 
@@ -18,7 +17,10 @@ Your task is to generate usage examples of the project {project_name} to achieve
 
 The diff affects the following functions: {fut_qualified_names}.
 
-Each element in the following list specifies the lines from both the old and new versions that need to be covered. Generate a usage example for each element.
+Each element in the following set contains ranges specifying the lines from both the old and new versions that need to be covered.
+For example, an element with content: 'Specified lines that need to be covered: Old: [range(10, 13), range(20, 21)], New: [range(8, 9), range(15, 17)]' indicates that 
+the usage example should aim to cover lines 10, 11, 12 and 20 in old version, and lines 8, 15, and 16 in the new version. 
+For each element, generate a corresponding usage example.
 
 {all_uncovered_modified_lines_info}
 
@@ -26,17 +28,22 @@ The usage examples you create may use only the public API of the {project_name} 
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
-Wrap each individual example into Python code blocks by using the following output format (replace <index> with the corresponding index number, e.g., Refined Example 2.):
+Wrap each individual example into Python code blocks by using the following output format:
 ```python
-# Refined Example <index>:
+# New Example 1:
 ...
 ```
+```python
+# New Example 2:
+...
+```
+etc.
 """
 
+# TODO to clarify the prompt, now it fails to understand how to generate tests by generating for each range.
         return template.format(diff=self.diff, project_name=self.project_name, 
                                all_uncovered_modified_lines_info=self.all_uncovered_modified_lines_info,
-                               fut_qualified_names=", ".join(self.fut_qualified_names),
-                               fail_to_reach_change_indices = self.fail_to_reach_change_indices)
+                               fut_qualified_names=", ".join(self.fut_qualified_names))
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")
