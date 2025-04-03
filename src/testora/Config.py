@@ -29,6 +29,9 @@ classification_temp = 1.0
 # DeepSeek's recommended default: 0.6
 # classification_temp = 0.6
 
+# max round for feedback loop
+max_round = 3
+
 # different prompts for classification task
 classification_prompt_version = 4
 

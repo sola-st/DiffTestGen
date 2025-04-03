@@ -28,10 +28,6 @@ Wrap each individual example into Python code blocks by using the following outp
 # Example 2:
 ...
 ```
-```python
-# Example 3:
-...
-```
 etc.
 """
 

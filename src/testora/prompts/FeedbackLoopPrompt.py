@@ -1,38 +1,40 @@
 class FeedbackTestGeneratorPrompt:
-    def __init__(self, project_name, fut_qualified_names, diff, pre_rounds_tests, fail_to_reach_change_indices):
+    '''
+    Given the uncovered lines, let LLM generate some new tests that cover the lines.
+    '''
+    def __init__(self, project_name, fut_qualified_names, diff, fail_to_reach_change_indices, all_uncovered_modified_lines_info):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.pre_rounds_tests = pre_rounds_tests
         self.fail_to_reach_change_indices = fail_to_reach_change_indices
+        self.all_uncovered_modified_lines_info = all_uncovered_modified_lines_info # uncovered lines of both versions
         self.use_json_output = False
 
     def create_prompt(self):
         template = """
-Your task is to refine the given tests of project {project_name} to achives a higher coverage of the changed code, the following diff shows the code under test and the changes:
+Your task is to generate usage examples of the project {project_name} to achieve the highest possible coverage of the specified lines, the following diff shows the code under test and the changes:
 
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}.
 
-The following tests are generated with the same diff and function information in a pre-round test generation. 
-Tests {fail_to_reach_change_indices} (index starts at 0) fail to execute the changed lines.
+Each element in the following list specifies the lines from both the old and new versions that need to be covered. Generate a usage example for each element.
+
+{all_uncovered_modified_lines_info}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
-
-Answer by giving a refined test for each test that failed to reach the changed lines and make them non-repetitive with all the pre-round tests. 
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
-Wrap the refined test into Python code blocks by using the following output format (replace <ori> with the original prefix of the test, e.g., Refined Example 1.):
+Wrap each individual example into Python code blocks by using the following output format (replace <index> with the corresponding index number, e.g., Refined Example 2.):
 ```python
-# Refined <ori>:
+# Refined Example <index>:
 ...
 ```
-
 """
 
-        return template.format(diff=self.diff, project_name=self.project_name,
+        return template.format(diff=self.diff, project_name=self.project_name, 
+                               all_uncovered_modified_lines_info=self.all_uncovered_modified_lines_info,
                                fut_qualified_names=", ".join(self.fut_qualified_names),
                                fail_to_reach_change_indices = self.fail_to_reach_change_indices)
 

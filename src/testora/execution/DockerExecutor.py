@@ -57,7 +57,6 @@ class DockerExecutor:
         # -u to avoid non-deterministic buffering
         # coverage run: to get the coverage report.
         # --include is a list of file name patterns. If specified, only files matching those patterns will be measured. 
-        # TODO --branch measure branch coverage
         command = (
             f"timeout 300s python -u -m coverage run "
             f"--include={coverage_files} "

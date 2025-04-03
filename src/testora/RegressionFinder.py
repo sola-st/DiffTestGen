@@ -1,7 +1,6 @@
 import argparse
 import glob
 import json
-from os.path import join
 from typing import List
 from github import Github, Auth
 from testora.execution.CoverageAnalyzer import summarize_coverage
@@ -89,8 +88,7 @@ def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
         return all_outputs
 
     merged_code = merge_programs([test.code for test in test_executions])
-    append_event(ErrorEvent(
-        pr_nb=-1, message="Merged code", details=merged_code))
+    append_event(ErrorEvent(pr_nb=-1, message="Merged code", details=merged_code))
     # TODO: in case we ever revive this code, use the coverage report provided here
     merged_outputs, coverage_report = docker_executor.execute_python_code(merged_code)
     append_event(ErrorEvent(pr_nb=-1, message="Merged output", details=merged_outputs))
@@ -213,7 +211,7 @@ def generate_tests(pr, github_repo, changed_functions):
                  message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
     return all_tests
 
-def generate_replacement_tests(pr, github_repo, changed_functions, pre_rounds_tests, fail_to_reach_change_indices):
+def generate_replacement_tests(pr, github_repo, changed_functions, fail_to_reach_change_indices, all_uncovered_modified_lines_info):
     '''
     Generate replacment tests for the ones that failed to reach the changed lines, 
     and keep different with the exisiting reached tests.
@@ -228,8 +226,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, pre_rounds_te
 
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
-        prompt_full_diff = FeedbackTestGeneratorPrompt(
-            github_repo.name, changed_functions, full_diff, pre_rounds_tests, fail_to_reach_change_indices)
+        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
+                fail_to_reach_change_indices, all_uncovered_modified_lines_info)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm))
 
         # full diff with GPT3.5
@@ -237,8 +235,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, pre_rounds_te
 
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
-        prompt_filtered_diff = FeedbackTestGeneratorPrompt(
-            github_repo.name, changed_functions, filtered_diff, pre_rounds_tests, fail_to_reach_change_indices)
+        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
+                fail_to_reach_change_indices, all_uncovered_modified_lines_info)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm))
 
         # filtered diff with GPT3.5
@@ -409,6 +407,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     old_executions, new_executions = run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests)
 
     # analyze behavior of executions
+    # TODO do we want to filter out the test that covers no modified lines? since the execution is already there, maybe keep it.
+    # TODO add covered lines to show which lines introduce the behavioral differences.
     for (old_execution, new_execution) in zip(old_executions, new_executions):
         assert old_execution.output is not None
         assert new_execution.output is not None
@@ -462,8 +462,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
             select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
 
 
-def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, \
-        changed_functions, generated_tests, old_executions:list=[], new_executions:list=[], round=0):
+def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
+            old_executions:list=[], new_executions:list=[], round=0):
     ''' 
     A recursive function to run the generated tests and use the feedback for the next round test generation.
     Loop ends when:
@@ -474,7 +474,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, \
     '''
 
     # TODO decide a max round, and util at least a full-coverage reahces.
-    if not generated_tests: # TODO does this really happen?
+    if not generated_tests:
         append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
         return
 
@@ -517,33 +517,32 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, \
 
     # analyze coverage during test execution
     fail_to_reach_change_indices = []
+    all_uncovered_modified_lines_info = []
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
         assert old_execution.coverage_report is not None
         assert new_execution.coverage_report is not None
-        # uncovered_modified_lines_old, uncovered_modified_lines_new
-        diff_coverage_old = summarize_coverage(pr, old_execution, is_old_version=True)
-        diff_coverage_new = summarize_coverage(pr, new_execution, is_old_version=False)
+        
+        diff_coverage_old, uncovered_modified_lines_old = summarize_coverage(pr, old_execution, is_old_version=True)
+        diff_coverage_new, uncovered_modified_lines_new = summarize_coverage(pr, new_execution, is_old_version=False)
 
         details = f"Old: {diff_coverage_old}, New: {diff_coverage_new}"
-        append_event(CoverageEvent(pr_nb=pr.number,
-                                   message=f"Diff coverage Round {round}",
-                                   details=details))
-        # The loop ends refer to the uncovered modified lines in the new version.
-        # Because the deleted lines in old version also count as modified lines, and the deleted lines 
-        # this does not happen in new version, new version always get really modified and newly added lines.
-        # if uncovered_modified_lines_new:
-        if " 0.0" in f"{diff_coverage_new}":
-            # loop end criteria checking
-            # the index overall counts for full_diff tests and selected_diff
-            # e.g., 1, 2 for full_diff and 3, 4 (not another 1, 2) for selected diff
-            fail_to_reach_change_indices.append(test_i) 
+        append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage Round {round}", details=details))
+
+        if uncovered_modified_lines_old or uncovered_modified_lines_new:
+            fail_to_reach_change_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
+            # uncovered_info will be used in feedback prompt.
+            uncovered_info = f"Specified lines that need to be covered: Old: {uncovered_modified_lines_old}, New: {uncovered_modified_lines_new}"
+            all_uncovered_modified_lines_info.append(uncovered_info)
 
     if fail_to_reach_change_indices:
-        # feedback loop to get higher quality tests, coverage diff
-        # models has no memory, also provide the pre-round tests.
+        details = f"{fail_to_reach_change_indices}. Numbers start at 1."
+        append_event(CoverageEvent(pr_nb=pr.number, message=f"Tests need to be refined {round}", details=details))
+
+        # feedback loop to get tests cover more modified lines.
         round+=1
-        if round < 2:
-            refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, generated_tests, fail_to_reach_change_indices)
+        if round < 2: # Config.max_round:
+            refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, 
+                    fail_to_reach_change_indices, all_uncovered_modified_lines_info)
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, old_executions, new_executions, round)
 
     return old_executions, new_executions
