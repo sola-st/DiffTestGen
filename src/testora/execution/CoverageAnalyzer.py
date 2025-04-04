@@ -58,7 +58,7 @@ def summarize_coverage(pr, test_execution, is_old_version):
     all_covered_modified_lines_in_ranges = to_ranges(all_covered_modified_lines)
     all_uncovered_modified_lines_ranges = to_ranges(all_uncovered_modified_lines)
     return DiffCoverage(percentage_covered, total_modified_lines, total_covered_modified_lines), \
-            all_covered_modified_lines_in_ranges, all_uncovered_modified_lines_ranges
+            all_covered_modified_lines_in_ranges, all_uncovered_modified_lines_ranges, all_uncovered_modified_lines
 
 def to_ranges(numbers:set):
     # tranfer numbers to ranges, 

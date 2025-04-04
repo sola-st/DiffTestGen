@@ -464,9 +464,10 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     A recursive function to run the generated tests and use the feedback for the next round test generation.
     Loop ends when:
      ** reach the specified max round, or 
-     ** one or more of the generated tests covers all the changed lines [may impractical], or
-     *[so far, no branch information] one or more of the generated tests covers all the modified lines in a branch and all the non-branch lines, or
-     *[...] the coverage is not increased for a fixed number of times.
+     ** one or more of the generated tests covers all the changed lines [may impractical], or 
+     ** the coverage is not increased.
+
+    Initial generation is marked as round 0, and feedback loops marks start at round 1.
     '''
 
     if not generated_tests:
@@ -518,35 +519,41 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         assert old_execution.coverage_report is not None
         assert new_execution.coverage_report is not None
         
-        diff_coverage_old, covered_modified_lines_old, uncovered_modified_lines_old = summarize_coverage(pr, old_execution, is_old_version=True)
-        diff_coverage_new, covered_modified_lines_new, uncovered_modified_lines_new = summarize_coverage(pr, new_execution, is_old_version=False)
+        diff_coverage_old, covered_modified_lines_old, uncovered_modified_lines_old, uncovered_modified_lines_old_nbs = summarize_coverage(pr, old_execution, is_old_version=True)
+        diff_coverage_new, covered_modified_lines_new, uncovered_modified_lines_new, uncovered_modified_lines_new_nbs = summarize_coverage(pr, new_execution, is_old_version=False)
 
         details = f"Old: {diff_coverage_old}, New: {diff_coverage_new}\nUncovered modified lines: Old: {uncovered_modified_lines_old}, New: {uncovered_modified_lines_new}"
-        append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage Round {round}", details=details))
+        append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
         
         # get all the covered modified lines, corresponding to the 'old_executions' and 'new_executions'.
         all_covered_modified_lines_old.append(covered_modified_lines_old)
         all_covered_modified_lines_new.append(covered_modified_lines_new)
 
-        # Check whether to 
+        # Check whether to enter to the feebackloop
         if uncovered_modified_lines_old or uncovered_modified_lines_new:
             fail_to_reach_change_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
             # uncovered_info will be used in feedback prompt.
-            uncovered_info = f"Specified lines that need to be covered: Old: {uncovered_modified_lines_old}, New: {uncovered_modified_lines_new}"
+            uncovered_info = f"Specified lines that need to be covered: Old: [{','.join(map(str, uncovered_modified_lines_old_nbs))}], New: [{','.join(map(str, uncovered_modified_lines_new_nbs))}]"
             all_uncovered_modified_lines_info.add(uncovered_info)
         if not uncovered_modified_lines_old and not uncovered_modified_lines_new:
             # the test executes all the modified lines
             full_coverage_exists = True
             # still keep checking the coverage information
 
-    if fail_to_reach_change_indices and full_coverage_exists == False:
+    if (fail_to_reach_change_indices and full_coverage_exists == False): # no full coverage exists in all the tests
         round+=1
-        details = f"Tests need to be refined: {fail_to_reach_change_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_lines_info)}"
-        append_event(CoverageEvent(pr_nb=pr.number, 
-                message=f"Refinement round {round}, expected to get {len(fail_to_reach_change_indices)} more tests", details=details))
-
+        is_coverage_changed = True
+        if round > 1:
+            # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
+            if (covered_modified_lines_old in all_covered_modified_lines_old and covered_modified_lines_new in all_covered_modified_lines_new):
+                is_coverage_changed = False
+        
         # feedback loop to get tests cover more modified lines.
-        if round < 2: # Config.max_round:
+        if is_coverage_changed == True and round < Config.max_round:
+            details = f"Tests need to be refined: {fail_to_reach_change_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_lines_info)}"
+            append_event(CoverageEvent(pr_nb=pr.number, 
+                    message=f"Refinement, round {round}, expected to get {len(fail_to_reach_change_indices)} more tests", details=details))
+            
             refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_lines_info)
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
                     old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new, round)

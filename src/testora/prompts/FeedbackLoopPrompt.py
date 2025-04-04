@@ -2,7 +2,7 @@ class FeedbackTestGeneratorPrompt:
     '''
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_lines_info):
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_lines_info:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
@@ -11,16 +11,15 @@ class FeedbackTestGeneratorPrompt:
 
     def create_prompt(self):
         template = """
-Your task is to generate usage examples of the project {project_name} to achieve the highest possible coverage of the specified lines, the following diff shows the code under test and the changes:
+Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff, 
+and achieve the highest possible coverage of the specified lines in both the old and new versions:
 
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}.
 
-Each element in the following set contains ranges specifying the lines from both the old and new versions that need to be covered.
-For example, an element with content: 'Specified lines that need to be covered: Old: [range(10, 13), range(20, 21)], New: [range(8, 9), range(15, 17)]' indicates that 
-the usage example should aim to cover lines 10, 11, 12 and 20 in old version, and lines 8, 15, and 16 in the new version. 
-For each element, generate a corresponding usage example.
+Each element of the following set starts with 'Specified lines that need to be covered' and follows the specified lines from both the old and new versions that need to be covered.
+For each element, generate one corresponding usage example, i.e., here expected to generate {len} usage example(s).
 
 {all_uncovered_modified_lines_info}
 
@@ -43,6 +42,7 @@ etc.
 # TODO to clarify the prompt, now it fails to understand how to generate tests by generating for each range.
         return template.format(diff=self.diff, project_name=self.project_name, 
                                all_uncovered_modified_lines_info=self.all_uncovered_modified_lines_info,
+                               len = len(self.all_uncovered_modified_lines_info),
                                fut_qualified_names=", ".join(self.fut_qualified_names))
 
     def remove_unnecessary_indentation(self, code):
