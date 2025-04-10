@@ -389,7 +389,9 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # extract diff and names of changed functions
     # changed_function : qualified names
     # raw_info_changed_functions: file paths (with "/") and function names
-    changed_functions = pr.get_changed_function_names()
+    # changed_functions = pr.get_changed_function_names()
+    # TODO the '__' is the old_changed_functions
+    __, changed_functions = pr.get_changed_function_names_and_non_executable_lines()
 
     # changed_functions, raw_info_changed_functions = pr.get_changed_function_names()
     # # extract call gragh and dependency gragh
@@ -547,6 +549,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
             if (covered_modified_lines_old in all_covered_modified_lines_old and covered_modified_lines_new in all_covered_modified_lines_new):
                 is_coverage_changed = False
+            else:
+                append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info in not change anymore."))
         
         # feedback loop to get tests cover more modified lines.
         if is_coverage_changed == True and round < Config.max_round:
@@ -557,6 +561,10 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_lines_info)
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
                     old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new, round)
+        else:
+            append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
+    else:
+        append_event(Event(pr_nb=pr.number, message=f"Refinement ends, full coverage exists."))
 
     return old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new
 

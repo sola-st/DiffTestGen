@@ -3,6 +3,7 @@ import urllib.request
 
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
+from testora.util.PythonCodeUtil2 import analyze_file_and_function
 
 
 class PullRequest:
@@ -17,7 +18,10 @@ class PullRequest:
 
         self._pr_url_to_patch()
         self._compute_non_test_modified_files()
-        self._compute_modified_lines()
+
+        self._compute_modified_lines() # all modified lines, includes the non-excutable ones
+        self.old_file_path_to_exec_modified_lines = {} # only executable modified lines
+        self.new_file_path_to_exec_modified_lines = {} # expected format of its element: {file_path: set()}
 
     def _pr_url_to_patch(self):
         diff_url = self.github_pr.html_url + ".diff"
@@ -106,7 +110,7 @@ class PullRequest:
                     new_file_content = f.read()
 
                 module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
-
+                # H: what about if a file has multiple classes
                 for hunk in modified_file:
                     start_line = hunk.target_start
                     end_line = hunk.target_start + hunk.target_length
@@ -120,21 +124,61 @@ class PullRequest:
 
         result = list(dict.fromkeys(result))
         return result
+    
+    def get_changed_function_names_and_non_executable_lines(self):
+        pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
+        pre_result = self.get_helper(pre_commit_cloned_repo, "pre")
+        post_result = self.get_helper(post_commit_cloned_repo, "post")
+        return pre_result, post_result
+    
+    def get_helper(self, cloned_repo, version):
+        changed_functions = []
+
+        for modified_file in self.patch.modified_files:
+            if modified_file.path in self._get_relevant_changed_files():
+                with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
+                    file_content = f.read()
+
+                module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
+
+                patch_ranges = []
+                for hunk in modified_file:
+                    start_line = hunk.target_start
+                    end_line = hunk.target_start + hunk.target_length
+                    patch_range = (start_line, end_line) # numbers start at 1 andend_line included
+                    patch_ranges.append(patch_range) 
+
+                non_exec_lines, functions = analyze_file_and_function(file_content, patch_ranges) # dict
+                for func in functions: # func, name, start ab line, end ab line (included)
+                    changed_functions.append(f"{module_name}.{func[0]}")
+                    # TODO the start and end lines of the functions are available if needed, like consider only the executable lines intra these functions.
+            
+            if version == "pre":
+                all_modified_line_from_cur_file = self.old_file_path_to_all_modified_lines[modified_file.path]
+                exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
+                self.old_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
+            elif version == "post":
+                all_modified_line_from_cur_file = self.new_file_path_to_all_modified_lines[modified_file.path]
+                exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
+                self.new_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
+
+        return changed_functions
 
     def _compute_modified_lines(self):
-        self.old_file_path_to_modified_lines = {}
-        self.new_file_path_to_modified_lines = {}
+        self.old_file_path_to_all_modified_lines = {}
+        self.new_file_path_to_all_modified_lines = {}
 
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit)
         patch = PatchSet(diff)
 
         for patched_file in patch:
-            self.old_file_path_to_modified_lines[patched_file.path] = set()
-            self.new_file_path_to_modified_lines[patched_file.path] = set()
+            self.old_file_path_to_all_modified_lines[patched_file.path] = set()
+            self.new_file_path_to_all_modified_lines[patched_file.path] = set()
             for hunk in patched_file:
                 for line in hunk:
                     if line.is_removed:
-                        self.old_file_path_to_modified_lines[patched_file.path].add(line.source_line_no)
+                        self.old_file_path_to_all_modified_lines[patched_file.path].add(line.source_line_no)
                     elif line.is_added:
-                        self.new_file_path_to_modified_lines[patched_file.path].add(line.target_line_no)
+                        self.new_file_path_to_all_modified_lines[patched_file.path].add(line.target_line_no)

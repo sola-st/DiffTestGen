@@ -5,11 +5,11 @@ from coverage.data import CoverageData
 @dataclass
 class DiffCoverage:
     percentage_covered: float
-    total_modified_lines: int
-    total_covered_modified_lines: int
+    total_exec_modified_lines: int
+    total_covered_exec_modified_lines: int
 
     def __str__(self):
-        return f"Coverage: {self.percentage_covered:.2%} ({self.total_covered_modified_lines}/{self.total_modified_lines})"
+        return f"Coverage: {self.percentage_covered:.2%} ({self.total_covered_exec_modified_lines}/{self.total_exec_modified_lines})"
 
 def summarize_coverage(pr, test_execution, is_old_version):
     # get coverage data
@@ -25,18 +25,18 @@ def summarize_coverage(pr, test_execution, is_old_version):
 
     # check coverage for modified files
     # focus on the numbers of lines
-    total_modified_lines = 0
-    total_covered_modified_lines = 0
+    total_exec_modified_lines = 0
+    total_covered_exec_modified_lines = 0
     # focus on the details lines, specifically which lines are uncovered
-    all_modified_lines = set()
-    all_covered_modified_lines = set()
+    all_exec_modified_lines = set()
+    all_covered_exec_modified_lines = set()
     target_files = pr.non_test_modified_python_files
     for target_file in target_files:
         # get modified lines
         if is_old_version:
-            modified_lines = pr.old_file_path_to_modified_lines[target_file]
+            exec_modified_lines = pr.old_file_path_to_exec_modified_lines[target_file]
         else:
-            modified_lines = pr.new_file_path_to_modified_lines[target_file]
+            exec_modified_lines = pr.new_file_path_to_exec_modified_lines[target_file]
 
         # get covered lines
         covered_lines = coverage_data.lines(file_prefix + target_file)
@@ -44,21 +44,22 @@ def summarize_coverage(pr, test_execution, is_old_version):
             # happens, e.g., when generated test doesn't invoke the tested project
             covered_lines = set()
 
-        total_modified_lines += len(modified_lines)
-        covered_modified_lines = set(modified_lines) & set(covered_lines)
-        total_covered_modified_lines += len(covered_modified_lines)
+        total_exec_modified_lines += len(exec_modified_lines)
+        covered_exec_modified_lines = set(exec_modified_lines) & set(covered_lines)
+        total_covered_exec_modified_lines += len(covered_exec_modified_lines)
 
-        all_modified_lines = all_modified_lines.union(modified_lines)
-        all_covered_modified_lines = all_covered_modified_lines.union(covered_modified_lines)
+        all_exec_modified_lines = all_exec_modified_lines.union(exec_modified_lines)
+        all_covered_exec_modified_lines = all_covered_exec_modified_lines.union(covered_exec_modified_lines)
 
-    percentage_covered = total_covered_modified_lines / total_modified_lines if total_modified_lines > 0 else 0
-    all_uncovered_modified_lines = all_modified_lines.difference(all_covered_modified_lines)
+    # here 0/0 counts as 100% coverage.
+    percentage_covered = total_covered_exec_modified_lines / total_exec_modified_lines if total_exec_modified_lines > 0 else 1
+    all_uncovered_exec_modified_lines = all_exec_modified_lines.difference(all_covered_exec_modified_lines)
 
     # transfer the individual line numbers to ranges
-    all_covered_modified_lines_in_ranges = to_ranges(all_covered_modified_lines)
-    all_uncovered_modified_lines_ranges = to_ranges(all_uncovered_modified_lines)
-    return DiffCoverage(percentage_covered, total_modified_lines, total_covered_modified_lines), \
-            all_covered_modified_lines_in_ranges, all_uncovered_modified_lines_ranges, all_uncovered_modified_lines
+    all_covered_exec_modified_lines_in_ranges = to_ranges(all_covered_exec_modified_lines)
+    all_uncovered_exec_modified_lines_ranges = to_ranges(all_uncovered_exec_modified_lines)
+    return DiffCoverage(percentage_covered, total_exec_modified_lines, total_covered_exec_modified_lines), \
+            all_covered_exec_modified_lines_in_ranges, all_uncovered_exec_modified_lines_ranges, all_uncovered_exec_modified_lines
 
 def to_ranges(numbers:set):
     # tranfer numbers to ranges, 
