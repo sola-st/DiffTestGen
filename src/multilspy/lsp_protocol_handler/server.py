@@ -299,7 +299,7 @@ class LanguageServerHandler:
                 if not line:
                     continue
                 self._log("LSP stderr: " + line.decode(ENCODING))
-        except (BrokenPipeError, ConnectionResetError, StopLoopException):
+        except (BrokenPipeError, ConnectionResetError, StopLoopException, asyncio.CancelledError):
             pass
 
     async def _handle_body(self, body: bytes) -> None:

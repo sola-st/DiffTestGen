@@ -127,8 +127,8 @@ class PullRequest:
     
     def get_changed_function_names_and_non_executable_lines(self):
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         pre_result = self.get_helper(pre_commit_cloned_repo, "pre")
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         post_result = self.get_helper(post_commit_cloned_repo, "post")
         return pre_result, post_result
     
@@ -153,15 +153,15 @@ class PullRequest:
                 for func in functions: # func, name, start ab line, end ab line (included)
                     changed_functions.append(f"{module_name}.{func[0]}")
                     # TODO the start and end lines of the functions are available if needed, like consider only the executable lines intra these functions.
-            
-            if version == "pre":
-                all_modified_line_from_cur_file = self.old_file_path_to_all_modified_lines[modified_file.path]
-                exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
-                self.old_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
-            elif version == "post":
-                all_modified_line_from_cur_file = self.new_file_path_to_all_modified_lines[modified_file.path]
-                exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
-                self.new_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
+                
+                if version == "pre":
+                    all_modified_line_from_cur_file = self.old_file_path_to_all_modified_lines[modified_file.path]
+                    exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
+                    self.old_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
+                elif version == "post":
+                    all_modified_line_from_cur_file = self.new_file_path_to_all_modified_lines[modified_file.path]
+                    exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
+                    self.new_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
 
         return changed_functions
 

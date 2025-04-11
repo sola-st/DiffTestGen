@@ -255,15 +255,15 @@ def validate_output_difference(cloned_repo_manager, pr, old_execution, new_execu
     assert (new_execution.output is not None)
 
     # re-execute test on old and new version and ignore flaky differences
-    for _ in range(len(new_execution)):
-        old_execution_repeated = TestExecution(old_execution.code)
-        execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit, "old")
-        new_execution_repeated = TestExecution(new_execution.code)
-        execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit, "new")
-        if old_execution.output != old_execution_repeated.output:
-            return False
-        if new_execution.output != new_execution_repeated.output:
-            return False
+    # for _ in range(len(new_execution)): # H: default to 1?
+    old_execution_repeated = TestExecution(old_execution.code)
+    execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit, "old")
+    new_execution_repeated = TestExecution(new_execution.code)
+    execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit, "new")
+    if old_execution.output != old_execution_repeated.output:
+        return False
+    if new_execution.output != new_execution_repeated.output:
+        return False
     return True
 
 
@@ -423,11 +423,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
                     test_code=old_execution.code, old_output=old_execution.output,
                     new_output=new_execution.output))
             continue
-        # if difference_found:
-        #     # double-check differences by re-executing the tests
-        #     difference_found_again = validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution)
-        #     if not difference_found_again:
-        #         difference_found = False
+        if difference_found:
+            # double-check differences by re-executing the tests
+            difference_found_again = validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution)
+            if not difference_found_again:
+                difference_found = False
 
         if not difference_found:
             append_event(ComparisonEvent(pr_nb=pr.number, message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
@@ -543,9 +543,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             # still keep checking the coverage information
 
     if (fail_to_reach_change_indices and full_coverage_exists == False): # no full coverage exists in all the tests
-        round+=1
         is_coverage_changed = True
-        if round > 1:
+        if round > 1: # initail round is 0, and feedback loop starts from 1, here we expected Config.max_round feedback loops.
             # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
             if (covered_modified_lines_old in all_covered_modified_lines_old and covered_modified_lines_new in all_covered_modified_lines_new):
                 is_coverage_changed = False
@@ -554,6 +553,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         
         # feedback loop to get tests cover more modified lines.
         if is_coverage_changed == True and round < Config.max_round:
+            round+=1
             details = f"Tests need to be refined: {fail_to_reach_change_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_lines_info)}"
             append_event(CoverageEvent(pr_nb=pr.number, 
                     message=f"Refinement, round {round}, expected to get {len(fail_to_reach_change_indices)} more tests", details=details))
