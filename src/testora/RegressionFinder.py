@@ -8,7 +8,12 @@ from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
 from testora.llms.LLMCache import LLMCache
-from testora.prompts.FeedbackLoopPrompt import FeedbackTestGeneratorPrompt
+from testora.prompts.RegressionTestGeneratorPromptV1 import RegressionTestGeneratorPromptV1
+from testora.prompts.RegressionTestGeneratorPromptV2 import RegressionTestGeneratorPromptV2
+from testora.prompts.RegressionTestGeneratorPromptV3 import RegressionTestGeneratorPromptV3
+from testora.prompts.FeedbackLoopPromptV1 import FeedbackTestGeneratorPromptV1
+from testora.prompts.FeedbackLoopPromptV2 import FeedbackTestGeneratorPromptV2
+from testora.prompts.FeedbackLoopPromptV3 import FeedbackTestGeneratorPromptV3
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
 from testora.prompts.RegressionClassificationPromptV1 import RegressionClassificationPromptV1
@@ -17,7 +22,6 @@ from testora.prompts.RegressionClassificationPromptV3 import RegressionClassific
 from testora.prompts.RegressionClassificationPromptV4 import RegressionClassificationPromptV4
 from testora.prompts.RegressionClassificationPromptV5 import RegressionClassificationPromptV5
 from testora.prompts.RegressionClassificationPromptV6 import RegressionClassificationPromptV6
-from testora.prompts.RegressionTestGeneratorPrompt import RegressionTestGeneratorPrompt
 from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorPrompt
 from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
@@ -45,6 +49,19 @@ elif Config.classification_prompt_version == 5:
 elif Config.classification_prompt_version == 6:
     RegressionClassificationPrompt = RegressionClassificationPromptV6
 
+if Config.initial_test_generation_prompt_version == 1:
+    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV1
+elif Config.initial_test_generation_prompt_version == 2:
+    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV2
+elif Config.initial_test_generation_prompt_version == 3:
+    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV3
+
+if Config.feedback_test_generation_prompt_version == 1:
+    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV1
+elif Config.feedback_test_generation_prompt_version == 2:
+    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV2
+elif Config.feedback_test_generation_prompt_version == 3:
+    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV3
 
 def clean_output(output):
     # remove warnings caused by coverage measurements
@@ -185,7 +202,7 @@ def generate_tests(pr, github_repo, changed_functions):
 
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
-        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, full_diff)
+        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, pr.old_file_contents, pr.new_file_contents)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -193,7 +210,7 @@ def generate_tests(pr, github_repo, changed_functions):
 
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
-        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff)
+        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, pr.old_file_contents, pr.new_file_contents)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -225,7 +242,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
 
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
-        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, all_uncovered_modified_lines_info)
+        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
+                all_uncovered_modified_lines_info, pr.old_file_contents, pr.new_file_contents)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -233,7 +251,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
 
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
-        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, all_uncovered_modified_lines_info)
+        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
+                all_uncovered_modified_lines_info, pr.old_file_contents, pr.new_file_contents)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5

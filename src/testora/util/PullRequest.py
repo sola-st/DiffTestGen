@@ -23,6 +23,9 @@ class PullRequest:
         self.old_file_path_to_exec_modified_lines = {} # only executable modified lines
         self.new_file_path_to_exec_modified_lines = {} # expected format of its element: {file_path: set()}
 
+        self.old_file_contents = {}
+        self.new_file_contents = {}
+
     def _pr_url_to_patch(self):
         diff_url = self.github_pr.html_url + ".diff"
         diff = urllib.request.urlopen(diff_url)
@@ -84,12 +87,19 @@ class PullRequest:
             raise Exception(f"Unexpected configuration value: {Config.code_change_pl}")
 
     def get_filtered_diff(self):
+        pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
-
         diff_parts = []
         for file_path in self._get_relevant_changed_files():
             raw_diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit, file_path)
             diff_parts.append(raw_diff)
+
+            # collect old and new file contents
+            with open(f"{pre_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
+                self.old_file_contents.update({file_path: f.read()})
+            
+            with open(f"{post_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
+                self.new_file_contents.update({file_path: f.read()})
 
         return "\n\n".join(diff_parts)
 

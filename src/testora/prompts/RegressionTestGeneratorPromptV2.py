@@ -1,49 +1,45 @@
-class FeedbackTestGeneratorPrompt:
-    '''
-    Given the uncovered lines, let LLM generate some new tests that cover the lines.
-    '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_lines_info:set):
+class RegressionTestGeneratorPromptV2:
+    def __init__(self, project_name, fut_qualified_names, diff, old_file_contents:set, new_file_contents:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.all_uncovered_modified_lines_info = all_uncovered_modified_lines_info # uncovered lines of both versions
+        self.old_file_contents = old_file_contents
         self.use_json_output = False
 
     def create_prompt(self):
         template = """
-Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff, 
-and achieve the highest possible coverage of the specified lines in both the old and new versions:
+Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff:
 
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}.
 
-Each element of the following set starts with 'Specified lines that need to be covered' and follows the specified lines from both the old and new versions that need to be covered.
-For each element, generate one corresponding usage example, i.e., here expected to generate {len} usage example(s).
+The following set contains the old versions of the changed files, where each element consists of a file path and a list of its lines.
 
-{all_uncovered_modified_lines_info}
+{old_file_contents}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
+
+Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
 Wrap each individual example into Python code blocks by using the following output format:
 ```python
-# New Example 1:
+# Example 1:
 ...
 ```
 ```python
-# New Example 2:
+# Example 2:
 ...
 ```
 etc.
 """
 
-# TODO to clarify the prompt, now it fails to understand how to generate tests by generating for each range.
-        return template.format(diff=self.diff, project_name=self.project_name, 
-                               all_uncovered_modified_lines_info=self.all_uncovered_modified_lines_info,
-                               len = len(self.all_uncovered_modified_lines_info),
-                               fut_qualified_names=", ".join(self.fut_qualified_names))
+        return template.format(project_name=self.project_name,
+                               fut_qualified_names=", ".join(self.fut_qualified_names),
+                               diff=self.diff,
+                               old_file_contents=self.old_file_contents)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")

@@ -35,6 +35,12 @@ max_round = 3
 # different prompts for classification task
 classification_prompt_version = 4
 
+# different prompts for initial round (0th) test generation
+initial_test_generation_prompt_version = 2
+
+# different prompts for feedback rounds (1th - {max_round}th) test generation
+feedback_test_generation_prompt_version = 2
+
 # KEEP THIS AT THE END: log the current configuration
 current_globals = set(globals().keys())
 config_parameters = current_globals - initial_globals

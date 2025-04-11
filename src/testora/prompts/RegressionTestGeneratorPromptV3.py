@@ -1,8 +1,10 @@
-class RegressionTestGeneratorPrompt:
-    def __init__(self, project_name, fut_qualified_names, diff):
+class RegressionTestGeneratorPromptV3:
+    def __init__(self, project_name, fut_qualified_names, diff, old_file_contents:set, new_file_contents:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
+        self.old_file_contents = old_file_contents
+        self.new_file_contents = new_file_contents
         self.use_json_output = False
 
     def create_prompt(self):
@@ -13,9 +15,19 @@ Your task is to generate usage examples of the {project_name} project that expos
 
 The diff affects the following functions: {fut_qualified_names}.
 
+The following sets contains the old and new versions of the changed files, where each element consists of a file path and a list of its lines.
+
+Old version: 
+
+{old_file_contents}
+
+New version:
+
+{new_file_contents}
+
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
-Answer by giving ten usage examples that cover normal usage scenarios and ten usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
+Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
@@ -33,7 +45,8 @@ etc.
 
         return template.format(project_name=self.project_name,
                                fut_qualified_names=", ".join(self.fut_qualified_names),
-                               diff=self.diff)
+                               diff=self.diff,
+                               old_file_contents=self.old_file_contents)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")
