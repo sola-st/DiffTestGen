@@ -3,13 +3,13 @@ class FeedbackTestGeneratorPromptV3:
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
     def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_lines_info:set,
-                old_file_contents:set, new_file_contents:set):
+                old_context:set, new_context:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
         self.all_uncovered_modified_lines_info = all_uncovered_modified_lines_info # uncovered lines of both versions
-        self.old_file_contents = old_file_contents
-        self.new_file_contents = new_file_contents
+        self.old_context = old_context
+        self.new_context = new_context
         self.use_json_output = False
 
     def create_prompt(self):
@@ -25,11 +25,11 @@ The following sets contains the old and new versions of the changed files, where
 
 Old version: 
 
-{old_file_contents}
+{old_context}
 
 New version:
 
-{new_file_contents}
+{new_context}
 
 Each element of the following set starts with 'Specified lines that need to be covered' and follows the specified lines from both the old and new versions that need to be covered.
 For each element, generate one corresponding usage example, i.e., here expected to generate {len} usage example(s).
@@ -56,8 +56,8 @@ etc.
                                all_uncovered_modified_lines_info=self.all_uncovered_modified_lines_info,
                                len = len(self.all_uncovered_modified_lines_info),
                                fut_qualified_names=", ".join(self.fut_qualified_names),
-                               old_file_contents = self.old_file_contents,
-                               new_file_contents = self.new_file_contents)
+                               old_context = self.old_context,
+                               new_context = self.new_context)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")

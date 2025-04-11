@@ -202,7 +202,7 @@ def generate_tests(pr, github_repo, changed_functions):
 
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
-        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, pr.old_file_contents, pr.new_file_contents)
+        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -210,7 +210,7 @@ def generate_tests(pr, github_repo, changed_functions):
 
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
-        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, pr.old_file_contents, pr.new_file_contents)
+        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -243,7 +243,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
         prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
-                all_uncovered_modified_lines_info, pr.old_file_contents, pr.new_file_contents)
+                all_uncovered_modified_lines_info, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -252,7 +252,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
         prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
-                all_uncovered_modified_lines_info, pr.old_file_contents, pr.new_file_contents)
+                all_uncovered_modified_lines_info, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -409,8 +409,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # changed_function : qualified names
     # raw_info_changed_functions: file paths (with "/") and function names
     # changed_functions = pr.get_changed_function_names()
-    # TODO the '__' is the old_changed_functions
-    __, changed_functions = pr.get_changed_function_names_and_non_executable_lines()
+    pre_result, post_result  = pr.get_changed_function_names_and_non_executable_lines()
+    old_changed_functions, old_changed_functions_code = pre_result
+    changed_functions, new_changed_functions_code = post_result
+    pr.old_context = old_changed_functions_code
+    pr.new_context = new_changed_functions_code
 
     # changed_functions, raw_info_changed_functions = pr.get_changed_function_names()
     # # extract call gragh and dependency gragh

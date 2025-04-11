@@ -23,8 +23,11 @@ class PullRequest:
         self.old_file_path_to_exec_modified_lines = {} # only executable modified lines
         self.new_file_path_to_exec_modified_lines = {} # expected format of its element: {file_path: set()}
 
-        self.old_file_contents = {}
-        self.new_file_contents = {}
+        # the following two sets could contains:
+        #    the entire file contents, or only the modified functions, or something else
+        # serve as a extra context provider.
+        self.old_context = {} 
+        self.new_context = {}
 
     def _pr_url_to_patch(self):
         diff_url = self.github_pr.html_url + ".diff"
@@ -87,19 +90,23 @@ class PullRequest:
             raise Exception(f"Unexpected configuration value: {Config.code_change_pl}")
 
     def get_filtered_diff(self):
-        pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
+        pre_commit_cloned_repo = None
+        if Config.context_version == 1: # provide the entire file content as context for query.
+            pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
+
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         diff_parts = []
         for file_path in self._get_relevant_changed_files():
             raw_diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit, file_path)
             diff_parts.append(raw_diff)
 
-            # collect old and new file contents
-            with open(f"{pre_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
-                self.old_file_contents.update({file_path: f.read()})
-            
-            with open(f"{post_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
-                self.new_file_contents.update({file_path: f.read()})
+            if Config.context_version == 1:
+                # collect old and new file contents
+                with open(f"{pre_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
+                    self.old_context.update({file_path: f.read()})
+                
+                with open(f"{post_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
+                    self.new_context.update({file_path: f.read()})
 
         return "\n\n".join(diff_parts)
 
@@ -159,7 +166,7 @@ class PullRequest:
                     patch_range = (start_line, end_line) # numbers start at 1 andend_line included
                     patch_ranges.append(patch_range) 
 
-                non_exec_lines, functions = analyze_file_and_function(file_content, patch_ranges) # dict
+                non_exec_lines, functions, functions_code = analyze_file_and_function(file_content, patch_ranges) # dict
                 for func in functions: # func, name, start ab line, end ab line (included)
                     changed_functions.append(f"{module_name}.{func[0]}")
                     # TODO the start and end lines of the functions are available if needed, like consider only the executable lines intra these functions.
@@ -173,7 +180,7 @@ class PullRequest:
                     exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
                     self.new_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
 
-        return changed_functions
+        return changed_functions, functions_code
 
     def _compute_modified_lines(self):
         self.old_file_path_to_all_modified_lines = {}

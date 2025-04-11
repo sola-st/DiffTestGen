@@ -3,7 +3,7 @@ class FeedbackTestGeneratorPromptV1:
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
     def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_lines_info:set,
-                old_file_contents:set, new_file_contents:set):
+                old_context:set, new_context:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff

@@ -1,9 +1,9 @@
 class RegressionTestGeneratorPromptV2:
-    def __init__(self, project_name, fut_qualified_names, diff, old_file_contents:set, new_file_contents:set):
+    def __init__(self, project_name, fut_qualified_names, diff, old_context:set, new_context:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.old_file_contents = old_file_contents
+        self.old_context = old_context
         self.use_json_output = False
 
     def create_prompt(self):
@@ -16,7 +16,7 @@ The diff affects the following functions: {fut_qualified_names}.
 
 The following set contains the old versions of the changed files, where each element consists of a file path and a list of its lines.
 
-{old_file_contents}
+{old_context}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
@@ -39,7 +39,7 @@ etc.
         return template.format(project_name=self.project_name,
                                fut_qualified_names=", ".join(self.fut_qualified_names),
                                diff=self.diff,
-                               old_file_contents=self.old_file_contents)
+                               old_context=self.old_context)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")

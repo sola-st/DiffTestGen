@@ -1,5 +1,5 @@
 class RegressionTestGeneratorPromptV1:
-    def __init__(self, project_name, fut_qualified_names, diff, old_file_contents:set, new_file_contents:set):
+    def __init__(self, project_name, fut_qualified_names, diff, old_context:set, new_context:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff

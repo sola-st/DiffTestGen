@@ -41,6 +41,10 @@ initial_test_generation_prompt_version = 2
 # different prompts for feedback rounds (1th - {max_round}th) test generation
 feedback_test_generation_prompt_version = 2
 
+# different versions of contexts
+# 1. file, 2. function, 3. line_set
+context_version = 2
+
 # KEEP THIS AT THE END: log the current configuration
 current_globals = set(globals().keys())
 config_parameters = current_globals - initial_globals

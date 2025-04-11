@@ -33,6 +33,7 @@ class FileNonExecutableLineFinder(cst.CSTVisitor):
 
 
 def analyze_file_and_function(code: str, patch_ranges: list):
+    # Retrun non_exec_lines and modified function names.
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
@@ -57,7 +58,6 @@ def analyze_file_and_function(code: str, patch_ranges: list):
             func_name, start_line, end_line = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
-                # TODO is this possible and correct?
                 matched_functions.add(func) # Consider multiple functions involved in a single range
 
     # 4. Return 
