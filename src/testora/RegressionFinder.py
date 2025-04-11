@@ -424,6 +424,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     generated_tests = generate_tests(pr, github_repo, changed_functions)
     old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new = \
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests)
+    if all_covered_modified_lines_old == None:
+        return
 
     # analyze behavior of executions
     # TODO do we want to filter out the test that covers no modified lines? since the execution is already there, maybe keep it.
@@ -493,7 +495,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
     if not generated_tests:
         append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
-        return
+        return old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new
+        return None, None, None, None
 
     if cloned_repo_manager.repo_name == "pandas":
         # make sure the tests import pandas
