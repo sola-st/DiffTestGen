@@ -581,7 +581,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
                     old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new, round)
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
+            if is_coverage_changed == True:
+                append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
     else:
         append_event(Event(pr_nb=pr.number, message=f"Refinement ends, full coverage exists."))
 
