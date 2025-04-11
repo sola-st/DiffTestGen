@@ -495,7 +495,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
     if not generated_tests:
         append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
-        return old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new
+        # return old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new
         return None, None, None, None
 
     if cloned_repo_manager.repo_name == "pandas":
