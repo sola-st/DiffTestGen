@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from coverage.data import CoverageData
+
+import coverage
 
 
 @dataclass
@@ -16,8 +17,8 @@ def summarize_coverage(pr, test_execution, is_old_version):
     tmp_coverage_file = "coverage_report"
     with open(tmp_coverage_file, "wb") as f:
         f.write(test_execution.coverage_report)
-    coverage_data = CoverageData(tmp_coverage_file)
-    coverage_data.read()
+    cov = coverage.Coverage(tmp_coverage_file)
+    cov.load()
 
     # adapt file paths from the container's file system
     project_name = pr.cloned_repo_manager.repo_name
@@ -30,16 +31,22 @@ def summarize_coverage(pr, test_execution, is_old_version):
     # focus on the details lines, specifically which lines are uncovered
     all_exec_modified_lines = set()
     all_covered_exec_modified_lines = set()
+    
     target_files = pr.non_test_modified_python_files
     for target_file in target_files:
-        # get modified lines
-        if is_old_version:
-            exec_modified_lines = pr.old_file_path_to_exec_modified_lines[target_file]
-        else:
-            exec_modified_lines = pr.new_file_path_to_exec_modified_lines[target_file]
+        analysis = cov.analysis2(f"{file_prefix}{target_file}")
+        # excluded_lines means the lines that were specified to be excluded. 
+        # uncovered_lines: [30, 31], uncovered_lines_str: 30-31
+        filename, executable_lines, excluded_lines, uncovered_lines, uncovered_lines_str = analysis
 
-        # get covered lines
-        covered_lines = coverage_data.lines(file_prefix + target_file)
+        # get executable modified lines
+        if is_old_version:
+            exec_modified_lines = pr.old_file_path_to_all_modified_lines[target_file].intersection(set(executable_lines))
+        else:
+            exec_modified_lines = pr.new_file_path_to_all_modified_lines[target_file].intersection(set(executable_lines))
+
+        # get covered lines, if a line was covered, which exactly means it is coverable
+        covered_lines = set(executable_lines) - set(uncovered_lines)
         if covered_lines is None:
             # happens, e.g., when generated test doesn't invoke the tested project
             covered_lines = set()
