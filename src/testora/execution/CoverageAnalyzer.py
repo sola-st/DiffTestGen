@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-
 import coverage
 
 
@@ -34,9 +33,10 @@ def summarize_coverage(pr, test_execution, is_old_version):
     
     target_files = pr.non_test_modified_python_files
     for target_file in target_files:
-        analysis = cov.analysis2(f"{file_prefix}{target_file}")
+        analysis = cov.analysis2(file_prefix + target_file)
         # excluded_lines means the lines that were specified to be excluded. 
         # uncovered_lines: [30, 31], uncovered_lines_str: 30-31
+        # the executable_lines should be the same for the same file. TODO Deduplicate?
         filename, executable_lines, excluded_lines, uncovered_lines, uncovered_lines_str = analysis
 
         # get executable modified lines
@@ -62,13 +62,10 @@ def summarize_coverage(pr, test_execution, is_old_version):
     percentage_covered = total_covered_exec_modified_lines / total_exec_modified_lines if total_exec_modified_lines > 0 else 1
     all_uncovered_exec_modified_lines = all_exec_modified_lines.difference(all_covered_exec_modified_lines)
 
-    # transfer the individual line numbers to ranges
-    all_covered_exec_modified_lines_in_ranges = to_ranges(all_covered_exec_modified_lines)
-    all_uncovered_exec_modified_lines_ranges = to_ranges(all_uncovered_exec_modified_lines)
     return DiffCoverage(percentage_covered, total_exec_modified_lines, total_covered_exec_modified_lines), \
-            all_covered_exec_modified_lines_in_ranges, all_uncovered_exec_modified_lines_ranges, all_uncovered_exec_modified_lines
+            total_exec_modified_lines, all_covered_exec_modified_lines, all_uncovered_exec_modified_lines
 
-def to_ranges(numbers:set):
+def set_to_ranges(numbers:set):
     # tranfer numbers to ranges, 
     # e.g., from {1, 2, 10, 11, 12, 13, 25} to [range(1, 3), range(10, 14), range(25, 26)]
     ranges = []
@@ -83,3 +80,27 @@ def to_ranges(numbers:set):
 
         ranges.append(range(start, sorted_numbers[-1] + 1))
     return ranges
+
+def range_to_set(ranges:list):
+    number_list = []
+    for ran in ranges():
+        number_list.extend(list(ran))
+
+    number_set = set(number_list)
+    sorted_number_set = sorted(number_set)
+
+    return sorted_number_set
+
+def set_to_ranges_in_batch(list_of_set):
+    list_of_ranges = []
+    for number_set in list_of_set:
+        ranges = set_to_ranges(number_set)
+        list_of_ranges.append(ranges)
+    return list_of_ranges
+
+def ranges_to_set_in_batch(list_of_ranges):
+    list_of_set = []
+    for ranges in list_of_ranges:
+        nb_set = range_to_set(ranges)
+        list_of_set.append(nb_set)
+    return list_of_set

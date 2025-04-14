@@ -1,4 +1,5 @@
 import os
+import coverage
 import docker
 import tarfile
 import tempfile
@@ -47,7 +48,7 @@ class DockerExecutor:
 
         os.remove(temp_tar_file)
 
-    def execute_python_code(self, code):
+    def execute_python_code(self, code, analysis=False):
         # create a fresh directory to get rid of any old state
         self.container.exec_run("rm -rf /tmp/Testora")
         self.container.exec_run("mkdir /tmp/Testora")
@@ -81,10 +82,18 @@ class DockerExecutor:
         output = exec_result.output.decode("utf-8")
 
         self.copy_file_from_container("/tmp/coverage_report", ".")
-        with open("coverage_report", "rb") as f:
-            coverage_report = f.read()
+        if analysis == False:
+            with open("coverage_report", "rb") as f:
+                coverage_report = f.read()
 
-            return output, coverage_report
+                return output, coverage_report
+        else:
+            self.analysis_coverage()
+
+    def analysis_coverage(self):
+        cov = coverage.Coverage("/tmp/coverage_report")
+        cov.load()
+        # TODO Check the feasibility
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import urllib.request
 
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
-from testora.util.PythonCodeUtil2 import analyze_file_and_function
+from testora.util.PythonCodeUtil3 import analyze_file_and_function
 
 
 class PullRequest:

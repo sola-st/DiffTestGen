@@ -3,7 +3,7 @@ import glob
 import json
 from typing import List
 from github import Github, Auth
-from testora.execution.CoverageAnalyzer import summarize_coverage
+from testora.execution.CoverageAnalyzer import set_to_ranges_in_batch, summarize_coverage
 from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
@@ -126,7 +126,8 @@ def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
 
 
 def execute_test(test_execution, docker_executor):
-    output, coverage_report = docker_executor.execute_python_code(test_execution.code)
+    # True -> to analyze the coverage info inside the container
+    output, coverage_report = docker_executor.execute_python_code(test_execution.code, True)
     output = clean_output(output)
     test_execution.output = output
     test_execution.coverage_report = coverage_report
@@ -485,7 +486,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
 
 def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
-            old_executions:list=[], new_executions:list=[], all_covered_modified_lines_old:list=[], all_covered_modified_lines_new:list=[], round=0):
+            old_executions:list=[], new_executions:list=[], all_covered_modified_lines_old:list=[], all_covered_modified_lines_new:list=[], 
+            round=0, total_exec_recorded=False):
     ''' 
     A recursive function to run the generated tests and use the feedback for the next round test generation.
     Loop ends when:
@@ -542,14 +544,30 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     fail_to_reach_change_indices = []
     all_uncovered_modified_lines_info = set()
     full_coverage_exists = False
+
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
         assert old_execution.coverage_report is not None
         assert new_execution.coverage_report is not None
         
-        diff_coverage_old, covered_modified_lines_old, uncovered_modified_lines_old, uncovered_modified_lines_old_nbs = summarize_coverage(pr, old_execution, is_old_version=True)
-        diff_coverage_new, covered_modified_lines_new, uncovered_modified_lines_new, uncovered_modified_lines_new_nbs = summarize_coverage(pr, new_execution, is_old_version=False)
+        diff_coverage_old, total_exec_modified_lines_old, covered_modified_lines_old, uncovered_modified_lines_old = summarize_coverage(pr, old_execution, is_old_version=True)
+        diff_coverage_new, total_exec_modified_lines_new, covered_modified_lines_new, uncovered_modified_lines_new = summarize_coverage(pr, new_execution, is_old_version=False)
 
-        details = f"Old: {diff_coverage_old}, New: {diff_coverage_new}\nUncovered modified lines: Old: {uncovered_modified_lines_old}, New: {uncovered_modified_lines_new}"
+        # transfer the individual line numbers to ranges
+        total_exec_modified_lines_old_ranges, covered_modified_lines_old_ranges, uncovered_modified_lines_old_ranges = set_to_ranges_in_batch(
+                [total_exec_modified_lines_old, covered_modified_lines_old, uncovered_modified_lines_old])
+        total_exec_modified_lines_new_ranges, covered_modified_lines_new_ranges, uncovered_modified_lines_new_ranges = set_to_ranges_in_batch(
+                [total_exec_modified_lines_new, covered_modified_lines_new, uncovered_modified_lines_new])
+        
+        if total_exec_recorded == False: # Record the event only once
+            details = f"All executable/coverable modified lines: Old: {total_exec_modified_lines_old_ranges}, New: {total_exec_modified_lines_new_ranges}"
+            append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, all rounds", details=details))
+            total_exec_recorded = True
+
+        # Uncovered modified lines are recorded for further checking,
+        # Covered modified lines are recorded for later union coverage calculating
+        details = (f"Old: {diff_coverage_old}, New: {diff_coverage_new}\n"
+                f"Uncovered modified lines: Old: {uncovered_modified_lines_old_ranges}, New: {uncovered_modified_lines_new_ranges}\n"
+                f"Covered modified lines: Old {covered_modified_lines_old_ranges}, New: {covered_modified_lines_new_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
         
         # get all the covered modified lines, corresponding to the 'old_executions' and 'new_executions'.
@@ -560,7 +578,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         if uncovered_modified_lines_old or uncovered_modified_lines_new:
             fail_to_reach_change_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
             # uncovered_info will be used in feedback prompt.
-            uncovered_info = f"Specified lines that need to be covered: Old: [{','.join(map(str, uncovered_modified_lines_old_nbs))}], New: [{','.join(map(str, uncovered_modified_lines_new_nbs))}]"
+            uncovered_info = f"Specified lines that need to be covered: Old: [{','.join(map(str, uncovered_modified_lines_old))}], New: [{','.join(map(str, uncovered_modified_lines_new))}]"
             all_uncovered_modified_lines_info.add(uncovered_info)
         if not uncovered_modified_lines_old and not uncovered_modified_lines_new:
             # the test executes all the modified lines
@@ -585,7 +603,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             
             refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_lines_info)
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
-                    old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new, round)
+                    old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new, round, total_exec_recorded)
         else:
             if is_coverage_changed == True:
                 append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
