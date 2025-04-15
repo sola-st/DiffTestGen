@@ -1,4 +1,6 @@
+import argparse
 from dataclasses import dataclass
+import json
 import coverage
 
 
@@ -11,39 +13,32 @@ class DiffCoverage:
     def __str__(self):
         return f"Coverage: {self.percentage_covered:.2%} ({self.total_covered_exec_modified_lines}/{self.total_exec_modified_lines})"
 
-def summarize_coverage(pr, test_execution, is_old_version):
-    # get coverage data
-    tmp_coverage_file = "coverage_report"
-    with open(tmp_coverage_file, "wb") as f:
-        f.write(test_execution.coverage_report)
-    cov = coverage.Coverage(tmp_coverage_file)
+def analyze_coverage(coverage_report_file, coverage_files, version, \
+            old_file_path_to_exec_modified_lines, new_file_path_to_exec_modified_lines):
+    cov = coverage.Coverage(coverage_report_file) # default to be "/tmp/coverage_report"
     cov.load()
-
-    # adapt file paths from the container's file system
-    project_name = pr.cloned_repo_manager.repo_name
-    file_prefix = f"/home/{project_name}/"
-
+    
     # check coverage for modified files
-    # focus on the numbers of lines
+    # 1. focus on the numbers of lines
     total_exec_modified_lines = 0
     total_covered_exec_modified_lines = 0
-    # focus on the details lines, specifically which lines are uncovered
+    # 2. focus on the details lines, specifically which lines are uncovered
     all_exec_modified_lines = set()
     all_covered_exec_modified_lines = set()
     
-    target_files = pr.non_test_modified_python_files
-    for target_file in target_files:
-        analysis = cov.analysis2(file_prefix + target_file)
+    for file in coverage_files:
+        analysis = cov.analysis2(file)
         # excluded_lines means the lines that were specified to be excluded. 
         # uncovered_lines: [30, 31], uncovered_lines_str: 30-31
         # the executable_lines should be the same for the same file. TODO Deduplicate?
         filename, executable_lines, excluded_lines, uncovered_lines, uncovered_lines_str = analysis
 
         # get executable modified lines
-        if is_old_version:
-            exec_modified_lines = pr.old_file_path_to_all_modified_lines[target_file].intersection(set(executable_lines))
-        else:
-            exec_modified_lines = pr.new_file_path_to_all_modified_lines[target_file].intersection(set(executable_lines))
+        exec_modified_lines = None
+        if version == "old":
+            exec_modified_lines = old_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_lines))
+        elif version == "new":
+            exec_modified_lines = new_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_lines))
 
         # get covered lines, if a line was covered, which exactly means it is coverable
         covered_lines = set(executable_lines) - set(uncovered_lines)
@@ -62,8 +57,20 @@ def summarize_coverage(pr, test_execution, is_old_version):
     percentage_covered = total_covered_exec_modified_lines / total_exec_modified_lines if total_exec_modified_lines > 0 else 1
     all_uncovered_exec_modified_lines = all_exec_modified_lines.difference(all_covered_exec_modified_lines)
 
-    return DiffCoverage(percentage_covered, total_exec_modified_lines, total_covered_exec_modified_lines), \
-            total_exec_modified_lines, all_covered_exec_modified_lines, all_uncovered_exec_modified_lines
+    # transfer the individual line numbers to ranges
+    total_exec_modified_lines_ranges, covered_modified_lines_ranges, uncovered_modified_lines_ranges = \
+            set_to_ranges_in_batch([all_exec_modified_lines, all_covered_exec_modified_lines, all_uncovered_exec_modified_lines])
+    
+    coverage_percentage = DiffCoverage(percentage_covered, total_exec_modified_lines, total_covered_exec_modified_lines)
+
+    json_str_to_send_out = {
+        "total_exec_modified_lines_ranges": f"{total_exec_modified_lines_ranges}",
+        "covered_modified_lines_ranges": f"{covered_modified_lines_ranges}",
+        "uncovered_modified_lines_ranges": f"{uncovered_modified_lines_ranges}",
+        "coverage_percentage": f"{coverage_percentage}"
+    }
+
+    print(json.dumps(json_str_to_send_out)) # send this out from the container
 
 def set_to_ranges(numbers:set):
     # tranfer numbers to ranges, 
@@ -83,7 +90,7 @@ def set_to_ranges(numbers:set):
 
 def range_to_set(ranges:list):
     number_list = []
-    for ran in ranges():
+    for ran in ranges:
         number_list.extend(list(ran))
 
     number_set = set(number_list)
@@ -104,3 +111,21 @@ def ranges_to_set_in_batch(list_of_ranges):
         nb_set = range_to_set(ranges)
         list_of_set.append(nb_set)
     return list_of_set
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--coverage_report', required=True)
+    parser.add_argument('--coverage_files', nargs='+', required=True)
+    parser.add_argument('--version', required=True)
+    parser.add_argument('--exec_modified_lines_old', type=str, required=True)
+    parser.add_argument('--exec_modified_lines_new', type=str, required=True)
+    args = parser.parse_args()
+
+    old_tmp = json.loads(args.exec_modified_lines_old)
+    new_tmp = json.loads(args.exec_modified_lines_new)
+    old_file_path_to_exec_modified_lines = {k: set(v) if isinstance(v, list) else v for k, v in old_tmp.items()}
+    new_file_path_to_exec_modified_lines = {k: set(v) if isinstance(v, list) else v for k, v in new_tmp.items()}
+
+    analyze_coverage(args.coverage_report, args.coverage_files, args.version, \
+            old_file_path_to_exec_modified_lines, new_file_path_to_exec_modified_lines)

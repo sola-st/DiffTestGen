@@ -1,5 +1,6 @@
+import io
+import json
 import os
-import coverage
 import docker
 import tarfile
 import tempfile
@@ -8,8 +9,9 @@ from os import chdir, getcwd
 
 
 class DockerExecutor:
-    def __init__(self, container_name, project_name, coverage_files):
+    def __init__(self, pr, container_name, project_name, coverage_files):
         client = docker.from_env()
+        self.pr = pr
         self.container = client.containers.get(container_name)
         self.container.start()
 
@@ -48,7 +50,7 @@ class DockerExecutor:
 
         os.remove(temp_tar_file)
 
-    def execute_python_code(self, code, analysis=False):
+    def execute_python_code(self, code, analysis=False, version=None, test_execution=None):
         # create a fresh directory to get rid of any old state
         self.container.exec_run("rm -rf /tmp/Testora")
         self.container.exec_run("mkdir /tmp/Testora")
@@ -81,19 +83,43 @@ class DockerExecutor:
         exec_result = self.container.exec_run(command)
         output = exec_result.output.decode("utf-8")
 
+        if analysis == True:
+            # copy CoverageAnalyzer.py to the container root directory
+            tar_stream = io.BytesIO()
+            with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+                tar.add("src/testora/execution/CoverageAnalyzer.py", arcname="CoverageAnalyzer.py")
+            tar_stream.seek(0)
+            self.container.put_archive("/", tar_stream.read())
+
+            # Convert all sets to lists
+            old_tmp = {k: list(v) if isinstance(v, set) else v for k, v in self.pr.old_file_path_to_all_modified_lines.items()}
+            new_tmp = {k: list(v) if isinstance(v, set) else v for k, v in self.pr.new_file_path_to_all_modified_lines.items()}
+            old_file_path_to_all_modified_lines = json.dumps(old_tmp)
+            new_file_path_to_all_modified_lines = json.dumps(new_tmp)
+
+            analysis_command = (f"python /CoverageAnalyzer.py "
+                f"--coverage_report /tmp/coverage_report " 
+                f"--coverage_files {' '.join(self.coverage_files)} "
+                f"--version {version} "
+                f"--exec_modified_lines_old \'{old_file_path_to_all_modified_lines}\' "
+                f"--exec_modified_lines_new \'{new_file_path_to_all_modified_lines}\'")
+            # TODO intsall this when create the containers
+            self.container.exec_run("python3 -m pip install coverage") 
+            analysis_results = self.container.exec_run(analysis_command)
+            analysis_output = analysis_results.output.decode()
+            if analysis_output:
+                result_json_str = json.loads(analysis_output)
+                test_execution.all_executable_modified_line_ranges = eval(result_json_str["total_exec_modified_lines_ranges"])
+                test_execution.all_covered_exec_modified_line_ranges = eval(result_json_str["covered_modified_lines_ranges"])
+                test_execution.all_uncovered_exec_modified_line_ranges = eval(result_json_str["uncovered_modified_lines_ranges"])
+                test_execution.coverage_percentage = result_json_str["coverage_percentage"]
+
+            self.container.exec_run("rm -rf CoverageAnalyzer.py")
+            
         self.copy_file_from_container("/tmp/coverage_report", ".")
-        if analysis == False:
-            with open("coverage_report", "rb") as f:
-                coverage_report = f.read()
-
-                return output, coverage_report
-        else:
-            self.analysis_coverage()
-
-    def analysis_coverage(self):
-        cov = coverage.Coverage("/tmp/coverage_report")
-        cov.load()
-        # TODO Check the feasibility
+        with open("coverage_report", "rb") as f:
+            coverage_report = f.read()
+            return output, coverage_report
 
 
 if __name__ == "__main__":

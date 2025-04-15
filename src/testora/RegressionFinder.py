@@ -3,7 +3,7 @@ import glob
 import json
 from typing import List
 from github import Github, Auth
-from testora.execution.CoverageAnalyzer import set_to_ranges_in_batch, summarize_coverage
+from testora.execution.CoverageAnalyzer import range_to_set
 from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
@@ -89,7 +89,7 @@ def clean_output(output):
     return "\n".join(result)
 
 
-def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
+def merge_tests_and_execute(test_executions, docker_executor, version) -> List[str]:
     """
     Try to merge all tests into a single program (for efficiency, to avoid repeated imports and Python engine startup).
     If this fails (e.g., due to segfault of Python), execute smaller subsets of tests at once.
@@ -101,13 +101,14 @@ def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
         chunks = [test_executions[i:i + 20] for i in range(0, len(test_executions), 20)]
         all_outputs = []
         for chunk in chunks:
-            all_outputs.extend(merge_tests_and_execute(chunk, docker_executor))
+            all_outputs.extend(merge_tests_and_execute(chunk, docker_executor, version))
         return all_outputs
 
     merged_code = merge_programs([test.code for test in test_executions])
     append_event(ErrorEvent(pr_nb=-1, message="Merged code", details=merged_code))
     # TODO: in case we ever revive this code, use the coverage report provided here
-    merged_outputs, coverage_report = docker_executor.execute_python_code(merged_code)
+    # TODO: H: check when this works and if the new changes makes sense.
+    merged_outputs, coverage_report = docker_executor.execute_python_code(merged_code, version=version)
     append_event(ErrorEvent(pr_nb=-1, message="Merged output", details=merged_outputs))
     merged_outputs = clean_output(merged_outputs)
     outputs = separate_outputs(merged_outputs)
@@ -120,14 +121,15 @@ def merge_tests_and_execute(test_executions, docker_executor) -> List[str]:
     else:
         mid = len(test_executions) // 2
         test_executions_part1, test_executions_part2 = test_executions[:mid], test_executions[mid:]
-        outputs_part1 = merge_tests_and_execute(test_executions_part1, docker_executor)
-        outputs_part2 = merge_tests_and_execute(test_executions_part2, docker_executor)
+        outputs_part1 = merge_tests_and_execute(test_executions_part1, docker_executor, version)
+        outputs_part2 = merge_tests_and_execute(test_executions_part2, docker_executor, version)
         return outputs_part1 + outputs_part2
 
 
-def execute_test(test_execution, docker_executor):
+def execute_test(test_execution, docker_executor, version):
     # True -> to analyze the coverage info inside the container
-    output, coverage_report = docker_executor.execute_python_code(test_execution.code, True)
+    output, coverage_report = docker_executor.execute_python_code(test_execution.code, \
+            analysis=True, version=version, test_execution=test_execution)
     output = clean_output(output)
     test_execution.output = output
     test_execution.coverage_report = coverage_report
@@ -136,7 +138,7 @@ def execute_test(test_execution, docker_executor):
 def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, version):
     cloned_repo = cloned_repo_manager.get_cloned_repo(commit)
     container_name = cloned_repo.container_name
-    docker_executor = DockerExecutor(container_name,
+    docker_executor = DockerExecutor(pr, container_name,
             project_name=cloned_repo_manager.repo_name,
             coverage_files=pr.non_test_modified_python_files)
 
@@ -151,7 +153,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
 
     try:
         if Config.use_program_merger:
-            outputs = merge_tests_and_execute(test_executions, docker_executor)
+            outputs = merge_tests_and_execute(test_executions, docker_executor, version)
             assert len(outputs) == len(test_executions)
             for output, test_execution in zip(outputs, test_executions):
                 test_execution.output = output
@@ -161,7 +163,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
                                                 output=output))
         else:
             for test_execution in test_executions:
-                execute_test(test_execution, docker_executor)
+                execute_test(test_execution, docker_executor, version)
                 append_event(TestExecutionEvent(pr_nb=pr.number,
                                                 message=f"Test execution ({version})",
                                                 code=test_execution.code,
@@ -546,35 +548,30 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     full_coverage_exists = False
 
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
-        assert old_execution.coverage_report is not None
-        assert new_execution.coverage_report is not None
-        
-        diff_coverage_old, total_exec_modified_lines_old, covered_modified_lines_old, uncovered_modified_lines_old = summarize_coverage(pr, old_execution, is_old_version=True)
-        diff_coverage_new, total_exec_modified_lines_new, covered_modified_lines_new, uncovered_modified_lines_new = summarize_coverage(pr, new_execution, is_old_version=False)
-
-        # transfer the individual line numbers to ranges
-        total_exec_modified_lines_old_ranges, covered_modified_lines_old_ranges, uncovered_modified_lines_old_ranges = set_to_ranges_in_batch(
-                [total_exec_modified_lines_old, covered_modified_lines_old, uncovered_modified_lines_old])
-        total_exec_modified_lines_new_ranges, covered_modified_lines_new_ranges, uncovered_modified_lines_new_ranges = set_to_ranges_in_batch(
-                [total_exec_modified_lines_new, covered_modified_lines_new, uncovered_modified_lines_new])
+        assert old_execution.coverage_percentage is not None
+        assert new_execution.coverage_percentage is not None
         
         if total_exec_recorded == False: # Record the event only once
-            details = f"All executable/coverable modified lines: Old: {total_exec_modified_lines_old_ranges}, New: {total_exec_modified_lines_new_ranges}"
+            details = f"All executable/coverable modified lines: Old: {old_execution.all_executable_modified_line_ranges}, New: {new_execution.all_executable_modified_line_ranges}"
             append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, all rounds", details=details))
             total_exec_recorded = True
 
         # Uncovered modified lines are recorded for further checking,
         # Covered modified lines are recorded for later union coverage calculating
-        details = (f"Old: {diff_coverage_old}, New: {diff_coverage_new}\n"
-                f"Uncovered modified lines: Old: {uncovered_modified_lines_old_ranges}, New: {uncovered_modified_lines_new_ranges}\n"
-                f"Covered modified lines: Old {covered_modified_lines_old_ranges}, New: {covered_modified_lines_new_ranges}")
+        details = (f"Old: {old_execution.coverage_percentage}, New: {new_execution.coverage_percentage}\n"
+                f"Uncovered modified lines: Old: {old_execution.all_uncovered_exec_modified_line_ranges}, New: {new_execution.all_uncovered_exec_modified_line_ranges}\n"
+                f"Covered modified lines: Old {old_execution.all_covered_exec_modified_line_ranges}, New: {new_execution.all_covered_exec_modified_line_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
         
         # get all the covered modified lines, corresponding to the 'old_executions' and 'new_executions'.
+        covered_modified_lines_old = range_to_set(old_execution.all_covered_exec_modified_line_ranges)
         all_covered_modified_lines_old.append(covered_modified_lines_old)
+        covered_modified_lines_new = range_to_set(new_execution.all_covered_exec_modified_line_ranges)
         all_covered_modified_lines_new.append(covered_modified_lines_new)
 
         # Check whether to enter to the feebackloop
+        uncovered_modified_lines_old = range_to_set(old_execution.all_uncovered_exec_modified_line_ranges)
+        uncovered_modified_lines_new = range_to_set(new_execution.all_uncovered_exec_modified_line_ranges)
         if uncovered_modified_lines_old or uncovered_modified_lines_new:
             fail_to_reach_change_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
             # uncovered_info will be used in feedback prompt.
