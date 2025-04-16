@@ -13,27 +13,8 @@ class FunctionCollector(cst.CSTVisitor):
         self.functions.append((node, pos.start.line, pos.end.line))
 
 
-class FileNonExecutableLineFinder(cst.CSTVisitor):
-    # File-wide non-executable line finder
-    METADATA_DEPENDENCIES = (PositionProvider,)
-
-    def __init__(self):
-        self.non_exec_lines = set()
-
-    def visit_EmptyLine(self, node: cst.EmptyLine):
-        pos = self.get_metadata(PositionProvider, node)
-        self.non_exec_lines.add(pos.start.line)
-
-    def visit_SimpleStatementLine(self, node: cst.SimpleStatementLine):
-        # Check for docstrings
-        if isinstance(node.body[0], cst.Expr) and isinstance(node.body[0].value, cst.SimpleString):
-            pos = self.get_metadata(PositionProvider, node)
-            for line in range(pos.start.line, pos.end.line + 1):
-                self.non_exec_lines.add(line)
-
-
 def analyze_file_and_function(code: str, patch_ranges: list):
-    # Retrun non_exec_lines, modified function names, and the code of these functions.
+    # Retrun modified function names, and the code of these functions.
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
@@ -41,15 +22,11 @@ def analyze_file_and_function(code: str, patch_ranges: list):
 
     wrapper = MetadataWrapper(tree)
 
-    # 1. Collect all functions
+    # Collect all functions
     collector = FunctionCollector()
     wrapper.visit(collector)
 
-    # 2. Collect non-executable lines for entire file
-    file_line_finder = FileNonExecutableLineFinder()
-    wrapper.visit(file_line_finder)
-
-    # 3. Match the function by patch range
+    # Match the function by patch range
     matched_functions = set() # function names
     matched_functions_code = set()
     for patch_range in patch_ranges:
@@ -64,8 +41,8 @@ def analyze_file_and_function(code: str, patch_ranges: list):
                 function_code = module_with_node.code
                 matched_functions_code.add(function_code)
 
-    # 4. Return 
-    return set(sorted(file_line_finder.non_exec_lines)), list(matched_functions), list(matched_functions_code)
+    # Return 
+    return list(matched_functions), list(matched_functions_code)
 
 
 # --- Example, for test ---
@@ -87,7 +64,6 @@ def bar():
     pass'''
 
     patch_ranges = [(3, 3), (7, 8), (13, 13)]
-    non_exec_lines, functions, func_code = analyze_file_and_function(sample_code, patch_ranges)
-    print(non_exec_lines)
+    functions, func_code = analyze_file_and_function(sample_code, patch_ranges)
     print(functions)
     print(func_code)

@@ -230,7 +230,7 @@ def generate_tests(pr, github_repo, changed_functions):
             message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
     return all_tests
 
-def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_lines_info):
+def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info):
     '''
     Generate replacment tests for the ones that failed to reach the changed lines, 
     and keep different with the exisiting reached tests.
@@ -246,7 +246,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
         prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
-                all_uncovered_modified_lines_info, pr.old_context, pr.new_context)
+                all_uncovered_modified_stmts_info, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -255,7 +255,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
         prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
-                all_uncovered_modified_lines_info, pr.old_context, pr.new_context)
+                all_uncovered_modified_stmts_info, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -412,7 +412,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # changed_function : qualified names
     # raw_info_changed_functions: file paths (with "/") and function names
     # changed_functions = pr.get_changed_function_names()
-    pre_result, post_result  = pr.get_changed_function_names_and_non_executable_lines()
+    pre_result, post_result  = pr.get_changed_function_names_and_more()
     old_changed_functions, old_changed_functions_code = pre_result
     changed_functions, new_changed_functions_code = post_result
     pr.old_context = old_changed_functions_code
@@ -428,16 +428,16 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
     # generate tests via LLM
     generated_tests = generate_tests(pr, github_repo, changed_functions)
-    old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new = \
+    old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests)
-    if all_covered_modified_lines_old == None:
+    if all_covered_modified_stmts_old == None:
         return
 
     # analyze behavior of executions
     # TODO do we want to filter out the test that covers no modified lines? since the execution is already there, maybe keep it.
     # TODO add covered lines to show which lines introduce the behavioral differences.
     for (old_execution, new_execution, old_covered, new_covered) in zip(
-            old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new):
+            old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new):
         assert old_execution.output is not None
         assert new_execution.output is not None
 
@@ -488,7 +488,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
 
 def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
-            old_executions:list=[], new_executions:list=[], all_covered_modified_lines_old:list=[], all_covered_modified_lines_new:list=[], 
+            old_executions:list=[], new_executions:list=[], all_covered_modified_stmts_old:list=[], all_covered_modified_stmts_new:list=[], 
             round=0, total_exec_recorded=False):
     ''' 
     A recursive function to run the generated tests and use the feedback for the next round test generation.
@@ -502,7 +502,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
     if not generated_tests:
         append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
-        # return old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new
+        # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
         return None, None, None, None
 
     if cloned_repo_manager.repo_name == "pandas":
@@ -544,7 +544,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
     # analyze coverage during test execution
     fail_to_reach_change_indices = []
-    all_uncovered_modified_lines_info = set()
+    all_uncovered_modified_stmts_info = set()
     full_coverage_exists = False
 
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
@@ -552,32 +552,32 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         assert new_execution.coverage_percentage is not None
         
         if total_exec_recorded == False: # Record the event only once
-            details = f"All executable/coverable modified lines: Old: {old_execution.all_executable_modified_line_ranges}, New: {new_execution.all_executable_modified_line_ranges}"
+            details = f"All executable/coverable modified lines: Old: {old_execution.all_executable_modified_stmt_ranges}, New: {new_execution.all_executable_modified_stmt_ranges}"
             append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, all rounds", details=details))
             total_exec_recorded = True
 
         # Uncovered modified lines are recorded for further checking,
         # Covered modified lines are recorded for later union coverage calculating
         details = (f"Old: {old_execution.coverage_percentage}, New: {new_execution.coverage_percentage}\n"
-                f"Uncovered modified lines: Old: {old_execution.all_uncovered_exec_modified_line_ranges}, New: {new_execution.all_uncovered_exec_modified_line_ranges}\n"
-                f"Covered modified lines: Old {old_execution.all_covered_exec_modified_line_ranges}, New: {new_execution.all_covered_exec_modified_line_ranges}")
+                f"Uncovered modified lines: Old: {old_execution.all_uncovered_exec_modified_stmt_ranges}, New: {new_execution.all_uncovered_exec_modified_stmt_ranges}\n"
+                f"Covered modified lines: Old {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
         
         # get all the covered modified lines, corresponding to the 'old_executions' and 'new_executions'.
-        covered_modified_lines_old = range_to_set(old_execution.all_covered_exec_modified_line_ranges)
-        all_covered_modified_lines_old.append(covered_modified_lines_old)
-        covered_modified_lines_new = range_to_set(new_execution.all_covered_exec_modified_line_ranges)
-        all_covered_modified_lines_new.append(covered_modified_lines_new)
+        covered_modified_stmts_old = range_to_set(old_execution.all_covered_exec_modified_stmt_ranges)
+        all_covered_modified_stmts_old.append(covered_modified_stmts_old)
+        covered_modified_stmts_new = range_to_set(new_execution.all_covered_exec_modified_stmt_ranges)
+        all_covered_modified_stmts_new.append(covered_modified_stmts_new)
 
         # Check whether to enter to the feebackloop
-        uncovered_modified_lines_old = range_to_set(old_execution.all_uncovered_exec_modified_line_ranges)
-        uncovered_modified_lines_new = range_to_set(new_execution.all_uncovered_exec_modified_line_ranges)
-        if uncovered_modified_lines_old or uncovered_modified_lines_new:
+        uncovered_modified_stmts_old = range_to_set(old_execution.all_uncovered_exec_modified_stmt_ranges)
+        uncovered_modified_stmts_new = range_to_set(new_execution.all_uncovered_exec_modified_stmt_ranges)
+        if uncovered_modified_stmts_old or uncovered_modified_stmts_new:
             fail_to_reach_change_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
             # uncovered_info will be used in feedback prompt.
-            uncovered_info = f"Specified lines that need to be covered: Old: [{','.join(map(str, uncovered_modified_lines_old))}], New: [{','.join(map(str, uncovered_modified_lines_new))}]"
-            all_uncovered_modified_lines_info.add(uncovered_info)
-        if not uncovered_modified_lines_old and not uncovered_modified_lines_new:
+            uncovered_info = f"Specified lines that need to be covered: Old: [{','.join(map(str, uncovered_modified_stmts_old))}], New: [{','.join(map(str, uncovered_modified_stmts_new))}]"
+            all_uncovered_modified_stmts_info.add(uncovered_info)
+        if not uncovered_modified_stmts_old and not uncovered_modified_stmts_new:
             # the test executes all the modified lines
             full_coverage_exists = True
             # still keep checking the coverage information
@@ -586,7 +586,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         is_coverage_changed = True
         if round > 1: # initail round is 0, and feedback loop starts from 1, here we expected Config.max_round feedback loops.
             # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
-            if (covered_modified_lines_old in all_covered_modified_lines_old and covered_modified_lines_new in all_covered_modified_lines_new):
+            if (covered_modified_stmts_old in all_covered_modified_stmts_old and covered_modified_stmts_new in all_covered_modified_stmts_new):
                 is_coverage_changed = False
             else:
                 append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info in not change anymore."))
@@ -594,20 +594,20 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         # feedback loop to get tests cover more modified lines.
         if is_coverage_changed == True and round < Config.max_round:
             round+=1
-            details = f"Tests need to be refined: {fail_to_reach_change_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_lines_info)}"
+            details = f"Tests need to be refined: {fail_to_reach_change_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_stmts_info)}"
             append_event(CoverageEvent(pr_nb=pr.number, 
                     message=f"Refinement, round {round}, expected to get {len(fail_to_reach_change_indices)} more tests", details=details))
             
-            refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_lines_info)
+            refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info)
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
-                    old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new, round, total_exec_recorded)
+                    old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
         else:
             if is_coverage_changed == True:
                 append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
     else:
         append_event(Event(pr_nb=pr.number, message=f"Refinement ends, full coverage exists."))
 
-    return old_executions, new_executions, all_covered_modified_lines_old, all_covered_modified_lines_new
+    return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
 
 
 def get_merged_prs(github_repo, max_prs):

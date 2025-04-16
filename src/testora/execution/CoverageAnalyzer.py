@@ -7,11 +7,11 @@ import coverage
 @dataclass
 class DiffCoverage:
     percentage_covered: float
-    total_exec_modified_lines: int
-    total_covered_exec_modified_lines: int
+    total_exec_modified_stmts: int
+    total_covered_exec_modified_stmts: int
 
     def __str__(self):
-        return f"Coverage: {self.percentage_covered:.2%} ({self.total_covered_exec_modified_lines}/{self.total_exec_modified_lines})"
+        return f"Coverage: {self.percentage_covered:.2%} ({self.total_covered_exec_modified_stmts}/{self.total_exec_modified_stmts})"
 
 def analyze_coverage(coverage_report_file, coverage_files, version, \
             old_file_path_to_exec_modified_lines, new_file_path_to_exec_modified_lines):
@@ -19,54 +19,53 @@ def analyze_coverage(coverage_report_file, coverage_files, version, \
     cov.load()
     
     # check coverage for modified files
-    # 1. focus on the numbers of lines
-    total_exec_modified_lines = 0
-    total_covered_exec_modified_lines = 0
-    # 2. focus on the details lines, specifically which lines are uncovered
-    all_exec_modified_lines = set()
-    all_covered_exec_modified_lines = set()
+    # 1. focus on the numbers of statements
+    total_exec_modified_stmts = 0
+    total_covered_exec_modified_stmts = 0
+    # 2. focus on the details statements, specifically which statements are uncovered
+    all_exec_modified_stmts = set()
+    all_covered_exec_modified_stmts = set()
     
     for file in coverage_files:
         analysis = cov.analysis2(file)
-        # excluded_lines means the lines that were specified to be excluded. 
-        # uncovered_lines: [30, 31], uncovered_lines_str: 30-31
-        # the executable_lines should be the same for the same file. TODO Deduplicate?
-        filename, executable_lines, excluded_lines, uncovered_lines, uncovered_lines_str = analysis
+        # excluded_stmts means the statements that were specified to be excluded. 
+        # uncovered_stmts: [30, 31], uncovered_stmts_str: 30-31
+        filename, executable_stmts, excluded_stmts, uncovered_stmts, uncovered_stmts_str = analysis # all are statements
 
-        # get executable modified lines
-        exec_modified_lines = None
+        # get executable modified statements
+        exec_modified_stmts = set()
         if version == "old":
-            exec_modified_lines = old_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_lines))
+            exec_modified_stmts = old_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_stmts))
         elif version == "new":
-            exec_modified_lines = new_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_lines))
+            exec_modified_stmts = new_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_stmts))
 
-        # get covered lines, if a line was covered, which exactly means it is coverable
-        covered_lines = set(executable_lines) - set(uncovered_lines)
-        if covered_lines is None:
+        # get covered statements, if a statement was covered, which exactly means it is coverable
+        covered_stmts = set(executable_stmts) - set(uncovered_stmts)
+        if covered_stmts is None:
             # happens, e.g., when generated test doesn't invoke the tested project
-            covered_lines = set()
+            covered_stmts = set()
 
-        total_exec_modified_lines += len(exec_modified_lines)
-        covered_exec_modified_lines = set(exec_modified_lines) & set(covered_lines)
-        total_covered_exec_modified_lines += len(covered_exec_modified_lines)
+        total_exec_modified_stmts += len(exec_modified_stmts)
+        covered_exec_modified_stmts = set(exec_modified_stmts) & set(covered_stmts)
+        total_covered_exec_modified_stmts += len(covered_exec_modified_stmts)
 
-        all_exec_modified_lines = all_exec_modified_lines.union(exec_modified_lines)
-        all_covered_exec_modified_lines = all_covered_exec_modified_lines.union(covered_exec_modified_lines)
+        all_exec_modified_stmts = all_exec_modified_stmts.union(exec_modified_stmts)
+        all_covered_exec_modified_stmts = all_covered_exec_modified_stmts.union(covered_exec_modified_stmts)
 
     # here 0/0 counts as 100% coverage.
-    percentage_covered = total_covered_exec_modified_lines / total_exec_modified_lines if total_exec_modified_lines > 0 else 1
-    all_uncovered_exec_modified_lines = all_exec_modified_lines.difference(all_covered_exec_modified_lines)
+    percentage_covered = total_covered_exec_modified_stmts / total_exec_modified_stmts if total_exec_modified_stmts > 0 else 1
+    all_uncovered_exec_modified_stmts = all_exec_modified_stmts.difference(all_covered_exec_modified_stmts)
 
-    # transfer the individual line numbers to ranges
-    total_exec_modified_lines_ranges, covered_modified_lines_ranges, uncovered_modified_lines_ranges = \
-            set_to_ranges_in_batch([all_exec_modified_lines, all_covered_exec_modified_lines, all_uncovered_exec_modified_lines])
+    # transfer the individual statement numbers to ranges
+    total_exec_modified_stmts_ranges, covered_modified_stmts_ranges, uncovered_modified_stmts_ranges = \
+            set_to_ranges_in_batch([all_exec_modified_stmts, all_covered_exec_modified_stmts, all_uncovered_exec_modified_stmts])
     
-    coverage_percentage = DiffCoverage(percentage_covered, total_exec_modified_lines, total_covered_exec_modified_lines)
+    coverage_percentage = DiffCoverage(percentage_covered, total_exec_modified_stmts, total_covered_exec_modified_stmts)
 
     json_str_to_send_out = {
-        "total_exec_modified_lines_ranges": f"{total_exec_modified_lines_ranges}",
-        "covered_modified_lines_ranges": f"{covered_modified_lines_ranges}",
-        "uncovered_modified_lines_ranges": f"{uncovered_modified_lines_ranges}",
+        "total_exec_modified_stmts_ranges": f"{total_exec_modified_stmts_ranges}",
+        "covered_modified_stmts_ranges": f"{covered_modified_stmts_ranges}",
+        "uncovered_modified_stmts_ranges": f"{uncovered_modified_stmts_ranges}",
         "coverage_percentage": f"{coverage_percentage}"
     }
 
@@ -89,14 +88,16 @@ def set_to_ranges(numbers:set):
     return ranges
 
 def range_to_set(ranges:list):
-    number_list = []
-    for ran in ranges:
-        number_list.extend(list(ran))
+    if ranges:
+        number_list = []
+        for ran in ranges:
+            number_list.extend(list(ran))
 
-    number_set = set(number_list)
-    sorted_number_set = sorted(number_set)
-
-    return sorted_number_set
+        number_set = set(number_list)
+        sorted_number_set = sorted(number_set)
+        return sorted_number_set
+    else:
+        return []
 
 def set_to_ranges_in_batch(list_of_set):
     list_of_ranges = []
@@ -110,7 +111,7 @@ def ranges_to_set_in_batch(list_of_ranges):
     for ranges in list_of_ranges:
         nb_set = range_to_set(ranges)
         list_of_set.append(nb_set)
-    return list_of_set
+    return list_of_set # it is a list of list
 
 
 if __name__ == '__main__':

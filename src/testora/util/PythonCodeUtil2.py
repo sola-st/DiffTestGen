@@ -41,15 +41,11 @@ def analyze_file_and_function(code: str, patch_ranges: list):
 
     wrapper = MetadataWrapper(tree)
 
-    # 1. Collect all functions
+    # Collect all functions
     collector = FunctionCollector()
     wrapper.visit(collector)
 
-    # 2. Collect non-executable lines for entire file
-    file_line_finder = FileNonExecutableLineFinder()
-    wrapper.visit(file_line_finder)
-
-    # 3. Match the function by patch range
+    # Match the function by patch range
     matched_functions = set() 
     for patch_range in patch_ranges:
         target_line = (patch_range[0] + patch_range[1]) / 2
@@ -60,8 +56,7 @@ def analyze_file_and_function(code: str, patch_ranges: list):
             if start_line <= target_line <= end_line:
                 matched_functions.add(func) # Consider multiple functions involved in a single range
 
-    # 4. Return 
-    return set(sorted(file_line_finder.non_exec_lines)), list(matched_functions)
+    return list(matched_functions), None
 
 
 # --- Example, for test ---
@@ -83,6 +78,5 @@ def bar():
     pass'''
 
     patch_ranges = [(3, 3), (7, 8), (13, 13)]
-    non_exec_lines, functions = analyze_file_and_function(sample_code, patch_ranges)
-    print(non_exec_lines)
+    functions = analyze_file_and_function(sample_code, patch_ranges)
     print(functions)

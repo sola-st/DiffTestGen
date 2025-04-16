@@ -2,12 +2,12 @@ class FeedbackTestGeneratorPromptV1:
     '''
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_lines_info:set,
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info:set,
                 old_context:set, new_context:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.all_uncovered_modified_lines_info = all_uncovered_modified_lines_info # uncovered lines of both versions
+        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered lines of both versions
         self.use_json_output = False
 
     def create_prompt(self):
@@ -22,7 +22,7 @@ The diff affects the following functions: {fut_qualified_names}.
 Each element of the following set starts with 'Specified lines that need to be covered' and follows the specified lines from both the old and new versions that need to be covered.
 For each element, generate one corresponding usage example, i.e., here expected to generate {len} usage example(s).
 
-{all_uncovered_modified_lines_info}
+{all_uncovered_modified_stmts_info}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 Each example must be an executable piece of Python code, including all necessary imports.
@@ -41,8 +41,8 @@ etc.
 """
 
         return template.format(diff=self.diff, project_name=self.project_name, 
-                               all_uncovered_modified_lines_info=self.all_uncovered_modified_lines_info,
-                               len = len(self.all_uncovered_modified_lines_info),
+                               all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
+                               len = len(self.all_uncovered_modified_stmts_info),
                                fut_qualified_names=", ".join(self.fut_qualified_names))
 
     def remove_unnecessary_indentation(self, code):

@@ -109,9 +109,9 @@ class DockerExecutor:
             analysis_output = analysis_results.output.decode()
             if analysis_output:
                 result_json_str = json.loads(analysis_output)
-                test_execution.all_executable_modified_line_ranges = eval(result_json_str["total_exec_modified_lines_ranges"])
-                test_execution.all_covered_exec_modified_line_ranges = eval(result_json_str["covered_modified_lines_ranges"])
-                test_execution.all_uncovered_exec_modified_line_ranges = eval(result_json_str["uncovered_modified_lines_ranges"])
+                test_execution.all_executable_modified_line_ranges = eval(result_json_str["total_exec_modified_stmts_ranges"])
+                test_execution.all_covered_exec_modified_line_ranges = eval(result_json_str["covered_modified_stmts_ranges"])
+                test_execution.all_uncovered_exec_modified_line_ranges = eval(result_json_str["uncovered_modified_stmts_ranges"])
                 test_execution.coverage_percentage = result_json_str["coverage_percentage"]
 
             self.container.exec_run("rm -rf CoverageAnalyzer.py")

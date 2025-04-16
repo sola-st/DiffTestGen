@@ -20,9 +20,6 @@ class PullRequest:
         self._compute_non_test_modified_files()
 
         self._compute_modified_lines() # all modified lines, includes the non-excutable ones
-        # the following two lines are only need when getting the exuctable lines based on ast
-        # self.old_file_path_to_exec_modified_lines = {} # only executable modified lines
-        # self.new_file_path_to_exec_modified_lines = {} # expected format of its element: {file_path: set()}
 
         # the following two sets could contains:
         #    the entire file contents, or only the modified functions, or something else
@@ -143,14 +140,14 @@ class PullRequest:
         result = list(dict.fromkeys(result))
         return result
     
-    def get_changed_function_names_and_non_executable_lines(self):
+    def get_changed_function_names_and_more(self):
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-        pre_result = self.get_helper(pre_commit_cloned_repo, "pre")
+        pre_result = self.get_helper(pre_commit_cloned_repo)
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
-        post_result = self.get_helper(post_commit_cloned_repo, "post")
+        post_result = self.get_helper(post_commit_cloned_repo)
         return pre_result, post_result
     
-    def get_helper(self, cloned_repo, version):
+    def get_helper(self, cloned_repo):
         changed_functions = []
 
         for modified_file in self.patch.modified_files:
@@ -167,20 +164,9 @@ class PullRequest:
                     patch_range = (start_line, end_line) # numbers start at 1 andend_line included
                     patch_ranges.append(patch_range) 
 
-                non_exec_lines, functions, functions_code = analyze_file_and_function(file_content, patch_ranges) # dict
+                functions, functions_code = analyze_file_and_function(file_content, patch_ranges) # dict
                 for func in functions: # func, name, start ab line, end ab line (included)
                     changed_functions.append(f"{module_name}.{func[0]}")
-                    # TODO the start and end lines of the functions are available if needed, like consider only the executable lines intra these functions.
-                
-                # # based on ast, alternatively -> based on coverage.py (_compute_modified_lines)
-                # if version == "pre":
-                #     all_modified_line_from_cur_file = self.old_file_path_to_all_modified_lines[modified_file.path]
-                #     exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines 
-                #     self.old_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
-                # elif version == "post":
-                #     all_modified_line_from_cur_file = self.new_file_path_to_all_modified_lines[modified_file.path]
-                #     exec_modified_lines = all_modified_line_from_cur_file - non_exec_lines
-                #     self.new_file_path_to_exec_modified_lines.update({modified_file.path: exec_modified_lines})
 
         return changed_functions, functions_code
 
