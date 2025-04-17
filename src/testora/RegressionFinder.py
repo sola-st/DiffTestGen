@@ -611,7 +611,6 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             if (old_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_old and \
                     new_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_new):
                 is_coverage_changed = False
-            else:
                 append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info does not change anymore."))
         
         # feedback loop to get new tests that are expected to cover more modified lines.
@@ -627,6 +626,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         else:
             if is_coverage_changed == True:
                 append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
+
     else:
         append_event(Event(pr_nb=pr.number, message=f"Refinement ends, full coverage exists."))
 
