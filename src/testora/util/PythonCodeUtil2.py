@@ -102,7 +102,33 @@ def get_function_names_code_with_line_num(code: str, patch_ranges: list):
     return list(matched_functions), list(matched_functions_code)
 
 def get_function_names_code_with_mark(code: str, patch_ranges: list):
-    pass
+    ''' Retrun modified function names, and the code of the functions (with to_cover marks).'''
+    try:
+        tree = cst.parse_module(code)
+    except cst.ParserSyntaxError:
+        return None
+
+    wrapper = MetadataWrapper(tree)
+    collector = FunctionCollector()
+    wrapper.visit(collector)
+
+    matched_functions = set() # function names
+    matched_functions_code = set()
+    for patch_range in patch_ranges:
+        target_line = (patch_range[0] + patch_range[1]) / 2
+
+        for func in collector.functions:
+            func_node, start_line, end_line = func
+            # the start and end lines are both included, and start at 1.
+            if start_line <= target_line <= end_line:
+                matched_functions.add(func_node.name.value)
+                module_with_node = cst.Module(body=[func_node])
+                function_code = module_with_node.code
+                numbered_lines = [f"<<{start_line}>> {line}" for i, line in enumerate(function_code.splitlines())]
+                function_code_with_line_numbers = "\n".join(numbered_lines)
+                matched_functions_code.add(function_code_with_line_numbers)
+
+    return list(matched_functions), list(matched_functions_code)
 
 
 # --- Example, for test ---

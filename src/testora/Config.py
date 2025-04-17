@@ -35,6 +35,17 @@ max_round = 3
 # different prompts for classification task
 classification_prompt_version = 4
 
+'''
+Version clarification for the following two prompts:
+(so far, here the context indicated function code)
+
+            Initial                         Feedback                                Details
+1.  original Testora            add a loop, same as initial             only diff
+2.  |--use old context                                      --|         diff + old context
+3.  |--use both old and new contexts                        --|         diff + old context + new context 
+4.  |--use both old and new contexts with line numbers      --|         diff + old context + new context (line numbers marked)
+5.  |--use both old and new contexts with to_cover marks    --|         diff + old context + new context (to_cover mark added)
+'''
 # different prompts for initial round (0th) test generation
 initial_test_generation_prompt_version = 2
 
@@ -42,8 +53,13 @@ initial_test_generation_prompt_version = 2
 feedback_test_generation_prompt_version = 2
 
 # different versions of contexts
-# 1. file, 2. function, 3. line_set
-context_version = 2
+# it follows a similar version above, but versions 2 and 3 are from the same implementation
+# the implementation can return for both the versions, use one or both the returned info as needed.
+context_version = 4 # available from 1 to 5 (with 2 and 3 direct to the same inplementation)
+
+# TODO: different versions of context types
+# file, function, a set of lines
+# context_type
 
 # KEEP THIS AT THE END: log the current configuration
 current_globals = set(globals().keys())

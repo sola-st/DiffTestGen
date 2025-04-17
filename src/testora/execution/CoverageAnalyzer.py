@@ -24,9 +24,11 @@ def analyze_coverage(coverage_report_file, coverage_files, version, \
     total_covered_exec_modified_stmts = 0
     # 2. focus on the details statements, specifically which statements are uncovered
     all_exec_modified_stmts = set()
-    all_covered_exec_modified_stmts = set()
+    all_covered_exec_modified_stmts = set() 
+    all_uncovered_exec_modified_stmts = {} # file level uncovered statement line numbers, format -> file_path: line set
     
     for file in coverage_files:
+        relative_file_path = file.split("/", 3)[-1]
         analysis = cov.analysis2(file)
         # excluded_stmts means the statements that were specified to be excluded. 
         # uncovered_stmts: [30, 31], uncovered_stmts_str: 30-31
@@ -35,9 +37,9 @@ def analyze_coverage(coverage_report_file, coverage_files, version, \
         # get executable modified statements
         exec_modified_stmts = set()
         if version == "old":
-            exec_modified_stmts = old_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_stmts))
+            exec_modified_stmts = old_file_path_to_exec_modified_lines[relative_file_path].intersection(set(executable_stmts))
         elif version == "new":
-            exec_modified_stmts = new_file_path_to_exec_modified_lines[file.split("/", 3)[-1]].intersection(set(executable_stmts))
+            exec_modified_stmts = new_file_path_to_exec_modified_lines[relative_file_path].intersection(set(executable_stmts))
 
         # get covered statements, if a statement was covered, which exactly means it is coverable
         covered_stmts = set(executable_stmts) - set(uncovered_stmts)
@@ -51,21 +53,28 @@ def analyze_coverage(coverage_report_file, coverage_files, version, \
 
         all_exec_modified_stmts = all_exec_modified_stmts.union(exec_modified_stmts)
         all_covered_exec_modified_stmts = all_covered_exec_modified_stmts.union(covered_exec_modified_stmts)
+        all_uncovered_exec_modified_stmts.update({relative_file_path: exec_modified_stmts.difference(covered_exec_modified_stmts)})
 
     # here 0/0 counts as 100% coverage.
     percentage_covered = total_covered_exec_modified_stmts / total_exec_modified_stmts if total_exec_modified_stmts > 0 else 1
-    all_uncovered_exec_modified_stmts = all_exec_modified_stmts.difference(all_covered_exec_modified_stmts)
 
     # transfer the individual statement numbers to ranges
-    total_exec_modified_stmts_ranges, covered_modified_stmts_ranges, uncovered_modified_stmts_ranges = \
-            set_to_ranges_in_batch([all_exec_modified_stmts, all_covered_exec_modified_stmts, all_uncovered_exec_modified_stmts])
+    total_exec_modified_stmts_ranges, covered_modified_stmts_ranges = set_to_ranges_in_batch([all_exec_modified_stmts, all_covered_exec_modified_stmts])
+    uncovered_exec_modified_stmts_ranges = {}
+    for file_path, uncovered in all_uncovered_exec_modified_stmts.items():
+        uncovered_ranges = set_to_ranges(uncovered)
+        # update the all_uncovered_exec_modified_stmts dict to record ranges.
+        uncovered_exec_modified_stmts_ranges.update({file_path: uncovered_ranges})
     
     coverage_percentage = DiffCoverage(percentage_covered, total_exec_modified_stmts, total_covered_exec_modified_stmts)
 
     json_str_to_send_out = {
         "total_exec_modified_stmts_ranges": f"{total_exec_modified_stmts_ranges}",
         "covered_modified_stmts_ranges": f"{covered_modified_stmts_ranges}",
-        "uncovered_modified_stmts_ranges": f"{uncovered_modified_stmts_ranges}",
+        "uncovered_modified_stmts_ranges": f"{all_uncovered_exec_modified_stmts}",
+        "all_executable_modified_stmts_num": f"{all_exec_modified_stmts}",
+        "all_covered_exec_modified_stms_num": f"{all_covered_exec_modified_stmts}",
+        "all_uncovered_exec_modified_stmts_num": f"{all_uncovered_exec_modified_stmts}",
         "coverage_percentage": f"{coverage_percentage}"
     }
 

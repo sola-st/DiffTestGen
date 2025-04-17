@@ -418,9 +418,10 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # changed_function : qualified names
     # raw_info_changed_functions: file paths (with "/") and function names
     # changed_functions = pr.get_changed_function_names()
-    pre_result, post_result  = pr.get_changed_function_names_and_more()
+    pre_result, post_result  = pr.get_changed_function_names_and_context()
     old_changed_functions, old_changed_functions_code = pre_result
     changed_functions, new_changed_functions_code = post_result
+    # no any coverage info, because the initial round do not have converage info yet.
     pr.old_context = old_changed_functions_code
     pr.new_context = new_changed_functions_code
 
@@ -549,7 +550,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     assert None not in [e.output for e in old_executions_cur_round]
 
     # analyze coverage during test execution
-    fail_to_reach_change_indices = []
+    fail_to_cover_all_indices = []
     all_uncovered_modified_stmts_info = set()
     full_coverage_exists = False
 
@@ -569,40 +570,56 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 f"Covered modified lines: Old {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
         
-        # get all the covered modified lines, corresponding to the 'old_executions' and 'new_executions'.
-        covered_modified_stmts_old = range_to_set(old_execution.all_covered_exec_modified_stmt_ranges)
-        all_covered_modified_stmts_old.append(covered_modified_stmts_old)
-        covered_modified_stmts_new = range_to_set(new_execution.all_covered_exec_modified_stmt_ranges)
-        all_covered_modified_stmts_new.append(covered_modified_stmts_new)
+        # to check if all the rounds and executions cover the same statements
+        all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # list of ranges
+        all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
 
         # Check whether to enter to the feebackloop
-        uncovered_modified_stmts_old = range_to_set(old_execution.all_uncovered_exec_modified_stmt_ranges)
-        uncovered_modified_stmts_new = range_to_set(new_execution.all_uncovered_exec_modified_stmt_ranges)
-        if uncovered_modified_stmts_old or uncovered_modified_stmts_new:
-            fail_to_reach_change_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
+        uncovered_modified_stmts_old_exist = False
+        for uncover in old_execution.all_uncovered_exec_modified_stmts_num.values():
+            if uncover:
+                uncovered_modified_stmts_old_exist = True
+                break # uncovered statements exist
+        
+        uncovered_modified_stmts_new_exist = False
+        for uncover in new_execution.all_uncovered_exec_modified_stmts_num.values():
+            if uncover:
+                uncovered_modified_stmts_new_exist = True
+                break 
+
+        if uncovered_modified_stmts_old_exist or uncovered_modified_stmts_new_exist:
+            fail_to_cover_all_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
             # uncovered_info will be used in feedback prompt.
-            uncovered_info = f"Specified lines that need to be covered: Old: [{','.join(map(str, uncovered_modified_stmts_old))}], New: [{','.join(map(str, uncovered_modified_stmts_new))}]"
+            file_to_uncovered_old = [f"{file_path}: {uncovered}" for file_path, uncovered in old_execution.all_uncovered_exec_modified_stmts_num.items()]
+            file_to_uncovered_new = [f"{file_path}: {uncovered}" for file_path, uncovered in new_execution.all_uncovered_exec_modified_stmts_num.items()]
+            file_to_uncovered_old_str = '\n'.join(file_to_uncovered_old)
+            file_to_uncovered_new_str = '\n'.join(file_to_uncovered_new)
+            uncovered_info = (f"Specified lines that need to be covered for each file:\n"
+                              f"Old:\n{file_to_uncovered_old_str}\n"
+                              f"New:\n{file_to_uncovered_new_str}")
             all_uncovered_modified_stmts_info.add(uncovered_info)
-        if not uncovered_modified_stmts_old and not uncovered_modified_stmts_new:
-            # the test executes all the modified lines
+
+        if uncovered_modified_stmts_old_exist == True and uncovered_modified_stmts_new_exist == True:
+            # the test covers all the modified lines
             full_coverage_exists = True
             # still keep checking the coverage information
 
-    if (fail_to_reach_change_indices and full_coverage_exists == False): # no full coverage exists in all the tests
+    if (fail_to_cover_all_indices and full_coverage_exists == False): # no full coverage exists in all the tests
         is_coverage_changed = True
-        if round > 1: # initail round is 0, and feedback loop starts from 1, here we expected Config.max_round feedback loops.
+        if round > 1: # initail round is 0, and feedback loop starts from 1, here we expect Config.max_round feedback loops.
             # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
-            if (covered_modified_stmts_old in all_covered_modified_stmts_old and covered_modified_stmts_new in all_covered_modified_stmts_new):
+            if (old_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_old and \
+                    new_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_new):
                 is_coverage_changed = False
             else:
-                append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info in not change anymore."))
+                append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info does not change anymore."))
         
-        # feedback loop to get tests cover more modified lines.
+        # feedback loop to get new tests that are expected to cover more modified lines.
         if is_coverage_changed == True and round < Config.max_round:
             round+=1
-            details = f"Tests need to be refined: {fail_to_reach_change_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_stmts_info)}"
+            details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_stmts_info)}"
             append_event(CoverageEvent(pr_nb=pr.number, 
-                    message=f"Refinement, round {round}, expected to get {len(fail_to_reach_change_indices)} more tests", details=details))
+                    message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
             
             refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info)
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 

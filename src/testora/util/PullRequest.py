@@ -142,7 +142,7 @@ class PullRequest:
         result = list(dict.fromkeys(result))
         return result
     
-    def get_changed_function_names_and_more(self):
+    def get_changed_function_names_and_context(self):
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
         pre_result = self.get_helper(pre_commit_cloned_repo)
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)

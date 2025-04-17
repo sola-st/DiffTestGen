@@ -103,15 +103,22 @@ class DockerExecutor:
                 f"--version {version} "
                 f"--exec_modified_lines_old \'{old_file_path_to_all_modified_lines}\' "
                 f"--exec_modified_lines_new \'{new_file_path_to_all_modified_lines}\'")
+            
             # TODO intsall this when create the containers
             self.container.exec_run("python3 -m pip install coverage") 
             analysis_results = self.container.exec_run(analysis_command)
             analysis_output = analysis_results.output.decode()
             if analysis_output:
                 result_json_str = json.loads(analysis_output)
-                test_execution.all_executable_modified_line_ranges = eval(result_json_str["total_exec_modified_stmts_ranges"])
-                test_execution.all_covered_exec_modified_line_ranges = eval(result_json_str["covered_modified_stmts_ranges"])
-                test_execution.all_uncovered_exec_modified_line_ranges = eval(result_json_str["uncovered_modified_stmts_ranges"])
+                # ranges
+                test_execution.all_executable_modified_line_ranges = eval(result_json_str["total_exec_modified_stmts_ranges"]) # list
+                test_execution.all_covered_exec_modified_line_ranges = eval(result_json_str["covered_modified_stmts_ranges"]) # list
+                test_execution.all_uncovered_exec_modified_line_ranges = eval(result_json_str["uncovered_modified_stmts_ranges"]) # dict
+                # detailed numbers
+                test_execution.all_executable_modified_stmts_num = eval(result_json_str["all_executable_modified_stmts_num"]) # set
+                test_execution.all_covered_exec_modified_stms_num = eval(result_json_str["all_covered_exec_modified_stms_num"]) # set
+                test_execution.all_uncovered_exec_modified_stmts_num = eval(result_json_str["all_uncovered_exec_modified_stmts_num"]) # dict
+                # coverage rate
                 test_execution.coverage_percentage = result_json_str["coverage_percentage"]
 
             self.container.exec_run("rm -rf CoverageAnalyzer.py")
