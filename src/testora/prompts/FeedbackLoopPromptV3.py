@@ -7,7 +7,7 @@ class FeedbackTestGeneratorPromptV3:
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered lines of both versions
+        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered statements of both versions
         self.old_context = old_context
         self.new_context = new_context
         self.use_json_output = False

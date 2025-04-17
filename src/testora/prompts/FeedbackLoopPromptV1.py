@@ -7,7 +7,7 @@ class FeedbackTestGeneratorPromptV1:
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered lines of both versions
+        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered statements of both versions
         self.use_json_output = False
 
     def create_prompt(self):

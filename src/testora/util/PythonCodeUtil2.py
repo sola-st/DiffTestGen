@@ -10,30 +10,17 @@ class FunctionCollector(cst.CSTVisitor):
 
     def visit_FunctionDef(self, node: cst.FunctionDef):
         pos = self.get_metadata(PositionProvider, node)
-        self.functions.append((node.name.value, pos.start.line, pos.end.line))
+        self.functions.append((node, pos.start.line, pos.end.line))
 
 
-class FileNonExecutableLineFinder(cst.CSTVisitor):
-    # File-wide non-executable line finder
-    METADATA_DEPENDENCIES = (PositionProvider,)
 
-    def __init__(self):
-        self.non_exec_lines = set()
-
-    def visit_EmptyLine(self, node: cst.EmptyLine):
-        pos = self.get_metadata(PositionProvider, node)
-        self.non_exec_lines.add(pos.start.line)
-
-    def visit_SimpleStatementLine(self, node: cst.SimpleStatementLine):
-        # Check for docstrings
-        if isinstance(node.body[0], cst.Expr) and isinstance(node.body[0].value, cst.SimpleString):
-            pos = self.get_metadata(PositionProvider, node)
-            for line in range(pos.start.line, pos.end.line + 1):
-                self.non_exec_lines.add(line)
-
-
-def analyze_file_and_function(code: str, patch_ranges: list):
-    # Retrun non_exec_lines and modified function names.
+'''
+The following functions are some different versions of file analyis to return various information
+All functions return 2 values.
+'''
+# TODO get a union of these functions
+def get_function_names(code: str, patch_ranges: list):
+    '''Return modified function names.'''
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
@@ -51,12 +38,71 @@ def analyze_file_and_function(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_name, start_line, end_line = func
+            func_node, start_line, end_line = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
-                matched_functions.add(func) # Consider multiple functions involved in a single range
+                matched_functions.add(func_node.name.value) # Consider multiple functions involved in a single range
 
     return list(matched_functions), None
+
+def get_function_names_code(code: str, patch_ranges: list):
+    ''' Retrun modified function names, and the code of the functions.'''
+    try:
+        tree = cst.parse_module(code)
+    except cst.ParserSyntaxError:
+        return None
+
+    wrapper = MetadataWrapper(tree)
+    collector = FunctionCollector()
+    wrapper.visit(collector)
+
+    matched_functions = set() # function names
+    matched_functions_code = set()
+    for patch_range in patch_ranges:
+        target_line = (patch_range[0] + patch_range[1]) / 2
+
+        for func in collector.functions:
+            func_node, start_line, end_line = func
+            # the start and end lines are both included, and start at 1.
+            if start_line <= target_line <= end_line:
+                matched_functions.add(func_node.name.value) 
+                module_with_node = cst.Module(body=[func_node])
+                function_code = module_with_node.code
+                matched_functions_code.add(function_code)
+
+    return list(matched_functions), list(matched_functions_code)
+
+def get_function_names_code_with_line_num(code: str, patch_ranges: list):
+    ''' Retrun modified function names, and the code of the functions (with marked line numbers).'''
+    try:
+        tree = cst.parse_module(code)
+    except cst.ParserSyntaxError:
+        return None
+
+    wrapper = MetadataWrapper(tree)
+    collector = FunctionCollector()
+    wrapper.visit(collector)
+
+    matched_functions = set() # function names
+    matched_functions_code = set()
+    for patch_range in patch_ranges:
+        target_line = (patch_range[0] + patch_range[1]) / 2
+
+        for func in collector.functions:
+            func_node, start_line, end_line = func
+            # the start and end lines are both included, and start at 1.
+            if start_line <= target_line <= end_line:
+                matched_functions.add(func_node.name.value)
+                module_with_node = cst.Module(body=[func_node])
+                function_code = module_with_node.code
+                numbered_lines = [f"<<{start_line}>> {line}" for i, line in enumerate(function_code.splitlines())]
+                function_code_with_line_numbers = "\n".join(numbered_lines)
+                matched_functions_code.add(function_code_with_line_numbers)
+
+    return list(matched_functions), list(matched_functions_code)
+
+def get_function_names_code_with_mark(code: str, patch_ranges: list):
+    pass
 
 
 # --- Example, for test ---
@@ -78,5 +124,19 @@ def bar():
     pass'''
 
     patch_ranges = [(3, 3), (7, 8), (13, 13)]
-    functions = analyze_file_and_function(sample_code, patch_ranges)
+    functions = None
+    functions_code = None
+
+    # 1, original Testora (only diff, no contexts)
+    context_version = 1 # change as needed
+    if context_version == 1:
+        functions, functions_code = get_function_names(sample_code, patch_ranges)
+    elif context_version in [2, 3]:
+        functions, functions_code = get_function_names_code(sample_code, patch_ranges)
+    elif context_version == 4:
+        functions, functions_code = get_function_names_code_with_line_num(sample_code, patch_ranges)
+    elif context_version == 5:
+        functions, functions_code = get_function_names_code_with_mark(sample_code, patch_ranges)
+
     print(functions)
+    print(functions_code)

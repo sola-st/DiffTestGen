@@ -1,9 +1,13 @@
 from unidiff import PatchSet
 import urllib.request
-
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
-from testora.util.PythonCodeUtil3 import analyze_file_and_function
+from testora.util.PythonCodeUtil2 import (
+        get_function_names,
+        get_function_names_code, 
+        get_function_names_code_with_line_num, 
+        get_function_names_code_with_mark
+)
 
 
 class PullRequest:
@@ -18,12 +22,10 @@ class PullRequest:
 
         self._pr_url_to_patch()
         self._compute_non_test_modified_files()
-
         self._compute_modified_lines() # all modified lines, includes the non-excutable ones
 
-        # the following two sets could contains:
-        #    the entire file contents, or only the modified functions, or something else
-        # serve as a extra context provider.
+        # the following two sets serve as a extra context provider. 
+        # could contains different types of contexts, e.g., the entire file contents, only the modified functions, etc.
         self.old_context = {} 
         self.new_context = {}
 
@@ -154,9 +156,7 @@ class PullRequest:
             if modified_file.path in self._get_relevant_changed_files():
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     file_content = f.read()
-
                 module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
-
                 patch_ranges = []
                 for hunk in modified_file:
                     start_line = hunk.target_start
@@ -164,7 +164,17 @@ class PullRequest:
                     patch_range = (start_line, end_line) # numbers start at 1 andend_line included
                     patch_ranges.append(patch_range) 
 
-                functions, functions_code = analyze_file_and_function(file_content, patch_ranges) # dict
+                functions = None
+                functions_code = None
+                if Config.context_version == 1: # return only function names
+                    functions, __ = get_function_names(file_content, patch_ranges)
+                elif Config.context_version in [2, 3]: # return function names and code
+                    functions, functions_code = get_function_names_code(file_content, patch_ranges)
+                elif Config.context_version == 4: # return function names and code with line numbers
+                    functions, functions_code = get_function_names_code_with_line_num(file_content, patch_ranges)
+                elif Config.context_version == 5: # return function names and code with to_cover marks
+                    functions, functions_code = get_function_names_code_with_mark(file_content, patch_ranges)
+
                 for func in functions: # func, name, start ab line, end ab line (included)
                     changed_functions.append(f"{module_name}.{func[0]}")
 

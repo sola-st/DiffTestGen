@@ -14,6 +14,8 @@ from testora.prompts.RegressionTestGeneratorPromptV3 import RegressionTestGenera
 from testora.prompts.FeedbackLoopPromptV1 import FeedbackTestGeneratorPromptV1
 from testora.prompts.FeedbackLoopPromptV2 import FeedbackTestGeneratorPromptV2
 from testora.prompts.FeedbackLoopPromptV3 import FeedbackTestGeneratorPromptV3
+from testora.prompts.FeedbackLoopPromptV4 import FeedbackTestGeneratorPromptV4
+from testora.prompts.FeedbackLoopPromptV5 import FeedbackTestGeneratorPromptV5
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
 from testora.prompts.RegressionClassificationPromptV1 import RegressionClassificationPromptV1
@@ -62,6 +64,10 @@ elif Config.feedback_test_generation_prompt_version == 2:
     FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV2
 elif Config.feedback_test_generation_prompt_version == 3:
     FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV3
+elif Config.feedback_test_generation_prompt_version == 4:
+    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV4
+elif Config.feedback_test_generation_prompt_version == 5:
+    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV5
 
 def clean_output(output):
     # remove warnings caused by coverage measurements
