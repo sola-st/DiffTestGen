@@ -110,14 +110,15 @@ class DockerExecutor:
             analysis_output = analysis_results.output.decode()
             if analysis_output:
                 result_json_str = json.loads(analysis_output)
+                # the values of the following 6 keys are a dict.
                 # ranges
-                test_execution.all_executable_modified_line_ranges = eval(result_json_str["total_exec_modified_stmts_ranges"]) # list
-                test_execution.all_covered_exec_modified_line_ranges = eval(result_json_str["covered_modified_stmts_ranges"]) # list
-                test_execution.all_uncovered_exec_modified_line_ranges = eval(result_json_str["uncovered_modified_stmts_ranges"]) # dict
+                test_execution.all_executable_modified_stmt_ranges = eval(result_json_str["all_exec_modified_stmts_ranges"])
+                test_execution.all_covered_exec_modified_stmt_ranges = eval(result_json_str["all_covered_modified_stmts_ranges"]) 
+                test_execution.all_uncovered_exec_modified_stmt_ranges = eval(result_json_str["all_uncovered_modified_stmts_ranges"]) 
                 # detailed numbers
-                test_execution.all_executable_modified_stmts_num = eval(result_json_str["all_executable_modified_stmts_num"]) # set
-                test_execution.all_covered_exec_modified_stms_num = eval(result_json_str["all_covered_exec_modified_stms_num"]) # set
-                test_execution.all_uncovered_exec_modified_stmts_num = eval(result_json_str["all_uncovered_exec_modified_stmts_num"]) # dict
+                test_execution.all_executable_modified_stmts_num = eval(result_json_str["all_executable_modified_stmts_num"]) 
+                test_execution.all_covered_exec_modified_stms_num = eval(result_json_str["all_covered_exec_modified_stms_num"]) 
+                test_execution.all_uncovered_exec_modified_stmts_num = eval(result_json_str["all_uncovered_exec_modified_stmts_num"]) 
                 # coverage rate
                 test_execution.coverage_percentage = result_json_str["coverage_percentage"]
 

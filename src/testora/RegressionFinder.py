@@ -571,7 +571,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
         
         # to check if all the rounds and executions cover the same statements
-        all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # list of ranges
+        all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # a dict, and each value is a list of ranges
         all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
 
         # Check whether to enter to the feebackloop
