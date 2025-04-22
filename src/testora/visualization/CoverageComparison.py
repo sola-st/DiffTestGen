@@ -1,6 +1,7 @@
 import json
+import copy
 from os import listdir, makedirs
-from testora.execution.CoverageAnalyzer import range_to_set
+from testora.execution.CoverageAnalyzer import range_to_set, ranges_to_set_in_batch
 from os.path import join
 
 
@@ -34,10 +35,12 @@ class CoverageComparison():
         self.union_covered_lines_round2 = {"old": {}, "old_len_cross_file": None,  "new": {}, "new_len_cross_file": None,}
         self.union_covered_lines_round3 = {"old": {}, "old_len_cross_file": None,  "new": {}, "new_len_cross_file": None,}
 
-    def ranges_to_total_num(self, ranges):
+    def ranges_to_total_num(self, ranges_dict:dict):
         total_num = 0
-        for ran in ranges:
-            total_num += len(list(ran))
+        for file, range_list_str in ranges_dict.items():
+            ranges = eval(range_list_str)
+            for ran in ranges:
+                total_num += len(list(ran))
         return total_num
 
     def get_single_log_file_coverage_dtg(self, log_file):
@@ -56,8 +59,13 @@ class CoverageComparison():
                             pr_num = info_block["pr_nb"]
                             tmp = info_block_details.split("Old: ")[1]
                             all_executable_modified_lines_old_ranges, all_executable_modified_lines_new_ranges = tmp.split(", New: ")
-                            self.all_executable_modified_lines_old_len = self.ranges_to_total_num(all_executable_modified_lines_old_ranges) 
-                            self.all_executable_modified_lines_new_len = self.ranges_to_total_num(all_executable_modified_lines_new_ranges) 
+                            old = all_executable_modified_lines_old_ranges.replace("\'", "\"").replace("[", "\"[").replace("]", "]\"")
+                            new = all_executable_modified_lines_new_ranges.replace("\'", "\"").replace("[", "\"[").replace("]", "]\"")
+                            all_executable_old_ranges_dict = json.loads(old) # from files to lines
+                            all_executable_new_ranges_dict = json.loads(new)
+
+                            self.all_executable_modified_lines_old_len = self.ranges_to_total_num(all_executable_old_ranges_dict) 
+                            self.all_executable_modified_lines_new_len = self.ranges_to_total_num(all_executable_new_ranges_dict) 
                     else:
                         coverage_percentage, uncovered_ranges_dict_str, covered_modified_line_ranges_dict_str = info_block_details.split("\n")
                         tmp = covered_modified_line_ranges_dict_str.split("Old: ")[1]
@@ -76,28 +84,36 @@ class CoverageComparison():
 
         self.format_coverage_info(pr_num, project_name)
 
-    def get_union_numbers_form_dict(self, range_dict, info_block_msg, version):
-        for file, stmt_num_range in range_dict.items():
-            covered_stmts = range_to_set(stmt_num_range) # deduplicated list
+    def get_union_numbers_form_dict(self, range_dict:dict, info_block_msg, version):
+        for file, range_list_str in range_dict.items():
+            stmt_num_ranges:list = eval(range_list_str)
+            covered_stmts_tmp = range_to_set(stmt_num_ranges)
+            covered_stmts= set(covered_stmts_tmp)
 
             if "Diff coverage, round 0" in info_block_msg:
                 try:
-                    self.union_covered_lines_round0[version][file] += covered_stmts
+                    self.union_covered_lines_round0[version][file] = set(self.union_covered_lines_round0[version][file]).union(covered_stmts)
                 except:
                     self.union_covered_lines_round0[version].update({file: covered_stmts})
             elif "Diff coverage, round 1" in info_block_msg:
+                if not self.union_covered_lines_round1["old"]:
+                    self.union_covered_lines_round1 = copy.deepcopy(self.union_covered_lines_round0)
                 try:
-                    self.union_covered_lines_round1[version][file] += covered_stmts
+                    self.union_covered_lines_round1[version][file] = set(self.union_covered_lines_round1[version][file]).union(covered_stmts)
                 except:
                     self.union_covered_lines_round1[version].update({file: covered_stmts})
             elif "Diff coverage, round 2" in info_block_msg:
+                if not self.union_covered_lines_round2["old"]:
+                    self.union_covered_lines_round2 = copy.deepcopy(self.union_covered_lines_round1)
                 try:
-                    self.union_covered_lines_round2[version][file] += covered_stmts
+                    self.union_covered_lines_round2[version][file] = set(self.union_covered_lines_round2[version][file]).union(covered_stmts)
                 except:
                     self.union_covered_lines_round2[version].update({file: covered_stmts})
             elif "Diff coverage, round 3" in info_block_msg:
+                if not self.union_covered_lines_round3["old"]:
+                    self.union_covered_lines_round3 = copy.deepcopy(self.union_covered_lines_round2)
                 try:
-                    self.union_covered_lines_round3[version][file] += covered_stmts
+                    self.union_covered_lines_round3[version][file] = set(self.union_covered_lines_round3[version][file]).union(covered_stmts)
                 except:
                     self.union_covered_lines_round3["old"].update({file: covered_stmts})
 
@@ -159,7 +175,7 @@ class CoverageComparison():
                 self.get_single_log_file_coverage_dtg(join(folder, log_file))
 
         self.all_from_dtg = sorted(self.all_from_dtg, key=lambda d: next(iter(d)))
-        meta_file = join(output_folder, "coverage_comparison_meta_2_2_4.json")
+        meta_file = join(output_folder, "coverage_comparison_meta.json")
         with open(meta_file, "w") as f:
             json.dump(self.all_from_dtg, f, indent=4, ensure_ascii=False)     
         print(f"All the collected coverage information is wriitten to {meta_file}")
@@ -211,7 +227,6 @@ if __name__=="__main__":
     init.get_multiple_pr_coverage_info()
     caption = "Coverage Comparison between Testora and Our Approach"
     label="coverage_comparison"
-    tex_file = join(table_output_folder, "coverage_comparison_2_2_4.tex")
-    # col_names = ["ID", "Project", "PR", "Rounds", "Testora", "Our Approach"]
+    tex_file = join(table_output_folder, "coverage_comparison_2_2_4_cross_round.tex")
     init.table_coverages(caption, label, tex_file)
 
