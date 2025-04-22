@@ -40,7 +40,8 @@ Version clarification for the following two prompts:
 (so far, here the context indicated function code)
 
             Initial                         Feedback                                Details
-1.  original Testora            add a loop, same as initial             only diff
+1.  original Testora            marked as 0,  original Testora          (original Testora, but report detailed coverage info)
+                                marked as 1, add a loop                 only diff
 2.  |--use old context                                      --|         diff + old context
 3.  |--use both old and new contexts                        --|         diff + old context + new context 
 4.  |--use both old and new contexts with line numbers      --|         diff + old context + new context (line numbers marked)
@@ -50,12 +51,13 @@ Version clarification for the following two prompts:
 initial_test_generation_prompt_version = 2
 
 # different prompts for feedback rounds (1th - {max_round}th) test generation
+# 0 indicates no feedback loop (original version Testora)
 feedback_test_generation_prompt_version = 2
 
 # different versions of contexts
 # it follows a similar version above, but versions 2 and 3 are from the same implementation
 # the implementation can return for both the versions, use one or both the returned info as needed.
-context_version = 4 # available from 1 to 5 (with 2 and 3 direct to the same inplementation)
+context_version = 2 # available from 1 to 5 (with 2 and 3 direct to the same inplementation)
 
 # TODO: different versions of context types
 # file, function, a set of lines

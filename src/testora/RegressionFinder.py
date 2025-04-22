@@ -567,7 +567,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         # Covered modified lines are recorded for later union coverage calculating
         details = (f"Old: {old_execution.coverage_percentage}, New: {new_execution.coverage_percentage}\n"
                 f"Uncovered modified lines: Old: {old_execution.all_uncovered_exec_modified_stmt_ranges}, New: {new_execution.all_uncovered_exec_modified_stmt_ranges}\n"
-                f"Covered modified lines: Old {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
+                f"Covered modified lines: Old: {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
         
         # to check if all the rounds and executions cover the same statements
@@ -599,36 +599,37 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                               f"New:\n{file_to_uncovered_new_str}")
             all_uncovered_modified_stmts_info.add(uncovered_info)
 
-        if uncovered_modified_stmts_old_exist == True and uncovered_modified_stmts_new_exist == True:
-            # the test covers all the modified lines
-            full_coverage_exists = True
-            # still keep checking the coverage information
+        if Config.feedback_test_generation_prompt_version != 0:
+            if uncovered_modified_stmts_old_exist == True and uncovered_modified_stmts_new_exist == True:
+                # the test covers all the modified lines
+                full_coverage_exists = True
+                # still keep checking the coverage information
 
-    if (fail_to_cover_all_indices and full_coverage_exists == False): # no full coverage exists in all the tests
-        is_coverage_changed = True
-        if round > 1: # initail round is 0, and feedback loop starts from 1, here we expect Config.max_round feedback loops.
-            # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
-            if (old_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_old and \
-                    new_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_new):
-                is_coverage_changed = False
-                append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info does not change anymore."))
-        
-        # feedback loop to get new tests that are expected to cover more modified lines.
-        if is_coverage_changed == True and round < Config.max_round:
-            round+=1
-            details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_stmts_info)}"
-            append_event(CoverageEvent(pr_nb=pr.number, 
-                    message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
+    if Config.feedback_test_generation_prompt_version != 0: # 0 means to run original Testora, which does not have a feedback loop
+        if (fail_to_cover_all_indices and full_coverage_exists == False): # no full coverage exists in all the tests
+            is_coverage_changed = True
+            if round > 1: # initail round is 0, and feedback loop starts from 1, here we expect Config.max_round feedback loops.
+                # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
+                if (old_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_old and \
+                        new_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_new):
+                    is_coverage_changed = False
+                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info does not change anymore."))
             
-            refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info)
-            run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
-                    old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
+            # feedback loop to get new tests that are expected to cover more modified lines.
+            if is_coverage_changed == True and round < Config.max_round:
+                round+=1
+                details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_stmts_info)}"
+                append_event(CoverageEvent(pr_nb=pr.number, 
+                        message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
+                
+                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info)
+                run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
+                        old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
+            else:
+                if is_coverage_changed == True:
+                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
         else:
-            if is_coverage_changed == True:
-                append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
-
-    else:
-        append_event(Event(pr_nb=pr.number, message=f"Refinement ends, full coverage exists."))
+            append_event(Event(pr_nb=pr.number, message=f"Refinement ends, full coverage exists."))
 
     return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
 
