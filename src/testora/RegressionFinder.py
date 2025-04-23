@@ -600,7 +600,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             all_uncovered_modified_stmts_info.add(uncovered_info)
 
         if Config.feedback_test_generation_prompt_version != 0:
-            if uncovered_modified_stmts_old_exist == True and uncovered_modified_stmts_new_exist == True:
+            if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False:
                 # the test covers all the modified lines
                 full_coverage_exists = True
                 # still keep checking the coverage information

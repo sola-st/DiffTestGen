@@ -68,7 +68,7 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
                 
                 formatted_pr_block_start_line_prefix = pr_block_start_line_prefix.format(
                     initial_and_feedback_round_max_num=feedback_round_max+1,
-                    id=pr_idx,
+                    id=pr_idx+1,
                     project=project,
                     pr_num=pr_num
                 )
