@@ -25,7 +25,7 @@ class CoverageComparison():
         self.union_covered_lines_multiple_rounds = [] # a list of union_covered_lines_single_round
         
         self.approach_name = "Testora"
-        if version_id != "1_0":
+        if version_id != "1_0_0":
             self.approach_name = "Our Approach"
 
     def clear(self):

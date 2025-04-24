@@ -5,8 +5,8 @@ from testora import Config
 from testora.util.PythonCodeUtil2 import (
         get_function_names,
         get_function_names_code, 
-        get_function_names_code_with_line_num, 
-        get_function_names_code_with_mark
+        get_function_names_code_with_line_num,
+        get_function_names_code_to_with_mark
 )
 
 
@@ -24,10 +24,14 @@ class PullRequest:
         self._compute_non_test_modified_files()
         self._compute_modified_lines() # all modified lines, includes the non-excutable ones
 
-        # the following two sets serve as a extra context provider. 
+        # a extra context provider. 
         # could contains different types of contexts, e.g., the entire file contents, only the modified functions, etc.
-        self.old_context = {} 
-        self.new_context = {}
+        self.old_context = "" # str for models to easy-follow
+        self.new_context = ""
+
+        # only works when add "to_cover" mark to code
+        self.old_context_only_for_mark = {}
+        self.new_context_only_for_mark = {}
 
     def _pr_url_to_patch(self):
         diff_url = self.github_pr.html_url + ".diff"
@@ -144,13 +148,15 @@ class PullRequest:
     
     def get_changed_function_names_and_context(self):
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-        pre_result = self.get_helper(pre_commit_cloned_repo)
+        pre_result = self.get_helper(pre_commit_cloned_repo, "old")
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
-        post_result = self.get_helper(post_commit_cloned_repo)
+        post_result = self.get_helper(post_commit_cloned_repo, "new")
         return pre_result, post_result
     
-    def get_helper(self, cloned_repo):
+    def get_helper(self, cloned_repo, version):
         changed_functions = []
+        code_context = ""
+        code_context_with_line_num = {}
 
         for modified_file in self.patch.modified_files:
             if modified_file.path in self._get_relevant_changed_files():
@@ -166,19 +172,38 @@ class PullRequest:
 
                 functions = None
                 functions_code = None
+                functions_code_with_line_num = None
                 if Config.context_version == 1: # return only function names
-                    functions, __ = get_function_names(file_content, patch_ranges)
+                    functions, __, __ = get_function_names(file_content, patch_ranges)
                 elif Config.context_version in [2, 3]: # return function names and code
-                    functions, functions_code = get_function_names_code(file_content, patch_ranges)
+                    functions, functions_code, __ = get_function_names_code(file_content, patch_ranges)
                 elif Config.context_version == 4: # return function names and code with line numbers
-                    functions, functions_code = get_function_names_code_with_line_num(file_content, patch_ranges)
-                elif Config.context_version == 5: # return function names and code with to_cover marks
-                    functions, functions_code = get_function_names_code_with_mark(file_content, patch_ranges)
+                    functions, functions_code, __ = get_function_names_code_with_line_num(file_content, patch_ranges)
+                elif Config.context_version == 5: 
+                    functions, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
+                    code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
 
                 for func in functions: # func, name, start ab line, end ab line (included)
                     changed_functions.append(f"{module_name}.{func[0]}")
 
-        return changed_functions, functions_code
+                if functions_code:
+                    code_context += f"The following are the affected functions from file <{modified_file.path}>.\n"
+                    code_context += "\n\n".join(functions_code)
+                    code_context += "\n"
+        
+        if version == "old":
+            self.old_context = code_context
+        else:
+            self.new_context = code_context 
+
+        if Config.context_version == 5:
+            # only needed when add "to_cover" mark to code
+            if version == "old":
+                self.old_context_only_for_mark = code_context_with_line_num 
+            else:
+                self.new_context_only_for_mark = code_context_with_line_num 
+                
+        return changed_functions
 
     def _compute_modified_lines(self):
         self.old_file_path_to_all_modified_lines = {}

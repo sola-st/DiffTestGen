@@ -12,6 +12,7 @@ class FeedbackTestGeneratorPromptV2:
         self.use_json_output = False
 
     def create_prompt(self):
+        # In this case, the model try to map the uncovered lines and the provided code by refereing to @@ line in diff.
         template = """
 Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff, 
 and achieve the highest possible coverage of the specified lines in both the old and new versions:
@@ -19,8 +20,7 @@ and achieve the highest possible coverage of the specified lines in both the old
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}.
-
-The following set contains the old versions of the changed files, where each element consists of a file path and a list of its lines.
+The following are the old versions of these affected functions:
 
 {old_context}
 

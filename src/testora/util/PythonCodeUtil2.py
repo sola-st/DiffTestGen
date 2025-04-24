@@ -16,7 +16,7 @@ class FunctionCollector(cst.CSTVisitor):
 
 '''
 The following functions are some different versions of file analyis to return various information
-All functions return 2 values.
+All functions return 3 values.
 '''
 # TODO get a union of these functions
 def get_function_names(code: str, patch_ranges: list):
@@ -24,7 +24,7 @@ def get_function_names(code: str, patch_ranges: list):
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
-        return None
+        return None, None, None
 
     wrapper = MetadataWrapper(tree)
 
@@ -43,14 +43,14 @@ def get_function_names(code: str, patch_ranges: list):
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value) # Consider multiple functions involved in a single range
 
-    return list(matched_functions), None
+    return list(matched_functions), None, None
 
 def get_function_names_code(code: str, patch_ranges: list):
     ''' Retrun modified function names, and the code of the functions.'''
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
-        return None
+        return None, None, None
 
     wrapper = MetadataWrapper(tree)
     collector = FunctionCollector()
@@ -70,14 +70,14 @@ def get_function_names_code(code: str, patch_ranges: list):
                 function_code = module_with_node.code
                 matched_functions_code.add(function_code)
 
-    return list(matched_functions), list(matched_functions_code)
+    return list(matched_functions), list(matched_functions_code), None
 
 def get_function_names_code_with_line_num(code: str, patch_ranges: list):
     ''' Retrun modified function names, and the code of the functions (with marked line numbers).'''
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
-        return None
+        return None, None, None
 
     wrapper = MetadataWrapper(tree)
     collector = FunctionCollector()
@@ -95,25 +95,33 @@ def get_function_names_code_with_line_num(code: str, patch_ranges: list):
                 matched_functions.add(func_node.name.value)
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
-                numbered_lines = [f"<<{start_line}>> {line}" for i, line in enumerate(function_code.splitlines())]
+                numbered_lines = [f"<{start_line + i}> {line}" for i, line in enumerate(function_code.splitlines())]
                 function_code_with_line_numbers = "\n".join(numbered_lines)
                 matched_functions_code.add(function_code_with_line_numbers)
 
-    return list(matched_functions), list(matched_functions_code)
+    return list(matched_functions), list(matched_functions_code), None
 
-def get_function_names_code_with_mark(code: str, patch_ranges: list):
-    ''' Retrun modified function names, and the code of the functions (with to_cover marks).'''
+def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
+    ''' 
+    Retrun modified function names, the code of the functions, 
+    and a line marked version of code (will be used to add the to_cover mark)
+    '''
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
-        return None
+        return None, None, None
 
     wrapper = MetadataWrapper(tree)
     collector = FunctionCollector()
     wrapper.visit(collector)
 
     matched_functions = set() # function names
-    matched_functions_code = set()
+
+    # the to_cover information represents future knowledge that isn't available during the initial test generation.
+    # So, we can't provide the marked code at this stage. 
+    # Instead, we add the marks during the feedback loop as part of creating prompt.
+    matched_functions_code = set() # used in initial test generation
+    matched_function_code_with_line_num = set() # used to mark to_cover lines in the feedback loop
     for patch_range in patch_ranges:
         target_line = (patch_range[0] + patch_range[1]) / 2
 
@@ -124,11 +132,45 @@ def get_function_names_code_with_mark(code: str, patch_ranges: list):
                 matched_functions.add(func_node.name.value)
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
-                numbered_lines = [f"<<{start_line}>> {line}" for i, line in enumerate(function_code.splitlines())]
+                matched_functions_code.add(function_code)
+                numbered_lines = [f"<{start_line + i}> {line}" for i, line in enumerate(function_code.splitlines())]
                 function_code_with_line_numbers = "\n".join(numbered_lines)
-                matched_functions_code.add(function_code_with_line_numbers)
+                matched_function_code_with_line_num.add(function_code_with_line_numbers)
 
-    return list(matched_functions), list(matched_functions_code)
+    return list(matched_functions), list(matched_functions_code), list(matched_function_code_with_line_num)
+
+def mark_to_cover_code_stmt(uncovered_info:list, file_path_to_code:dict): # list of dicts
+    # mark all uncovered statements in the code, i.e., multiple uncovered info integrate into one code
+    code_with_to_cover_mark = ""
+
+    overall_uncovered = {}
+    # unify all uncovered num for each file, now it is uncovered info from multiple pre_tests
+    for uncovered_from_pre_single_test in uncovered_info:
+        for file_path, uncovered_stmt_nums in uncovered_from_pre_single_test.items():
+            try:
+                overall_uncovered[file_path] = overall_uncovered[file_path].union(uncovered_stmt_nums)
+            except:
+                overall_uncovered.update({file_path: uncovered_stmt_nums})
+
+    # mark the code lines
+    for uncovered_from_pre_all_test in overall_uncovered:
+        for file_path, uncovered_stmt_nums in uncovered_from_pre_all_test.items():
+            for code in file_path_to_code[file_path]:
+                code_block = []
+                for code_line in code: # every code line starts with its line number
+                    num_mark, ori_line = code_line.split("> ", "1")
+                    if int(num_mark.replace("<", "")) in uncovered_stmt_nums:
+                        # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
+                        # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
+                        code_block.append(f"# TO_COVER\n{ori_line}")
+                    else:
+                        code_block.append(ori_line)
+
+                code_with_to_cover_mark += f"The following are the affected functions from file <{file_path}>.\n"
+                code_with_to_cover_mark += "\n\n".join(code_block)
+                code_with_to_cover_mark += "\n"
+                
+    return code_with_to_cover_mark
 
 
 # --- Example, for test ---
@@ -152,17 +194,20 @@ def bar():
     patch_ranges = [(3, 3), (7, 8), (13, 13)]
     functions = None
     functions_code = None
+    functions_code_with_line_num = None
 
     # 1, original Testora (only diff, no contexts)
     context_version = 1 # change as needed
     if context_version == 1:
-        functions, functions_code = get_function_names(sample_code, patch_ranges)
+        functions, functions_code, __ = get_function_names(sample_code, patch_ranges)
     elif context_version in [2, 3]:
-        functions, functions_code = get_function_names_code(sample_code, patch_ranges)
+        functions, functions_code, __ = get_function_names_code("", sample_code, patch_ranges)
     elif context_version == 4:
-        functions, functions_code = get_function_names_code_with_line_num(sample_code, patch_ranges)
+        functions, functions_code, __ = get_function_names_code_with_line_num("", sample_code, patch_ranges)
     elif context_version == 5:
-        functions, functions_code = get_function_names_code_with_mark(sample_code, patch_ranges)
+        functions, functions_code, functions_code_with_line_num = \
+            get_function_names_code_to_with_mark("", sample_code, patch_ranges)
 
     print(functions)
     print(functions_code)
+    print(functions_code_with_line_num)

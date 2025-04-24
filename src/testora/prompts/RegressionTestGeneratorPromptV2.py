@@ -14,7 +14,8 @@ Your task is to generate usage examples of the {project_name} project that expos
 
 The diff affects the following functions: {fut_qualified_names}.
 
-The following set contains the old versions of the changed files, where each element consists of a file path and a list of its lines.
+The following dictionary stores the old versions of the affected functions.
+Each key is the file path of a code file, and the corresponding value is the list of affected functions from that file.
 
 {old_context}
 

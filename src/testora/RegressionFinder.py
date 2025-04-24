@@ -3,7 +3,6 @@ import glob
 import json
 from typing import List
 from github import Github, Auth
-from testora.execution.CoverageAnalyzer import range_to_set
 from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
@@ -32,6 +31,7 @@ from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
 from testora.util.Logs import CoverageEvent, PreClassificationEvent, start_logging, ClassificationEvent, ErrorEvent, PREvent, SelectBehaviorEvent, TestExecutionEvent, append_event, Event, ComparisonEvent, LLMEvent, get_logs_as_json, store_logs, reset_logs
 from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
+from testora.util.PythonCodeUtil2 import mark_to_cover_code_stmt
 from testora.util.UndefinedRefsFinder import get_undefined_references
 from testora.evaluation import EvalTaskManager
 from testora import Config
@@ -55,7 +55,7 @@ if Config.initial_test_generation_prompt_version == 1:
     RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV1
 elif Config.initial_test_generation_prompt_version == 2:
     RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV2
-elif Config.initial_test_generation_prompt_version == 3:
+elif Config.initial_test_generation_prompt_version in [3, 4, 5]:
     RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV3
 
 if Config.feedback_test_generation_prompt_version == 1:
@@ -236,7 +236,7 @@ def generate_tests(pr, github_repo, changed_functions):
             message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
     return all_tests
 
-def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info):
+def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info, all_uncovered_only_for_to_cover_mark:dict=None):
     '''
     Generate replacment tests for the ones that failed to reach the changed lines, 
     and keep different with the exisiting reached tests.
@@ -247,12 +247,20 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     full_diff = pr.get_full_diff()
     filtered_diff = pr.get_filtered_diff()
 
+    old_context = pr.old_context # code lines with line numbers marked
+    new_context = pr.new_context
+    if Config.context_version == "5":
+        # process the code contexts to let code have 'to_cover' marks
+        # in this case, all_uncovered_modified_stmts_info is an empty set
+        old_context = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["old"], pr.old_context_only_for_mark)
+        new_context = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["new"], pr.new_context_only_for_mark)
+
     all_tests = []
 
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
         prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
-                all_uncovered_modified_stmts_info, pr.old_context, pr.new_context)
+                all_uncovered_modified_stmts_info, old_context, new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -261,7 +269,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
         prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
-                all_uncovered_modified_stmts_info, pr.old_context, pr.new_context)
+                all_uncovered_modified_stmts_info, old_context, new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -414,18 +422,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         append_event(Event(pr_nb=pr.number, message="Ignoring because labeled as 'DOC'"))
         return
 
-    # extract diff and names of changed functions
-    # changed_function : qualified names
-    # raw_info_changed_functions: file paths (with "/") and function names
-    # changed_functions = pr.get_changed_function_names()
-    pre_result, post_result  = pr.get_changed_function_names_and_context()
-    old_changed_functions, old_changed_functions_code = pre_result
-    changed_functions, new_changed_functions_code = post_result
-    # no any coverage info, because the initial round do not have converage info yet.
-    pr.old_context = old_changed_functions_code
-    pr.new_context = new_changed_functions_code
+    # extract diff and names of changed functions. changed_function : qualified names
+    # this function call wil also add the desired context to the pr.
+    old_changed_functions, changed_functions  = pr.get_changed_function_names_and_context() 
+    # note: the initial round do not have converage info.
 
-    # changed_functions, raw_info_changed_functions = pr.get_changed_function_names()
     # # extract call gragh and dependency gragh
     # output_dir = join("data", "results", github_repo.name)
     # call_gragh, dependency_gragh = extract_graphs_from_specified_files(
@@ -552,6 +553,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     # analyze coverage during test execution
     fail_to_cover_all_indices = []
     all_uncovered_modified_stmts_info = set()
+    all_uncovered_only_for_to_cover_mark =  {"old": [], "new": []} # Config.context_version = 5
     full_coverage_exists = False
 
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
@@ -590,14 +592,19 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         if uncovered_modified_stmts_old_exist or uncovered_modified_stmts_new_exist:
             fail_to_cover_all_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
             # uncovered_info will be used in feedback prompt.
-            file_to_uncovered_old = [f"{file_path}: {uncovered}" for file_path, uncovered in old_execution.all_uncovered_exec_modified_stmts_num.items()]
-            file_to_uncovered_new = [f"{file_path}: {uncovered}" for file_path, uncovered in new_execution.all_uncovered_exec_modified_stmts_num.items()]
-            file_to_uncovered_old_str = '\n'.join(file_to_uncovered_old)
-            file_to_uncovered_new_str = '\n'.join(file_to_uncovered_new)
-            uncovered_info = (f"Specified lines that need to be covered for each file:\n"
-                              f"Old:\n{file_to_uncovered_old_str}\n"
-                              f"New:\n{file_to_uncovered_new_str}")
-            all_uncovered_modified_stmts_info.add(uncovered_info)
+            if Config.context_version == 5:
+                all_uncovered_only_for_to_cover_mark["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
+                all_uncovered_only_for_to_cover_mark["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
+            else:
+                # TODO to make this a simple string
+                file_to_uncovered_old = [f"{file_path}: {uncovered}" for file_path, uncovered in old_execution.all_uncovered_exec_modified_stmts_num.items()]
+                file_to_uncovered_new = [f"{file_path}: {uncovered}" for file_path, uncovered in new_execution.all_uncovered_exec_modified_stmts_num.items()]
+                file_to_uncovered_old_str = '\n'.join(file_to_uncovered_old)
+                file_to_uncovered_new_str = '\n'.join(file_to_uncovered_new)
+                uncovered_info = (f"Specified lines that need to be covered for each file:\n"
+                                f"Old:\n{file_to_uncovered_old_str}\n"
+                                f"New:\n{file_to_uncovered_new_str}")
+                all_uncovered_modified_stmts_info.add(uncovered_info)
 
         if Config.feedback_test_generation_prompt_version != 0:
             if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False:
@@ -618,11 +625,12 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             # feedback loop to get new tests that are expected to cover more modified lines.
             if is_coverage_changed == True and round < Config.max_round:
                 round+=1
-                details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {len(all_uncovered_modified_stmts_info)}"
+                deduplicated_len = max(len(all_uncovered_modified_stmts_info), len(all_uncovered_only_for_to_cover_mark["old"]))
+                details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"
                 append_event(CoverageEvent(pr_nb=pr.number, 
                         message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
                 
-                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info)
+                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info, all_uncovered_only_for_to_cover_mark)
                 run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
                         old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
             else:

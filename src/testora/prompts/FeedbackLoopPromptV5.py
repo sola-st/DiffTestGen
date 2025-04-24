@@ -1,7 +1,4 @@
 class FeedbackTestGeneratorPromptV5:
-    '''
-    Given the uncovered lines, let LLM generate some new tests that cover the lines.
-    '''
     def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info:set,
                 old_context:set, new_context:set):
         self.project_name = project_name
@@ -19,10 +16,8 @@ and achieve the highest possible coverage of the specified lines in both the old
 
 {diff}
 
-The diff affects the following functions: {fut_qualified_names}.
-
-The following sets contains the old and new versions of the changed files, where each element consists of a file path and a list of its lines.
-Lines that are expected to be covered start with a '<<TO_COVER>> 'mark.
+The diff affects the following functions: {fut_qualified_names}. 
+The following are the old versions of these affected functions, where the comment lines containing # TO_COVER indicate that the next line of code is expected to be covered:
 
 Old version: 
 
@@ -31,11 +26,6 @@ Old version:
 New version:
 
 {new_context}
-
-Each element of the following set starts with 'Specified lines that need to be covered' and follows the specified lines from both the old and new versions that need to be covered.
-For each element, generate one corresponding usage example, i.e., here expected to generate {len} usage example(s).
-
-{all_uncovered_modified_stmts_info}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 Each example must be an executable piece of Python code, including all necessary imports.
@@ -54,8 +44,6 @@ etc.
 """
 
         return template.format(diff=self.diff, project_name=self.project_name, 
-                               all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
-                               len = len(self.all_uncovered_modified_stmts_info),
                                fut_qualified_names=", ".join(self.fut_qualified_names),
                                old_context = self.old_context,
                                new_context = self.new_context)
@@ -91,5 +79,3 @@ etc.
 
         return tests
     
-    # def preprocess_context(self):
-    #     for 

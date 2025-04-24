@@ -20,9 +20,7 @@ and achieve the highest possible coverage of the specified lines in both the old
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}.
-
-The following sets contains the old and new versions of the changed files, where each element consists of a file path and a list of its lines.
-Each line begins with its line number, shown as '<<line_num>> ' at the start.
+The following are the old and the new versions of these affected functions, where each line of code starts with its line number in the format <line_number> :
 
 Old version: 
 
