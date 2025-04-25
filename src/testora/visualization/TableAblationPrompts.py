@@ -110,10 +110,10 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
 def main():
     all_data = []
     all_version_id = []
-    log_folder_parent = "local"
 
-    output_folder = join("data", "results")
-    table_output_folder = join(output_folder, "table_and_plots")
+    results_folder = join("data", "results")
+    log_folder_parent = join(results_folder, "logs")
+    table_output_folder = join(results_folder, "table_and_plots")
     makedirs(table_output_folder, exist_ok=True)
 
     all_log_folder = [join(log_folder_parent, folder) for folder in listdir(log_folder_parent)\

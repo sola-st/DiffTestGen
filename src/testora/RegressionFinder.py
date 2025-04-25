@@ -444,7 +444,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
     # extract diff and names of changed functions. changed_function : qualified names
     # this function call wil also add the desired context to the pr.
-    old_changed_functions, changed_functions  = pr.get_changed_function_names_and_context() 
+    # old_changed_functions available if needed.
+    changed_functions = pr.get_changed_function_names_and_context() 
     # note: the initial round do not have converage info.
 
     # # extract call gragh and dependency gragh
@@ -620,15 +621,6 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                         new_execution.all_uncovered_exec_modified_stmts_num not in all_uncovered_modified_stmts_info["new"]:
                     all_uncovered_modified_stmts_info["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
                     all_uncovered_modified_stmts_info["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
-
-                # file_to_uncovered_old = [f"{file_path}: {uncovered}" for file_path, uncovered in old_execution.all_uncovered_exec_modified_stmts_num.items()]
-                # file_to_uncovered_new = [f"{file_path}: {uncovered}" for file_path, uncovered in new_execution.all_uncovered_exec_modified_stmts_num.items()]
-                # file_to_uncovered_old_str = '\n'.join(file_to_uncovered_old)
-                # file_to_uncovered_new_str = '\n'.join(file_to_uncovered_new)
-                # uncovered_info = (f"Specified lines that need to be covered for each file:\n"
-                #                 f"Old:\n{file_to_uncovered_old_str}\n"
-                #                 f"New:\n{file_to_uncovered_new_str}")
-                # all_uncovered_modified_stmts_info.add(uncovered_info)
 
         if Config.feedback_test_generation_prompt_version != 0:
             if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False:

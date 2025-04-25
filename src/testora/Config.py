@@ -35,18 +35,6 @@ max_round = 3
 # different prompts for classification task
 classification_prompt_version = 4
 
-'''
-Version clarification for the following two prompts:
-(so far, here the context indicated function code)
-
-            Initial                         Feedback                                Details
-1.  original Testora            marked as 0,  original Testora          (original Testora, but report detailed coverage info)
-                                marked as 1, add a loop                 only diff
-2.  |--use old context                                      --|         diff + old context
-3.  |--use both old and new contexts                        --|         diff + old context + new context 
-4.  |--use both old and new contexts with line numbers      --|         diff + old context + new context (line numbers marked)
-5.  |--use both old and new contexts with to_cover marks    --|         diff + old context + new context (to_cover mark added)
-'''
 # different prompts for initial round (0th) test generation
 initial_test_generation_prompt_version = 2
 

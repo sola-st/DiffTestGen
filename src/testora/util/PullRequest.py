@@ -94,9 +94,9 @@ class PullRequest:
             raise Exception(f"Unexpected configuration value: {Config.code_change_pl}")
 
     def get_filtered_diff(self):
-        pre_commit_cloned_repo = None
-        if Config.context_version == 1: # provide the entire file content as context for query.
-            pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
+        # pre_commit_cloned_repo = None
+        # if Config.context_type == 1: # provide the entire file content as context for query.
+        #     pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
 
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         diff_parts = []
@@ -104,13 +104,13 @@ class PullRequest:
             raw_diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit, file_path)
             diff_parts.append(raw_diff)
 
-            if Config.context_version == 1:
-                # collect old and new file contents
-                with open(f"{pre_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
-                    self.old_context.update({file_path: f.read()})
+            # if Config.context_type == 1:
+            #     # collect old and new file contents
+            #     with open(f"{pre_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
+            #         self.old_context.update({file_path: f.read()})
                 
-                with open(f"{post_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
-                    self.new_context.update({file_path: f.read()})
+            #     with open(f"{post_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
+            #         self.new_context.update({file_path: f.read()})
 
         return "\n\n".join(diff_parts)
 
@@ -148,10 +148,10 @@ class PullRequest:
     
     def get_changed_function_names_and_context(self):
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-        pre_result = self.get_helper(pre_commit_cloned_repo, "old")
+        changed_function_qualified_names_old = self.get_helper(pre_commit_cloned_repo, "old") # target on getting old context
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
-        post_result = self.get_helper(post_commit_cloned_repo, "new")
-        return pre_result, post_result
+        changed_function_qualified_names_new = self.get_helper(post_commit_cloned_repo, "new")
+        return changed_function_qualified_names_new
     
     def get_helper(self, cloned_repo, version):
         changed_functions = []

@@ -9,7 +9,7 @@ Each setting begins with three numbers that correspond to the detailed columns i
 
 | Version ID |    Initial test generation         |      Feedback test generation      |      Context      | Numbers to set |  Labeled version name 
 |:---- |:---------------- | :------ | :---- |  :---- |   :---- |
-|1|  Original Testora        |   **0** marked as 0 (means no feeback),  original Testora but report detailed covered statements |      **0** No context |   1 0 0   |   **V1_0_0 (Original Testora)**
+|1|  Original Testora        |   **0** marked as 0 (means no feeback),  original Testora but report detailed covered statements |      **1** No context |   1 0 1   |   **V1_0_1 (Original Testora)**
 | |  Use only diff          |   **1** marked as 1, add a loop. Use diff + uncovered statements info           |    **1** No context |   1 1 1   |   **V1_1_1** 
 |2|  Use diff + old context         |      Use diff + uncovered statements info +  old context |       Functions' code |   2 2 2   |   **V2_2_2** 
 |3|  Use diff + old context + new context    |   Use diff + uncovered statements info +  old context + new context  | Functions' code  |   3 3 3    |     **V3_3_3**
