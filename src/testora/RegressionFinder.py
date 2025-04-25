@@ -236,7 +236,18 @@ def generate_tests(pr, github_repo, changed_functions):
             message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
     return all_tests
 
-def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info, all_uncovered_only_for_to_cover_mark:dict=None):
+def get_str_from_dict(uncover_dict:dict):
+    # a util function for 'generate_replacement_tests'
+    uncovered_str = ""
+    for file_path, uncovered_nums in uncover_dict.items():
+        if uncovered_nums:
+            uncovered_str += f"{file_path}: {uncovered_nums}\n"
+        else:
+            uncovered_str += f"{file_path}: {{}}\n"
+    
+    return uncovered_str
+
+def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info_dict, all_uncovered_only_for_to_cover_mark:dict=None):
     '''
     Generate replacment tests for the ones that failed to reach the changed lines, 
     and keep different with the exisiting reached tests.
@@ -246,6 +257,14 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     # prepare context used by one or more prompts
     full_diff = pr.get_full_diff()
     filtered_diff = pr.get_filtered_diff()
+
+    # get a model easy-to-foolow string of uncovered info
+    all_uncovered_modified_stmts_info = ""
+    old_uncovered_list, new_uncovered_list = all_uncovered_modified_stmts_info_dict.values()
+    for i, (single_old, single_new) in enumerate(zip(old_uncovered_list, new_uncovered_list)):
+        old_uncovered_str = get_str_from_dict(single_old)
+        new_uncovered_str = get_str_from_dict(single_new)
+        all_uncovered_modified_stmts_info += f"Information {i+1}:\nOld:\n{old_uncovered_str}New:\n{new_uncovered_str}"
 
     old_context = pr.old_context # code lines with line numbers marked
     new_context = pr.new_context
@@ -552,7 +571,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
     # analyze coverage during test execution
     fail_to_cover_all_indices = []
-    all_uncovered_modified_stmts_info = set()
+    all_uncovered_modified_stmts_info = {"old": [], "new": []}
     all_uncovered_only_for_to_cover_mark =  {"old": [], "new": []} # Config.context_version = 5
     full_coverage_exists = False
 
@@ -596,15 +615,19 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 all_uncovered_only_for_to_cover_mark["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
                 all_uncovered_only_for_to_cover_mark["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
             else:
-                # TODO to make this a simple string
-                file_to_uncovered_old = [f"{file_path}: {uncovered}" for file_path, uncovered in old_execution.all_uncovered_exec_modified_stmts_num.items()]
-                file_to_uncovered_new = [f"{file_path}: {uncovered}" for file_path, uncovered in new_execution.all_uncovered_exec_modified_stmts_num.items()]
-                file_to_uncovered_old_str = '\n'.join(file_to_uncovered_old)
-                file_to_uncovered_new_str = '\n'.join(file_to_uncovered_new)
-                uncovered_info = (f"Specified lines that need to be covered for each file:\n"
-                                f"Old:\n{file_to_uncovered_old_str}\n"
-                                f"New:\n{file_to_uncovered_new_str}")
-                all_uncovered_modified_stmts_info.add(uncovered_info)
+                if old_execution.all_uncovered_exec_modified_stmts_num not in all_uncovered_modified_stmts_info["old"] or \
+                        new_execution.all_uncovered_exec_modified_stmts_num not in all_uncovered_modified_stmts_info["new"]:
+                    all_uncovered_modified_stmts_info["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
+                    all_uncovered_modified_stmts_info["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
+
+                # file_to_uncovered_old = [f"{file_path}: {uncovered}" for file_path, uncovered in old_execution.all_uncovered_exec_modified_stmts_num.items()]
+                # file_to_uncovered_new = [f"{file_path}: {uncovered}" for file_path, uncovered in new_execution.all_uncovered_exec_modified_stmts_num.items()]
+                # file_to_uncovered_old_str = '\n'.join(file_to_uncovered_old)
+                # file_to_uncovered_new_str = '\n'.join(file_to_uncovered_new)
+                # uncovered_info = (f"Specified lines that need to be covered for each file:\n"
+                #                 f"Old:\n{file_to_uncovered_old_str}\n"
+                #                 f"New:\n{file_to_uncovered_new_str}")
+                # all_uncovered_modified_stmts_info.add(uncovered_info)
 
         if Config.feedback_test_generation_prompt_version != 0:
             if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False:

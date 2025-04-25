@@ -2,8 +2,7 @@ class FeedbackTestGeneratorPromptV2:
     '''
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info:set,
-                old_context:set, new_context:set):
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
@@ -24,8 +23,8 @@ The following are the old versions of these affected functions:
 
 {old_context}
 
-Each element of the following set starts with 'Specified lines that need to be covered' and follows the specified lines from both the old and new versions that need to be covered.
-For each element, generate one corresponding usage example, i.e., here expected to generate {len} usage example(s).
+The following lists several pieces of information specifying the lines that should be covered in both the old and new versions of the code.
+Generate one usage example for each piece of the information. 
 
 {all_uncovered_modified_stmts_info}
 

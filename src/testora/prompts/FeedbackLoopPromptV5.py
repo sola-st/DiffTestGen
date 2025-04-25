@@ -1,6 +1,6 @@
 class FeedbackTestGeneratorPromptV5:
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info:set,
-                old_context:set, new_context:set):
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info,
+                old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
@@ -10,6 +10,7 @@ class FeedbackTestGeneratorPromptV5:
         self.use_json_output = False
 
     def create_prompt(self):
+        # TODO ask for several more tests
         template = """
 Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff, 
 and achieve the highest possible coverage of the specified lines in both the old and new versions:
