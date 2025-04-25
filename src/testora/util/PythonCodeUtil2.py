@@ -192,22 +192,22 @@ def bar():
     pass'''
 
     patch_ranges = [(3, 3), (7, 8), (13, 13)]
-    functions = None
+    function_names = None
     functions_code = None
     functions_code_with_line_num = None
 
     # 1, original Testora (only diff, no contexts)
-    context_version = 1 # change as needed
+    context_version = 2 # change as needed
     if context_version == 1:
-        functions, functions_code, __ = get_function_names(sample_code, patch_ranges)
+        function_names, functions_code, __ = get_function_names(sample_code, patch_ranges)
     elif context_version in [2, 3]:
-        functions, functions_code, __ = get_function_names_code("", sample_code, patch_ranges)
+        function_names, functions_code, __ = get_function_names_code(sample_code, patch_ranges)
     elif context_version == 4:
-        functions, functions_code, __ = get_function_names_code_with_line_num("", sample_code, patch_ranges)
+        function_names, functions_code, __ = get_function_names_code_with_line_num(sample_code, patch_ranges)
     elif context_version == 5:
-        functions, functions_code, functions_code_with_line_num = \
-            get_function_names_code_to_with_mark("", sample_code, patch_ranges)
+        function_names, functions_code, functions_code_with_line_num = \
+            get_function_names_code_to_with_mark(sample_code, patch_ranges)
 
-    print(functions)
+    print(function_names)
     print(functions_code)
     print(functions_code_with_line_num)

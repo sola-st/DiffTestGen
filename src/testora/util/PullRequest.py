@@ -170,21 +170,21 @@ class PullRequest:
                     patch_range = (start_line, end_line) # numbers start at 1 andend_line included
                     patch_ranges.append(patch_range) 
 
-                functions = None
+                function_names = None
                 functions_code = None
                 functions_code_with_line_num = None
                 if Config.context_version == 1: # return only function names
-                    functions, __, __ = get_function_names(file_content, patch_ranges)
+                    function_names, __, __ = get_function_names(file_content, patch_ranges)
                 elif Config.context_version in [2, 3]: # return function names and code
-                    functions, functions_code, __ = get_function_names_code(file_content, patch_ranges)
+                    function_names, functions_code, __ = get_function_names_code(file_content, patch_ranges)
                 elif Config.context_version == 4: # return function names and code with line numbers
-                    functions, functions_code, __ = get_function_names_code_with_line_num(file_content, patch_ranges)
+                    function_names, functions_code, __ = get_function_names_code_with_line_num(file_content, patch_ranges)
                 elif Config.context_version == 5: 
-                    functions, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
+                    function_names, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
                     code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
 
-                for func in functions: # func, name, start ab line, end ab line (included)
-                    changed_functions.append(f"{module_name}.{func[0]}")
+                for func_name in function_names:
+                    changed_functions.append(f"{module_name}.{func_name}")
 
                 if functions_code:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>.\n"
