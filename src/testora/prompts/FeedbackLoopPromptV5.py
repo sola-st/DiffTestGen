@@ -1,10 +1,9 @@
 class FeedbackTestGeneratorPromptV5:
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info,
-                old_context, new_context):
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered statements of both versions
+        self.expected_test_num = all_uncovered_modified_stmts_info # it is a int in this version, means the expected number of new tests
         self.old_context = old_context
         self.new_context = new_context
         self.use_json_output = False
@@ -18,7 +17,7 @@ and achieve the highest possible coverage of the specified lines in both the old
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}. 
-The following are the old versions of these affected functions, where the comment lines containing # TO_COVER indicate that the next line of code is expected to be covered:
+The following are the old versions of these affected functions. Comment lines containing # TO_COVER indicate that the next line of code is expected to be covered by the generated usage example(s), here expected to generate {expected_test_num} usage example(s).
 
 Old version: 
 
@@ -46,6 +45,7 @@ etc.
 
         return template.format(diff=self.diff, project_name=self.project_name, 
                                fut_qualified_names=", ".join(self.fut_qualified_names),
+                               expected_test_num=self.expected_test_num,
                                old_context = self.old_context,
                                new_context = self.new_context)
 

@@ -273,6 +273,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
         # in this case, all_uncovered_modified_stmts_info is an empty set
         old_context = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["old"], pr.old_context_only_for_mark)
         new_context = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["new"], pr.new_context_only_for_mark)
+        all_uncovered_modified_stmts_info = len(all_uncovered_only_for_to_cover_mark["old"]) # to indicate how many tetst to generate
 
     all_tests = []
 
