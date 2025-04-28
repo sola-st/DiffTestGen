@@ -639,7 +639,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info does not change anymore."))
             
             # feedback loop to get new tests that are expected to cover more modified lines.
-            if is_coverage_changed == True and round < Config.max_round:
+            if is_coverage_changed == True: # and round < Config.max_round:
                 round+=1
                 deduplicated_len = max(len(all_uncovered_modified_stmts_info), len(all_uncovered_only_for_to_cover_mark["old"]))
                 details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"

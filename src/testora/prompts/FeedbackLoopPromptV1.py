@@ -18,8 +18,8 @@ and achieve the highest possible coverage of the specified lines in both the old
 
 The diff affects the following functions: {fut_qualified_names}.
 
-Each element of the following set starts with 'Specified lines that need to be covered' and follows the specified lines from both the old and new versions that need to be covered.
-For each element, generate one corresponding usage example, i.e., here expected to generate {len} usage example(s).
+The following lists several pieces of information specifying the lines that should be covered in both the old and new versions of the code.
+Generate one usage example for each piece of the information. 
 
 {all_uncovered_modified_stmts_info}
 
@@ -41,7 +41,6 @@ etc.
 
         return template.format(diff=self.diff, project_name=self.project_name, 
                                all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
-                               len = len(self.all_uncovered_modified_stmts_info),
                                fut_qualified_names=", ".join(self.fut_qualified_names))
 
     def remove_unnecessary_indentation(self, code):
