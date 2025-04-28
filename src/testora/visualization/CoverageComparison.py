@@ -47,7 +47,7 @@ class CoverageComparison():
         with open(log_file, "r") as f:
             info = json.load(f)
         
-        pr_num = None
+        pr_num = info[1]["pr_nb"]
         project_name = None
         pre_round = -1
         for info_block in info:
@@ -57,7 +57,7 @@ class CoverageComparison():
                         "All executable/coverable modified lines:" in info_block_details:
                     if "Diff coverage, all rounds" in info_block["message"]:
                         if not self.all_executable_modified_lines_old_len and (not self.all_executable_modified_lines_new_len):
-                            pr_num = info_block["pr_nb"]
+                            # pr_num = info_block["pr_nb"]
                             tmp = info_block_details.split("Old: ")[1]
                             all_executable_modified_lines_old_ranges, all_executable_modified_lines_new_ranges = tmp.split(", New: ")
                             old = all_executable_modified_lines_old_ranges.replace("\'", "\"").replace("[", "\"[").replace("]", "]\"")

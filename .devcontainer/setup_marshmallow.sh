@@ -44,4 +44,4 @@ docker exec -w /home/marshmallow marshmallow-dev3 pip install -e '.[dev]'
 docker exec -w /home/marshmallow marshmallow-dev3 pip install coverage
 echo "Done with third clone"
 
-cd ../../../Testora
+cd ../../../Testora-diff-test-gen

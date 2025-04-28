@@ -104,8 +104,8 @@ class DockerExecutor:
                 f"--exec_modified_lines_old \'{old_file_path_to_all_modified_lines}\' "
                 f"--exec_modified_lines_new \'{new_file_path_to_all_modified_lines}\'")
             
-            # TODO intsall this when create the containers
-            self.container.exec_run("python3 -m pip install coverage") 
+            # intsall this in the containers
+            # self.container.exec_run("python3 -m pip install coverage") 
             analysis_results = self.container.exec_run(analysis_command)
             analysis_output = analysis_results.output.decode()
             if analysis_output:
