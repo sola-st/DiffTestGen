@@ -2,11 +2,12 @@ class FeedbackTestGeneratorPromptV2:
     '''
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, old_context, new_context):
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, round, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
         self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered statements of both versions
+        self.round = round
         self.old_context = old_context
         self.use_json_output = False
 
@@ -34,17 +35,17 @@ Print all relevant values, including intermediate values, in a human-readable fo
 
 Wrap each individual example into Python code blocks by using the following output format:
 ```python
-# New Example 1:
+# Round {round} Example 1:
 ...
 ```
 ```python
-# New Example 2:
+# Round {round} Example 2:
 ...
 ```
 etc.
 """
 
-        return template.format(diff=self.diff, project_name=self.project_name, 
+        return template.format(diff=self.diff, project_name=self.project_name, round=self.round,
                                all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
                                len = len(self.all_uncovered_modified_stmts_info),
                                fut_qualified_names=", ".join(self.fut_qualified_names),

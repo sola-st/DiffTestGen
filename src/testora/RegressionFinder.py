@@ -251,7 +251,7 @@ def get_str_from_dict(uncover_dict:dict):
     
     return uncovered_str
 
-def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info_dict, all_uncovered_only_for_to_cover_mark:dict=None):
+def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info_dict, round, all_uncovered_only_for_to_cover_mark:dict=None):
     '''
     Generate replacment tests for the ones that failed to reach the changed lines, 
     and keep different with the exisiting reached tests.
@@ -284,7 +284,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
         prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
-                all_uncovered_modified_stmts_info, old_context, new_context)
+                all_uncovered_modified_stmts_info, round, old_context, new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -293,7 +293,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
         prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
-                all_uncovered_modified_stmts_info, old_context, new_context)
+                all_uncovered_modified_stmts_info, round, old_context, new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -651,7 +651,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 append_event(CoverageEvent(pr_nb=pr.number, 
                         message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
                 
-                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info, all_uncovered_only_for_to_cover_mark)
+                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info, round, all_uncovered_only_for_to_cover_mark)
                 run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
                         old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
             else:

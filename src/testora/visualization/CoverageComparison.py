@@ -48,7 +48,7 @@ class CoverageComparison():
             info = json.load(f)
         
         pr_num = info[1]["pr_nb"]
-        project_name = None
+        project_name = info[1]["url"].split("/")[-3]
         pre_round = -1
         for info_block in info:
             if "details" in info_block.keys():
@@ -80,9 +80,6 @@ class CoverageComparison():
                         if "Diff coverage, round " in info_block_msg:
                             pre_round = self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, info_block_msg, "old", pre_round)
                             pre_round = self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, info_block_msg, "new", pre_round)
-
-            elif not project_name and "url" in info_block.keys():
-                project_name = info_block["url"].split("/")[-3]
 
         # append the last round, related to get_union_numbers_form_dict
         self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))
