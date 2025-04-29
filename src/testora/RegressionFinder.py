@@ -134,8 +134,11 @@ def merge_tests_and_execute(test_executions, docker_executor, version) -> List[s
 
 def execute_test(test_execution, docker_executor, version):
     # True -> to analyze the coverage info inside the container
+    analysis = True
+    if version == "main":
+        analysis = False # Do not check coverage info when run tests at main. 1. in case the file does not exist in main 2. save time
     output, coverage_report = docker_executor.execute_python_code(test_execution.code, \
-            analysis=True, version=version, test_execution=test_execution)
+            analysis, version=version, test_execution=test_execution)
     output = clean_output(output)
     test_execution.output = output
     test_execution.coverage_report = coverage_report
@@ -179,6 +182,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
 
 
 def is_crash(output):
+    # TODO Reduce mis-matching.
     return "Traceback (most recent call last)" in output or \
         "error" in output.lower() or \
         "fail" in output.lower()
@@ -364,6 +368,7 @@ def reduce_test(cloned_repo_manager, pr, old_execution, new_execution):
 def check_if_present_in_main(cloned_repo_manager, pr, new_execution):
     main_execution = TestExecution(new_execution.code)
     execute_tests_on_commit(cloned_repo_manager, pr, [main_execution], "main", "main")
+    # TODO NOT just matching the output strings
     return main_execution.output == new_execution.output
 
 
