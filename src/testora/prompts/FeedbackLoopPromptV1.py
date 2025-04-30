@@ -2,12 +2,11 @@ class FeedbackTestGeneratorPromptV1:
     '''
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, round, old_context, new_context):
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
         self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered statements of both versions
-        self.round = round
         self.use_json_output = False
 
     def create_prompt(self):
@@ -19,8 +18,8 @@ and achieve the highest possible coverage of the specified lines in both the old
 
 The diff affects the following functions: {fut_qualified_names}.
 
-The following lists several pieces of information specifying the lines that should be covered in both the old and new versions of the code.
-Generate one usage example for each piece of the information. 
+Each "Information" block below specifies the lines of code that should be covered in the old and new versions.
+For each block, generate one usage example that covers all the specified lines in both the old and new versions.
 
 {all_uncovered_modified_stmts_info}
 
@@ -28,19 +27,15 @@ The usage examples you create may use only the public API of the {project_name} 
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
-Wrap each individual example into Python code blocks by using the following output format:
+Wrap each individual example into a Python code block by using the following output format:
 ```python
-# Round {round} Example 1:
+# Example N:
 ...
 ```
-```python
-# Round {round} Example 2:
-...
-```
-etc.
+Where N is the example number, starting at 1 and increasing sequentially for each additional example.
 """
 
-        return template.format(diff=self.diff, project_name=self.project_name, round=self.round,
+        return template.format(diff=self.diff, project_name=self.project_name, 
                                all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
                                fut_qualified_names=", ".join(self.fut_qualified_names))
 

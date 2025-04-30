@@ -57,9 +57,10 @@ class GatherDiffOutputInfo():
 
 if __name__=="__main__":
     version_id = "1_1_1"
+    iteration = 2
     output_folder = join("data", "results")
-    dtg_log_folder = join(output_folder, "logs", f"log_{version_id}")
-    table_output_folder = join(output_folder, "table_and_plots")
+    dtg_log_folder = join(output_folder, f"logs_iter{iteration}", f"log_{version_id}")
+    table_output_folder = join(output_folder, "table_and_plots", f"meta_iter{iteration}")
     makedirs(table_output_folder, exist_ok=True)
     init = GatherDiffOutputInfo(dtg_log_folder, version_id)
     all_from_cur_version = init.get_multiple_pr_output_info()

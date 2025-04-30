@@ -188,14 +188,19 @@ def is_crash(output):
         "fail" in output.lower()
 
 
-def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1):
+def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, round=0):
     raw_answer = model.query(prompt, nb_samples)
     append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
 
     generated_tests = prompt.parse_answer(raw_answer)
+    name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
-        append_event(LLMEvent(pr_nb=pr.number, message=f"Generated test {idx+1} ({diff_version})", content=test))
-    return generated_tests
+        test_name, test_code = test.split(":", 1)
+        marked_name = test_name.replace("# Example", f"# Round {round} Example", 1) + f" ({diff_version}):"
+        formatted_test = f"{marked_name}{test_code}"
+        append_event(LLMEvent(pr_nb=pr.number, message=f"Generated test {idx+1}, round {round} ({diff_version})", content=formatted_test))
+        name_formatted_generated_tests.append(formatted_test)
+    return name_formatted_generated_tests
 
 
 def remove_tests_with_private_call(tests):
@@ -245,10 +250,10 @@ def get_str_from_dict(uncover_dict:dict):
     uncovered_str = ""
     for file_path, uncovered_nums in uncover_dict.items():
         if uncovered_nums:
-            uncovered_str += f"{file_path}: {uncovered_nums}\n"
-        else:
-            uncovered_str += f"{file_path}: {{}}\n"
-    
+            uncovered_str += f"{file_path}: lines {uncovered_nums}\n"
+
+    if not uncovered_str:
+        uncovered_str = "No specified lines.\n"
     return uncovered_str
 
 def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info_dict, round, all_uncovered_only_for_to_cover_mark:dict=None):
@@ -284,20 +289,20 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     if len(full_diff.split("\n")) <= 200:
         # full diff with GPT4
         prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
-                all_uncovered_modified_stmts_info, round, old_context, new_context)
-        all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
+                all_uncovered_modified_stmts_info, old_context, new_context)
+        all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", round=round))
 
         # full diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, "full_diff", nb_samples=10))
+        # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, "full_diff", nb_samples=10, round=round))
 
     if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
         # filtered diff with GPT4
         prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
-                all_uncovered_modified_stmts_info, round, old_context, new_context)
-        all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
+                all_uncovered_modified_stmts_info, old_context, new_context)
+        all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", round=round))
 
         # filtered diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, gpt35, "filtered_diff", nb_samples=10))
+        # all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, gpt35, "filtered_diff", nb_samples=10, round=round))
 
     # de-dup tests
     nb_tests_before_dedup_and_cleaning = len(all_tests)
@@ -317,9 +322,9 @@ def validate_output_difference(cloned_repo_manager, pr, old_execution, new_execu
     # re-execute test on old and new version and ignore flaky differences
     # for _ in range(len(new_execution)): # H: default to 1?
     old_execution_repeated = TestExecution(old_execution.code)
-    execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit, "old")
+    execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit, "old flaky")
     new_execution_repeated = TestExecution(new_execution.code)
-    execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit, "new")
+    execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit, "new flaky")
     if old_execution.output != old_execution_repeated.output:
         return False
     if new_execution.output != new_execution_repeated.output:
@@ -343,8 +348,8 @@ def reduce_test(cloned_repo_manager, pr, old_execution, new_execution):
     # execute all variants
     old_executions = [TestExecution(t) for t in increasingly_smaller_tests]
     new_executions = [TestExecution(t) for t in increasingly_smaller_tests]
-    execute_tests_on_commit(cloned_repo_manager, pr, old_executions, pr.pre_commit, "old")
-    execute_tests_on_commit(cloned_repo_manager, pr, new_executions, pr.post_commit, "new")
+    execute_tests_on_commit(cloned_repo_manager, pr, old_executions, pr.pre_commit, "old reduce")
+    execute_tests_on_commit(cloned_repo_manager, pr, new_executions, pr.post_commit, "new reduce")
 
     # find the last test that still shows a difference
     reduced_old_execution = old_execution
@@ -596,11 +601,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         details = (f"Old: {old_execution.coverage_percentage}, New: {new_execution.coverage_percentage}\n"
                 f"Uncovered modified lines: Old: {old_execution.all_uncovered_exec_modified_stmt_ranges}, New: {new_execution.all_uncovered_exec_modified_stmt_ranges}\n"
                 f"Covered modified lines: Old: {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
-        append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, round {round}", details=details))
-        
-        # to check if all the rounds and executions cover the same statements
-        all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # a dict, and each value is a list of ranges
-        all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
+        append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, {old_execution.code.split(':', 1)[0]}", details=details))
 
         # Check whether to enter to the feebackloop
         uncovered_modified_stmts_old_exist = False
@@ -622,10 +623,15 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 all_uncovered_only_for_to_cover_mark["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
                 all_uncovered_only_for_to_cover_mark["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
             else:
-                if old_execution.all_uncovered_exec_modified_stmts_num not in all_uncovered_modified_stmts_info["old"] or \
-                        new_execution.all_uncovered_exec_modified_stmts_num not in all_uncovered_modified_stmts_info["new"]:
+                if (old_execution.all_covered_exec_modified_stmt_ranges not in all_covered_modified_stmts_old or \
+                        new_execution.all_covered_exec_modified_stmt_ranges not in all_covered_modified_stmts_new): 
+                    # deduplicate from all rounds 
                     all_uncovered_modified_stmts_info["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
                     all_uncovered_modified_stmts_info["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
+        
+        # to check if all the rounds and executions cover the same statements
+        all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # a dict, and each value is a list of ranges
+        all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
 
         if Config.feedback_test_generation_prompt_version != 0:
             if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False:
@@ -638,15 +644,14 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             is_coverage_changed = True
             if round > 1: # initail round is 0, and feedback loop starts from 1, here we expect Config.max_round feedback loops.
                 # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
-                if (old_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_old and \
-                        new_execution.all_covered_exec_modified_stmt_ranges in all_covered_modified_stmts_new):
+                if not all_uncovered_modified_stmts_info["old"]:
                     is_coverage_changed = False
-                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends, coverage info does not change anymore."))
+                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, coverage info does not change anymore."))
             
             # feedback loop to get new tests that are expected to cover more modified lines.
             if is_coverage_changed == True: # and round < Config.max_round:
                 round+=1
-                deduplicated_len = max(len(all_uncovered_modified_stmts_info), len(all_uncovered_only_for_to_cover_mark["old"]))
+                deduplicated_len = max(len(all_uncovered_modified_stmts_info["old"]), len(all_uncovered_only_for_to_cover_mark["old"]))
                 details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"
                 append_event(CoverageEvent(pr_nb=pr.number, 
                         message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
@@ -654,11 +659,11 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info, round, all_uncovered_only_for_to_cover_mark)
                 run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
                         old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
-            else:
-                if is_coverage_changed == True:
-                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
+            # else:
+            #     if is_coverage_changed == True:
+            #         append_event(Event(pr_nb=pr.number, message=f"Refinement ends, reach the max iteration ({Config.max_round}) of feedback."))
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Refinement ends, full coverage exists."))
+            append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, full coverage exists."))
 
     return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
 
