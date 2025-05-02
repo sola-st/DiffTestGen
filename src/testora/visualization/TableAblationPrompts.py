@@ -108,12 +108,14 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
     print(f"The comparison table is wriitten to {tex_file}")
 
 def main():
+    iteration = 2
+
     all_data = []
     all_version_id = []
 
     results_folder = join("data", "results")
-    log_folder_parent = join(results_folder, "logs")
-    table_output_folder = join(results_folder, "table_and_plots")
+    log_folder_parent = join(results_folder, f"logs_iter{iteration}")
+    table_output_folder = join(results_folder, "table_and_plots", f"meta_iter{iteration}")
     makedirs(table_output_folder, exist_ok=True)
 
     all_log_folder = [join(log_folder_parent, folder) for folder in listdir(log_folder_parent)\

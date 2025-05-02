@@ -77,7 +77,7 @@ class CoverageComparison():
                         covered_lines_old_ranges_dict = json.loads(old) # from files to lines
                         covered_lines_new_ranges_dict = json.loads(new)
                         info_block_msg = info_block["message"]
-                        if "Diff coverage, round " in info_block_msg:
+                        if "Diff coverage, # Round " in info_block_msg:
                             pre_round = self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, info_block_msg, "old", pre_round)
                             pre_round = self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, info_block_msg, "new", pre_round)
 
@@ -91,7 +91,7 @@ class CoverageComparison():
             covered_stmts_tmp = range_to_set(stmt_num_ranges)
             covered_stmts = set(covered_stmts_tmp)
 
-            round = int(info_block_msg.rsplit(" ", 1)[1].replace("\"", ""))
+            round = int(info_block_msg.split("# Round ", 1)[1].split(" ", 1)[0])
             if pre_round != round: # another round starts, record all the collected info for round {round}
                 if self.union_covered_lines_single_round["old"].keys():
                     self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))

@@ -30,8 +30,11 @@ class GatherDiffOutputInfo():
                 if info_block_msg.startswith("Different outputs\nCovered lines in old"):
                     tmp = info_block_msg.split("Covered lines in old: ")[1]
                     old_covered_info, new_covered_info = tmp.split(", Covered lines in new: ")
+                    test_example_name = info_block["test_code"].split(":", 1)[0]
+                    if "\n" in test_example_name:
+                        test_example_name = test_example_name.rsplit("\n", 1)[1]
                     test_level_block = {
-                        "test_example_name": info_block["test_code"].split(":", 1)[0],
+                        "test_example_name": test_example_name,
                         "covered_lines_in_old": old_covered_info,
                         "covered_lines_in_new": new_covered_info,
                     }
