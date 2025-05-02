@@ -277,12 +277,15 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
 
     old_context = pr.old_context # code lines with line numbers marked
     new_context = pr.new_context
-    if Config.context_version == "5":
+    if Config.context_version == 5:
         # process the code contexts to let code have 'to_cover' marks
         # in this case, all_uncovered_modified_stmts_info is an empty set
-        old_context = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["old"], pr.old_context_only_for_mark)
-        new_context = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["new"], pr.new_context_only_for_mark)
+        old_context, overall_uncovered_old = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["old"], pr.old_context_only_for_mark)
+        new_context, overall_uncovered_new = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["new"], pr.new_context_only_for_mark)
         all_uncovered_modified_stmts_info = len(all_uncovered_only_for_to_cover_mark["old"]) # to indicate how many tetst to generate
+
+        details = f"All uncovered: Old: {overall_uncovered_old}, New: {overall_uncovered_new}"
+        append_event(CoverageEvent(pr_nb=pr.number, message=f"All uncovered, round {round}", details=f"{details}"))
 
     all_tests = []
 

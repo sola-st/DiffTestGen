@@ -153,24 +153,25 @@ def mark_to_cover_code_stmt(uncovered_info:list, file_path_to_code:dict): # list
                 overall_uncovered.update({file_path: uncovered_stmt_nums})
 
     # mark the code lines
-    for uncovered_from_pre_all_test in overall_uncovered:
-        for file_path, uncovered_stmt_nums in uncovered_from_pre_all_test.items():
-            for code in file_path_to_code[file_path]:
-                code_block = []
-                for code_line in code: # every code line starts with its line number
-                    num_mark, ori_line = code_line.split("> ", "1")
-                    if int(num_mark.replace("<", "")) in uncovered_stmt_nums:
-                        # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
-                        # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
-                        code_block.append(f"# TO_COVER\n{ori_line}")
-                    else:
-                        code_block.append(ori_line)
+    # for uncovered_from_pre_all_test in overall_uncovered:
+    for file_path, uncovered_stmt_nums in overall_uncovered.items():
+        code_list = file_path_to_code[file_path]
+        code_block = []
+        for code in code_list:
+            for code_line in code.splitlines(): # every code line starts with its line number
+                num_mark, ori_line = code_line.split("> ", 1)
+                if int(num_mark.replace("<", "")) in uncovered_stmt_nums:
+                    # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
+                    # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
+                    code_block.append(f"# TO_COVER\n{ori_line}")
+                else:
+                    code_block.append(ori_line)
 
-                code_with_to_cover_mark += f"The following are the affected functions from file <{file_path}>.\n"
-                code_with_to_cover_mark += "\n\n".join(code_block)
-                code_with_to_cover_mark += "\n"
+            code_with_to_cover_mark += f"The following are the affected functions from file <{file_path}>.\n"
+            code_with_to_cover_mark += "\n".join(code_block)
+            code_with_to_cover_mark += "\n"
                 
-    return code_with_to_cover_mark
+    return code_with_to_cover_mark, overall_uncovered
 
 
 # --- Example, for test ---
