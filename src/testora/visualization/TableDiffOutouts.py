@@ -33,6 +33,7 @@ def get_max_round_and_detailed_distribution(grouped_data):
                         distribution_str[pr_num].update({round_num: 1})
                     else:
                         distribution_str[pr_num][round_num] += 1
+            distribution_str[pr_num]["Total occurrences"] = sum(distribution_str[pr_num].values())
             distribution_list_row_level.append(distribution_str)
 
         max_round_list.append(round_max)
@@ -49,7 +50,11 @@ def table_differences(all_data, all_version_id, caption, label, tex_file):
     latex_table += "\\toprule\n"
 
     # prepare the head line of the table
-    head_line = "ID & Project & PR & \multicolumn{2}{c}{Rounds} & {Testora}"
+    latex_table += "\\multirow[h]{2}{*}{ID} & \\multirow[h]{2}{*}{Project} & \\multirow[h]{2}{*}{PR} & \\multicolumn{2}{c}{Timing} & \\multicolumn{" + str(approaches_num-1) + "}{c}{Occurrences of different outputs}\\\\" + "\n"
+    # head_line = "ID & Project & PR & \multicolumn{2}{c}{Rounds} & {Testora}"
+    latex_table += "\\cmidrule(lr){4-5}"
+    latex_table += "\\cmidrule(lr){6-" + str(3 + (approaches_num+1)) +"}\n"
+    head_line = "& & & \\multicolumn{2}{c}{Rounds} & Testora &"
     for version_id in all_version_id[1:]:
         # the first is Testora, and the remaining are all our test genration approach
         head_line += " & Our Approach " + version_id.replace("_", "\_")
@@ -78,7 +83,7 @@ def table_differences(all_data, all_version_id, caption, label, tex_file):
         
         pr_idx += 1
         # A PR block contains the following three parts 
-        pr_block_follow_lines = [""] * (round_max+1)
+        pr_block_follow_lines = [""] * (round_max+2) # 1 for total line, another 1 for including initial round 0.
 
         for col_idx, (pr_rec, distribution) in enumerate(zip(pr_rec_cross_approaches, row_level_distri)):
             if col_idx == 0:# get these info only once.
@@ -99,15 +104,19 @@ def table_differences(all_data, all_version_id, caption, label, tex_file):
                     pr_block_follow_lines[tmp_round] += f" & {distribution[pr_num][tmp_round]}"
                 else:
                     pr_block_follow_lines[tmp_round] += " & -- "
+            
+            pr_block_follow_lines[round_max+1] += f" & {distribution[pr_num]['Total occurrences']}"
 
             if col_idx + 1 == approaches_num:
                 # add an ending for all the lines in the pr block, and add thepr block to the table
                 latex_table += formatted_pr_block_start_line_prefix + pr_block_follow_lines[0] + " \\\\" + "\n"
-                for line_idx, line in enumerate(pr_block_follow_lines[1:]):
+                follow_lines = pr_block_follow_lines[1:-1]
+                for line_idx, line in enumerate(follow_lines):
                     if line_idx == 0:
                         latex_table += formatted_pr_block_feedback_start_line_prefix + line + " \\\\" + "\n"
                     else:
                         latex_table += "& & & & R-" + str(line_idx+1) + line + " \\\\" + "\n"
+                latex_table += "& & & \\multicolumn{2}{c}{Total} " + pr_block_follow_lines[-1] + "\\\\" + "\n"
                 latex_table += "\\midrule" + "\n"
 
     latex_table += "\\end{tabular}\n"
