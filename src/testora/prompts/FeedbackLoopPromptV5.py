@@ -9,7 +9,6 @@ class FeedbackTestGeneratorPromptV5:
         self.use_json_output = False
 
     def create_prompt(self):
-        # TODO ask for several more tests
         template = """
 Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff, 
 and achieve the highest possible coverage of the specified lines in both the old and new versions:

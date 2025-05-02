@@ -18,8 +18,7 @@ and achieve the highest possible coverage of the specified lines in both the old
 
 The diff affects the following functions: {fut_qualified_names}.
 
-Each "Information" block below specifies the lines of code that should be covered in the old and new versions.
-For each block, generate one usage example that covers all the specified lines in both the old and new versions.
+For each information block below, generate one usage example that attempts to cover all the specified lines across all mentioned files in both the old and new versions. Ideally, the example should run without errors and help expose the behavioral differences between the old and new versions. 
 
 {all_uncovered_modified_stmts_info}
 
@@ -27,12 +26,12 @@ The usage examples you create may use only the public API of the {project_name} 
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
-Wrap each individual example into a Python code block by using the following output format:
+Wrap each individual example into Python code blocks by using the following output format:
 ```python
 # Example N:
 ...
 ```
-Where N is the example number, starting at 1 and increasing sequentially for each additional example.
+Where N is the example number, starting at 1 and increasing sequentially for each generated example.
 """
 
         return template.format(diff=self.diff, project_name=self.project_name, 

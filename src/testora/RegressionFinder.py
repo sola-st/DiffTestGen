@@ -322,9 +322,9 @@ def validate_output_difference(cloned_repo_manager, pr, old_execution, new_execu
     # re-execute test on old and new version and ignore flaky differences
     # for _ in range(len(new_execution)): # H: default to 1?
     old_execution_repeated = TestExecution(old_execution.code)
-    execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit, "old flaky")
+    execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit, "old_flaky")
     new_execution_repeated = TestExecution(new_execution.code)
-    execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit, "new flaky")
+    execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit, "new_flaky")
     if old_execution.output != old_execution_repeated.output:
         return False
     if new_execution.output != new_execution_repeated.output:
@@ -348,8 +348,8 @@ def reduce_test(cloned_repo_manager, pr, old_execution, new_execution):
     # execute all variants
     old_executions = [TestExecution(t) for t in increasingly_smaller_tests]
     new_executions = [TestExecution(t) for t in increasingly_smaller_tests]
-    execute_tests_on_commit(cloned_repo_manager, pr, old_executions, pr.pre_commit, "old reduce")
-    execute_tests_on_commit(cloned_repo_manager, pr, new_executions, pr.post_commit, "new reduce")
+    execute_tests_on_commit(cloned_repo_manager, pr, old_executions, pr.pre_commit, "old_reduce")
+    execute_tests_on_commit(cloned_repo_manager, pr, new_executions, pr.post_commit, "new_reduce")
 
     # find the last test that still shows a difference
     reduced_old_execution = old_execution
@@ -405,8 +405,7 @@ def classify_regression(project_name, pr, changed_functions, docstrings, old_exe
                                          is_legal=is_legal,
                                          is_surprising=is_surprising,
                                          correct_output=correct_output,
-                                         old_is_crash=is_crash(
-                                             old_execution.output),
+                                         old_is_crash=is_crash(old_execution.output),
                                          new_is_crash=is_crash(new_execution.output)))
         result = is_relevant_change and is_deterministic and is_public and is_legal and is_surprising
         all_results.append(result)

@@ -42,10 +42,10 @@ def analyze_coverage(coverage_report_file, coverage_files, version, \
 
         # get executable modified statements
         exec_modified_stmts = set()
-        if version == "old":
+        if "old" in version:
             modified_stmt_firsts = lines_to_no_dup_stmt_firsts(old_file_path_to_exec_modified_lines[relative_file_path], line_to_stmt_first_mappings)
             exec_modified_stmts = modified_stmt_firsts.intersection(set(executable_stmts))
-        elif version == "new":
+        elif "new" in version:
             modified_stmt_firsts = lines_to_no_dup_stmt_firsts(new_file_path_to_exec_modified_lines[relative_file_path], line_to_stmt_first_mappings)
             exec_modified_stmts = modified_stmt_firsts.intersection(set(executable_stmts))
 
