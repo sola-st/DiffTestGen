@@ -46,18 +46,19 @@ def table_differences(all_data, all_version_id, caption, label, tex_file):
     latex_table = "\\begin{table*}[t]\n\\centering\n\\footnotesize\n"
     latex_table += "\\caption{" + caption + "}\n"
     latex_table += "\\label{tab:" + label + "}\n"
-    latex_table += "\\begin{tabular}{@{}" + "lll" + "".join(["r|"] * approaches_num) + "rr@{}}\n"
+    latex_table += "\\begin{tabular}{@{}" + "lll" + "".join(["r|"] * (approaches_num+1)) + "r@{}}\n"
     latex_table += "\\toprule\n"
 
     # prepare the head line of the table
-    latex_table += "\\multirow[h]{2}{*}{ID} & \\multirow[h]{2}{*}{Project} & \\multirow[h]{2}{*}{PR} & \\multicolumn{2}{c}{Timing} & \\multicolumn{" + str(approaches_num) + "}{c}{Occurrences of different outputs}\\\\" + "\n"
+    latex_table += "\\multirow[h]{2}{*}{ID} & \\multirow[h]{2}{*}{Project} & \\multirow[h]{2}{*}{PR} & \\multicolumn{2}{c}{Timing} & \\multicolumn{" + str(approaches_num) + "}{c}{Occurrences of Different Outputs}\\\\" + "\n"
     # head_line = "ID & Project & PR & \multicolumn{2}{c}{Rounds} & {Testora}"
     latex_table += "\\cmidrule(lr){4-5}"
     latex_table += "\\cmidrule(lr){6-" + str(5 + approaches_num) +"}\n"
     head_line = "& & & \\multicolumn{2}{c}{Rounds} & Testora "
     for version_id in all_version_id[1:]:
         # the first is Testora, and the remaining are all our test genration approach
-        head_line += " & Our Approach " + version_id.replace("_", "\_")
+        # head_line += " & Our Approach " + version_id.replace("_", "\_")
+        head_line += " & Our Approach V" + version_id.split("_", 1)[0]
     
     latex_table += head_line + "\\\\" + "\n" 
     latex_table += "\\cmidrule{4-" + str(5 + approaches_num) +"}\n" 
@@ -116,7 +117,8 @@ def table_differences(all_data, all_version_id, caption, label, tex_file):
                         latex_table += formatted_pr_block_feedback_start_line_prefix + line + " \\\\" + "\n"
                     else:
                         latex_table += "& & & & R-" + str(line_idx+1) + line + " \\\\" + "\n"
-                latex_table += "& & & \\multicolumn{2}{c}{Total occurrences} " + pr_block_follow_lines[-1] + "\\\\" + "\n"
+                # latex_table += "\\rowcolor{lightgray}"
+                latex_table += "& & & \\multicolumn{2}{c}{Total Occurrences} " + pr_block_follow_lines[-1] + "\\\\" + "\n"
                 latex_table += "\\midrule" + "\n"
 
     latex_table += "\\end{tabular}\n"
