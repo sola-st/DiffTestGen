@@ -35,7 +35,8 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
     head_line = "ID & Project & PR & \multicolumn{2}{c}{Rounds} & \multicolumn{2}{c}{Testora}"
     for version_id in all_version_id[1:]:
         # the first is Testora, and the remaining are all our test genration approach
-        head_line += " & \multicolumn{2}{c}{Our Approach " + version_id.replace("_", "\_") + "}"
+        # head_line += " & \multicolumn{2}{c}{Our Approach " + version_id.replace("_", "\_") + "}"
+        head_line += " & \multicolumn{2}{c}{Our Approach V" + version_id.split("_", 1)[0] + "}"
     
     latex_table += head_line + "\\\\" + "\n" 
     latex_table += "\\cmidrule{4-" + str(3 + (approaches_num+1) * 2) +"}\n" 
