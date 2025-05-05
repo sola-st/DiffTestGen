@@ -30,7 +30,7 @@ classification_temp = 1.0
 # classification_temp = 0.6
 
 # max round for feedback loop
-max_round = 3
+# max_round = 3
 
 # different prompts for classification task
 classification_prompt_version = 4

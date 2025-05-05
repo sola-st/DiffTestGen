@@ -47,10 +47,10 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
         "\\multirow[t]{{{initial_and_feedback_round_max_num}}}{{*}}{{{id}}} & "
         "\\multirow[t]{{{initial_and_feedback_round_max_num}}}{{*}}{{{project}}} & "
         "\\multirow[t]{{{initial_and_feedback_round_max_num}}}{{*}}{{{pr_num}}} & "
-        "Initial Round & R-0"
+        "Initial & R-0"
     )
 
-    pr_block_feedback_start_line_prefix = "& & & \multirow[t]{{{feedback_round_max}}}{{*}}{{Feedback Round}} & R-1 & -- & -- "
+    pr_block_feedback_start_line_prefix = "& & & \multirow[t]{{{feedback_round_max}}}{{*}}{{Feedback}} & R-1 & -- & -- "
     
     grouped = list(zip(*all_data))
     feedback_round_max_list = get_feedback_round_max_num(grouped)

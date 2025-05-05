@@ -58,9 +58,10 @@ class LLMCache:
                     cached_answers = result
 
                 if nb_samples <= len(cached_answers):
+                    user_message = prompt.create_prompt()
                     append_event(LLMEvent(pr_nb=-1,
-                                        message=f"Cached result for querying {self.llm_module.model}",
-                                        content=f"System message:\n{system_message}\nUser message:\n{prompt.create_prompt()}"))
+                                        message=f"Cached result for querying {self.llm_module.model}, user message length: {len(user_message)}",
+                                        content=f"System message:\n{system_message}\nUser message:\n{user_message}"))
                     self.nb_hits += 1
                     print(f"Prompt:\n{prompt_str}\nReturning cached result\n")
                     return cached_answers[:nb_samples]

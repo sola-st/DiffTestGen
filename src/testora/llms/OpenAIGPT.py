@@ -25,7 +25,7 @@ class OpenAIGPT:
         user_message = prompt.create_prompt()
         if len(user_message) > 30000:
             append_event(LLMEvent(pr_nb=-1,
-                                  message=f"Query too long {len(user_message)}",
+                                  message=f"Query too long, message length: {len(user_message)}",
                                   content=f"System message:\n{system_message}\nUser message:\n{user_message}"))
             return [""]
 
