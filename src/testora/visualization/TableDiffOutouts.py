@@ -18,7 +18,7 @@ def get_max_round_and_detailed_distribution(grouped_data):
             distribution_str = {}
             if not pr_num:
                 pr_num = list(pr_rec.keys())[-1]
-                distribution_str.update({pr_num: {}})
+            distribution_str.update({pr_num: {}})
             
             if pr_rec[pr_num]:
                 # to know which rounds expose the different output in current approach
@@ -50,17 +50,17 @@ def table_differences(all_data, all_version_id, caption, label, tex_file):
     latex_table += "\\toprule\n"
 
     # prepare the head line of the table
-    latex_table += "\\multirow[h]{2}{*}{ID} & \\multirow[h]{2}{*}{Project} & \\multirow[h]{2}{*}{PR} & \\multicolumn{2}{c}{Timing} & \\multicolumn{" + str(approaches_num-1) + "}{c}{Occurrences of different outputs}\\\\" + "\n"
+    latex_table += "\\multirow[h]{2}{*}{ID} & \\multirow[h]{2}{*}{Project} & \\multirow[h]{2}{*}{PR} & \\multicolumn{2}{c}{Timing} & \\multicolumn{" + str(approaches_num) + "}{c}{Occurrences of different outputs}\\\\" + "\n"
     # head_line = "ID & Project & PR & \multicolumn{2}{c}{Rounds} & {Testora}"
     latex_table += "\\cmidrule(lr){4-5}"
-    latex_table += "\\cmidrule(lr){6-" + str(3 + (approaches_num+1)) +"}\n"
-    head_line = "& & & \\multicolumn{2}{c}{Rounds} & Testora &"
+    latex_table += "\\cmidrule(lr){6-" + str(5 + approaches_num) +"}\n"
+    head_line = "& & & \\multicolumn{2}{c}{Rounds} & Testora "
     for version_id in all_version_id[1:]:
         # the first is Testora, and the remaining are all our test genration approach
         head_line += " & Our Approach " + version_id.replace("_", "\_")
     
     latex_table += head_line + "\\\\" + "\n" 
-    latex_table += "\\cmidrule{4-" + str(3 + (approaches_num+1)) +"}\n" 
+    latex_table += "\\cmidrule{4-" + str(5 + approaches_num) +"}\n" 
 
     # a template for every start point of a pr, designed for fitting to dynamic number of feedback rounds
     # add only once when a pr block starts
@@ -116,7 +116,7 @@ def table_differences(all_data, all_version_id, caption, label, tex_file):
                         latex_table += formatted_pr_block_feedback_start_line_prefix + line + " \\\\" + "\n"
                     else:
                         latex_table += "& & & & R-" + str(line_idx+1) + line + " \\\\" + "\n"
-                latex_table += "& & & \\multicolumn{2}{c}{Total} " + pr_block_follow_lines[-1] + "\\\\" + "\n"
+                latex_table += "& & & \\multicolumn{2}{c}{Total occurrences} " + pr_block_follow_lines[-1] + "\\\\" + "\n"
                 latex_table += "\\midrule" + "\n"
 
     latex_table += "\\end{tabular}\n"
