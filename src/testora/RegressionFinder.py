@@ -644,8 +644,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     if Config.feedback_test_generation_prompt_version != 0: # 0 means to run original Testora, which does not have a feedback loop
         if (fail_to_cover_all_indices and full_coverage_exists == False): # no full coverage exists in all the tests
             is_coverage_changed = True
-            if round > 1: # initail round is 0, and feedback loop starts from 1, here we expect Config.max_round feedback loops.
-                # For the 2nd+ round feedback, if the coverage info in not change anymore, stop the feedback loop.
+            if round > 0: # initail round is 0, and feedback loop starts from 1
+                # start from the first round of feedback, if the coverage info in not change anymore, stop the feedback loop.
                 if not all_uncovered_modified_stmts_info["old"]:
                     is_coverage_changed = False
                     append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, coverage info does not change anymore."))
