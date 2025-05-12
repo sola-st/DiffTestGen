@@ -195,6 +195,21 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     generated_tests = prompt.parse_answer(raw_answer)
     name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
+        # for test:
+        #  * normal: # Example 1: <code>
+        #  * outliers: for projects that need further adjustments for import lines.
+        #       e.g., import pandas as pd\nimport numpy as np\nimport pyarrow as pa\n\n# Example 1: <code>
+        #       e.g., import pandas as pd\nimport numpy as np  # Fix: Importing numpy\n\n# Example 2: <code>
+        
+        # 1. modification to put all the example code (in the above formats) in the same format.
+        test_lines = test.splitlines()
+        for i, line in enumerate(test_lines):
+            if "# Example" in line:
+                # get the newly formatted line
+                test = line + "\n" + test.replace(f"{line}\n", "")
+                break
+        
+        # 2. process to get the newly named tests
         test_name, test_code = test.split(":", 1)
         marked_name = test_name.replace("# Example", f"# Round {round} Example", 1) + f" ({diff_version}):"
         formatted_test = f"{marked_name}{test_code}"
