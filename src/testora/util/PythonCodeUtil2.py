@@ -167,7 +167,7 @@ def mark_to_cover_code_stmt(uncovered_info:list, file_path_to_code:dict): # list
                 else:
                     code_block.append(ori_line)
 
-            code_with_to_cover_mark += f"The following are the affected functions from file <{file_path}>.\n"
+            code_with_to_cover_mark += f"The following are the affected functions from file <{file_path}>:\n"
             code_with_to_cover_mark += "\n".join(code_block)
             code_with_to_cover_mark += "\n"
                 

@@ -1,3 +1,6 @@
+from testora.prompts.RegressionTestGeneratorPromptV7 import get_line_mappings
+
+
 class FeedbackTestGeneratorPromptV7:
     '''
     Given the uncovered lines, let LLM generate some new tests that cover the lines.
@@ -9,18 +12,7 @@ class FeedbackTestGeneratorPromptV7:
         self.old_context = old_context
         self.new_context = new_context
         self.use_json_output = False
-
-        line_mappings = []
-        single_block = ""
-        for line in diff:
-            if line.startswith("--- a") or line.startswith("+++ b"):
-                single_block += line
-            elif line.startswith("@@ "):
-                mapping = line.rsplit("@@", 1)[0] + "@@\n"
-                single_block += mapping
-                line_mappings.append(single_block)
-                self.line_mappings = "\n".join(line_mappings)
-                single_block = ""
+        self.line_mappings = get_line_mappings(diff)
 
     def create_prompt(self):
         template = """

@@ -215,7 +215,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         
         # 1. modification to put all the example code (in the above formats) in the same format.
         test_lines = test.splitlines()
-        for i, line in enumerate(test_lines):
+        for line in test_lines:
             if "# Example" in line:
                 # get the newly formatted line
                 test = line + "\n" + test.replace(f"{line}\n", "")

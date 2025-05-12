@@ -1,14 +1,15 @@
 class RegressionTestGeneratorPromptV7:
-    '''Provides nothing about diff, only the old and new functions'''
+    '''Provides the old and new functions, and the line mapping infomation (the '@@ ' lines) from diff.'''
     def __init__(self, project_name, fut_qualified_names, diff, old_context:set, new_context:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
-        # self.diff = diff
         self.old_context = old_context
         self.new_context = new_context
         self.use_json_output = False
+        self.line_mappings = get_line_mappings(diff)
 
     def create_prompt(self):
+        # Here the contexts are marked with line numbers
         template = """
 Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the code changes.
 
@@ -22,6 +23,10 @@ Old version:
 New version:
 
 {new_context}
+
+The line mapping between versions is presented in the form of a diff report, as shown below: 
+
+{line_mappings}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
@@ -41,7 +46,7 @@ Wrap each individual example into Python code blocks by using the following outp
 etc.
 """
 
-        return template.format(project_name=self.project_name,
+        return template.format(line_mappings=self.line_mappings, project_name=self.project_name,
                                fut_qualified_names=", ".join(self.fut_qualified_names),
                                old_context=self.old_context,
                                new_context=self.new_context)
@@ -76,3 +81,18 @@ etc.
                     in_code = True
 
         return tests
+
+
+def get_line_mappings(diff):
+    line_mappings = []
+    single_block = ""
+    for line in diff.splitlines():
+        if line.startswith("--- a") or line.startswith("+++ b"):
+            single_block += f"{line} "
+        elif line.startswith("@@ "):
+            mapping = line.rsplit("@@", 1)[0] + "@@"
+            single_block += mapping
+            line_mappings.append(single_block.strip())
+            single_block = ""
+
+    return "\n".join(line_mappings)
