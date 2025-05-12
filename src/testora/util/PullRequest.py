@@ -29,9 +29,9 @@ class PullRequest:
         self.old_context = "" # str for models to easy-follow
         self.new_context = ""
 
-        # only works when add "to_cover" mark to code
-        self.old_context_only_for_mark = {}
-        self.new_context_only_for_mark = {}
+        # needed when the code require both the function codes with and without line numbers
+        self.old_context_with_line_num = {}
+        self.new_context_with_line_num = {}
 
     def _pr_url_to_patch(self):
         diff_url = self.github_pr.html_url + ".diff"
@@ -177,9 +177,11 @@ class PullRequest:
                     function_names, __, __ = get_function_names(file_content, patch_ranges)
                 elif Config.context_version in [2, 3]: # return function names and code
                     function_names, functions_code, __ = get_function_names_code(file_content, patch_ranges)
-                elif Config.context_version == 4: # return function names and code with line numbers
+                elif Config.context_version in [4, 7]: # return function names and code with line numbers
+                    # 4 with line numbers. | 7 without diff, but with the @@ line mappings
+                    # here the functions_code is with line numbers
                     function_names, functions_code, __ = get_function_names_code_with_line_num(file_content, patch_ranges)
-                elif Config.context_version == 5: 
+                elif Config.context_version in [5, 6]: 
                     function_names, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
                     code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
 
@@ -196,12 +198,12 @@ class PullRequest:
         else:
             self.new_context = code_context 
 
-        if Config.context_version == 5:
+        if Config.context_version in [5, 6]:
             # only needed when add "to_cover" mark to code
             if version == "old":
-                self.old_context_only_for_mark = code_context_with_line_num 
+                self.old_context_with_line_num = code_context_with_line_num 
             else:
-                self.new_context_only_for_mark = code_context_with_line_num 
+                self.new_context_with_line_num = code_context_with_line_num 
                 
         return changed_functions
 

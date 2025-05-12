@@ -1,19 +1,18 @@
-class RegressionTestGeneratorPromptV3:
+class RegressionTestGeneratorPromptV7:
+    '''Provides nothing about diff, only the old and new functions'''
     def __init__(self, project_name, fut_qualified_names, diff, old_context:set, new_context:set):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
-        self.diff = diff
+        # self.diff = diff
         self.old_context = old_context
         self.new_context = new_context
         self.use_json_output = False
 
     def create_prompt(self):
         template = """
-Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff:
+Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the code changes.
 
-{diff}
-
-The diff affects the following functions: {fut_qualified_names}.
+The code changes affect the following functions: {fut_qualified_names}.
 The following are the old and the new versions of these affected functions:
 
 Old version: 
@@ -44,7 +43,6 @@ etc.
 
         return template.format(project_name=self.project_name,
                                fut_qualified_names=", ".join(self.fut_qualified_names),
-                               diff=self.diff,
                                old_context=self.old_context,
                                new_context=self.new_context)
 

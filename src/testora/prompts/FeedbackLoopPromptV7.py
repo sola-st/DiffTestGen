@@ -1,0 +1,100 @@
+class FeedbackTestGeneratorPromptV7:
+    '''
+    Given the uncovered lines, let LLM generate some new tests that cover the lines.
+    '''
+    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, old_context, new_context):
+        self.project_name = project_name
+        self.fut_qualified_names = fut_qualified_names
+        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered statements of both versions
+        self.old_context = old_context
+        self.new_context = new_context
+        self.use_json_output = False
+
+        line_mappings = []
+        single_block = ""
+        for line in diff:
+            if line.startswith("--- a") or line.startswith("+++ b"):
+                single_block += line
+            elif line.startswith("@@ "):
+                mapping = line.rsplit("@@", 1)[0] + "@@\n"
+                single_block += mapping
+                line_mappings.append(single_block)
+                self.line_mappings = "\n".join(line_mappings)
+                single_block = ""
+
+    def create_prompt(self):
+        template = """
+Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the code changes.
+
+The code changes affect the following functions: {fut_qualified_names}.
+The following are the old and the new versions of these affected functions, where each line of code starts with its line number in the format <line_number> :
+
+Old version: 
+
+{old_context}
+
+New version:
+
+{new_context}
+
+The line mapping between versions is presented in the form of a diff report, as shown below: 
+
+{line_mappings}
+
+The following lists several pieces of information specifying the lines that should be covered in both the old and new versions of the code.
+Generate one usage example for each piece of the information. 
+
+{all_uncovered_modified_stmts_info}
+
+The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
+Each example must be an executable piece of Python code, including all necessary imports.
+Print all relevant values, including intermediate values, in a human-readable form.
+
+Wrap each individual example into Python code blocks by using the following output format:
+```python
+# Example 1:
+...
+```
+```python
+# Example 2:
+...
+```
+etc.
+"""
+
+        return template.format(line_mappings=self.line_mappings, project_name=self.project_name, 
+                               all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
+                               fut_qualified_names=", ".join(self.fut_qualified_names),
+                               old_context = self.old_context,
+                               new_context = self.new_context)
+
+    def remove_unnecessary_indentation(self, code):
+        lines = code.split("\n")
+        if len(lines) > 0:
+            # find number of leading spaces in first line
+            num_spaces = len(lines[0]) - len(lines[0].lstrip())
+            if num_spaces > 0:
+                return "\n".join([line[num_spaces:] for line in lines])
+        return code
+
+    def parse_answer(self, raw_answer):
+        assert type(raw_answer) == list
+
+        tests = []
+
+        for answer in raw_answer:
+            in_code = False
+            next_test = ""
+            for line in answer.split("\n"):
+                if line.strip() == "```":
+                    in_code = False
+                    if next_test:
+                        next_test = self.remove_unnecessary_indentation(next_test)
+                        tests.append(next_test)
+                        next_test = ""
+                if in_code:
+                    next_test += line + "\n"
+                if line.strip() == "```python":
+                    in_code = True
+
+        return tests

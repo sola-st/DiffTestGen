@@ -9,12 +9,16 @@ from testora.execution.TestExecution import TestExecution
 from testora.llms.LLMCache import LLMCache
 from testora.prompts.RegressionTestGeneratorPromptV1 import RegressionTestGeneratorPromptV1
 from testora.prompts.RegressionTestGeneratorPromptV2 import RegressionTestGeneratorPromptV2
-from testora.prompts.RegressionTestGeneratorPromptV3 import RegressionTestGeneratorPromptV3
+from testora.prompts.RegressionTestGeneratorPromptV345 import RegressionTestGeneratorPromptV345
+from testora.prompts.RegressionTestGeneratorPromptV6 import RegressionTestGeneratorPromptV6
+from testora.prompts.RegressionTestGeneratorPromptV7 import RegressionTestGeneratorPromptV7
 from testora.prompts.FeedbackLoopPromptV1 import FeedbackTestGeneratorPromptV1
 from testora.prompts.FeedbackLoopPromptV2 import FeedbackTestGeneratorPromptV2
 from testora.prompts.FeedbackLoopPromptV3 import FeedbackTestGeneratorPromptV3
 from testora.prompts.FeedbackLoopPromptV4 import FeedbackTestGeneratorPromptV4
 from testora.prompts.FeedbackLoopPromptV5 import FeedbackTestGeneratorPromptV5
+from testora.prompts.FeedbackLoopPromptV6 import FeedbackTestGeneratorPromptV6
+from testora.prompts.FeedbackLoopPromptV7 import FeedbackTestGeneratorPromptV7
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
 from testora.prompts.RegressionClassificationPromptV1 import RegressionClassificationPromptV1
@@ -56,7 +60,11 @@ if Config.initial_test_generation_prompt_version == 1:
 elif Config.initial_test_generation_prompt_version == 2:
     RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV2
 elif Config.initial_test_generation_prompt_version in [3, 4, 5]:
-    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV3
+    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV345
+elif Config.initial_test_generation_prompt_version == 6:
+    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV6
+elif Config.initial_test_generation_prompt_version == 7:
+    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV7
 
 if Config.feedback_test_generation_prompt_version == 1:
     FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV1
@@ -68,6 +76,10 @@ elif Config.feedback_test_generation_prompt_version == 4:
     FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV4
 elif Config.feedback_test_generation_prompt_version == 5:
     FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV5
+elif Config.feedback_test_generation_prompt_version == 6:
+    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV6
+elif Config.feedback_test_generation_prompt_version == 7:
+    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV7
 
 def clean_output(output):
     # remove warnings caused by coverage measurements
@@ -290,17 +302,20 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
         new_uncovered_str = get_str_from_dict(single_new)
         all_uncovered_modified_stmts_info += f"Information {i+1}:\nOld:\n{old_uncovered_str}New:\n{new_uncovered_str}"
 
-    old_context = pr.old_context # code lines with line numbers marked
+    old_context = pr.old_context # generally without line numbers, exclude for context_version == 4. 
     new_context = pr.new_context
     if Config.context_version == 5:
         # process the code contexts to let code have 'to_cover' marks
         # in this case, all_uncovered_modified_stmts_info is an empty set
-        old_context, overall_uncovered_old = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["old"], pr.old_context_only_for_mark)
-        new_context, overall_uncovered_new = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["new"], pr.new_context_only_for_mark)
+        old_context, overall_uncovered_old = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["old"], pr.old_context_with_line_num)
+        new_context, overall_uncovered_new = mark_to_cover_code_stmt(all_uncovered_only_for_to_cover_mark["new"], pr.new_context_with_line_num)
         all_uncovered_modified_stmts_info = len(all_uncovered_only_for_to_cover_mark["old"]) # to indicate how many tetst to generate
 
         details = f"All uncovered: Old: {overall_uncovered_old}, New: {overall_uncovered_new}"
         append_event(CoverageEvent(pr_nb=pr.number, message=f"All uncovered, round {round}", details=f"{details}"))
+    elif Config.context_version == 6:
+        old_context = pr.old_context_with_line_num # code lines with line numbers marked
+        new_context = pr.new_context_with_line_num
 
     all_tests = []
 
