@@ -35,7 +35,16 @@ class PullRequest:
 
     def _pr_url_to_patch(self):
         diff_url = self.github_pr.html_url + ".diff"
-        diff = urllib.request.urlopen(diff_url)
+        # diff = urllib.request.urlopen(diff_url)
+        # the diff_url hits GitHub’s web servers (not the API), and GitHub does throttle access to these URLs.
+        # urllib.request.urlopen() by default sends no User-Agent, which looks like a bot/scraper.
+        # we use the following instead:
+        token = open(".github_token", "r").read().strip()
+        req = urllib.request.Request(
+            diff_url,
+            headers={'User-Agent': 'Mozilla/5.0 (compatible; MyScript/1.0)', 'Authorization': f'token {token}'}
+        )
+        diff = urllib.request.urlopen(req)
         encoding = diff.headers.get_charsets()[0]
         self.patch = PatchSet(diff, encoding=encoding)
 
