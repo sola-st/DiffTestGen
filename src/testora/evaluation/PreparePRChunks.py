@@ -46,9 +46,23 @@ def write_range_of_PR_tasks_into_database(project_name, project_id, start_pr_nb,
 
 
 if __name__ == "__main__":
-    EvalTaskManager.initialize()
-    write_specific_PR_tasks_into_database("scipy", "scipy/scipy", [])
+    target_project = "marshmallow"
+    with open(f"data/results/{target_project}_PRs.txt", "r") as f:
+        prs = f.readlines()
+    pr_list = [int(pr) for pr in prs]
 
+    EvalTaskManager.initialize()
+    # 1
+    if target_project == "scipy":
+        write_specific_PR_tasks_into_database("scipy", "scipy/scipy", pr_list)
+    elif target_project == "marshmallow":
+        write_specific_PR_tasks_into_database("marshmallow", "marshmallow-code/marshmallow", pr_list)
+    elif target_project == "pandas":
+        write_specific_PR_tasks_into_database("pandas", "pandas-dev/pandas", pr_list)
+    elif target_project == "keras":
+        write_specific_PR_tasks_into_database("keras", "keras-team/keras", pr_list)
+
+    # 2
     # write_range_of_PR_tasks_into_database(
     #     "pandas", "pandas-dev/pandas", 60322, 300)
 

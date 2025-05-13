@@ -54,7 +54,7 @@ def main(target_projects):
                     shutil.copyfile(join(target_folder, file), join(executable, file))
                     remained_pr_nums.append(file.split("_")[0])
         
-        with open(f"results/{target_project}_PRs.txt", "w") as f:
+        with open(f"data/results/{target_project}_PRs.txt", "w") as f:
             f.writelines("\n".join(remained_pr_nums))
 
         print(f"Filtering for project {target_project} done.")
@@ -62,7 +62,7 @@ def main(target_projects):
         print(f"Executable: {selected2}\n")
         to_write += f"Not ignored: {selected1}\nExecutable: {selected2}\nNon-executable: {may_non_executable}\n\n"
     
-    with open("results/filtered_details.txt", "w") as f:
+    with open("data/results/filtered_details.txt", "w") as f:
         f.writelines(to_write)
 
 
