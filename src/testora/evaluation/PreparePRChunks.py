@@ -47,7 +47,7 @@ def write_range_of_PR_tasks_into_database(project_name, project_id, start_pr_nb,
 
 if __name__ == "__main__":
     target_project = "marshmallow"
-    with open(f"data/results/{target_project}_PRs.txt", "r") as f:
+    with open(f"data/{target_project}_PRs.txt", "r") as f:
         prs = f.readlines()
     pr_list = [int(pr) for pr in prs]
 
