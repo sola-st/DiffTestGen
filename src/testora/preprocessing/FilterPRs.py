@@ -1,6 +1,5 @@
 import json
 from os import listdir, makedirs
-import os
 from os.path import join
 import shutil
 
@@ -31,15 +30,15 @@ def main(target_projects):
 
         files = listdir(target_folder)
         for file in files:
-            if os.stat(join(target_folder, file)).st_size > 1000: 
+            with open(join(target_folder, file), "r") as f:
+                info = json.load(f) 
+
+            if not '"message": "Ignoring' in json.dumps(info):
                 shutil.copyfile(join(target_folder, file), join(exclude_ignores, file))
                 selected1 +=1
-
+            
                 all_old_covered = 0
                 all_new_covered = 0
-                with open(join(target_folder, file), "r") as f:
-                    info = json.load(f)
-            
                 for info_block in info:
                     if "details" in info_block.keys():
                         old_str, new_str = info_block["details"].split(",")
