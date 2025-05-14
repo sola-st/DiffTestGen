@@ -106,7 +106,7 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
 
     with open(tex_file, "w") as f:
         f.write(latex_table.replace("%", "\%") + "\n")
-    print(f"The comparison table is wriitten to {tex_file}")
+    print(f"The comparison table is written to {tex_file}")
 
 def main():
     iteration = 2
