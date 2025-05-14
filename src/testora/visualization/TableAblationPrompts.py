@@ -2,25 +2,7 @@ import json
 from os import listdir, makedirs
 from os.path import join, isdir
 from testora.visualization.CoverageComparison import CoverageComparison
-
-
-def get_feedback_round_max_num(grouped_data):
-    feedback_round_max_list = [] # a max num for a pr
-    for pr_rec_cross_approaches in grouped_data:
-        feedback_round_max = 0
-        pr_num = None
-        for col_idx, pr_rec in enumerate(pr_rec_cross_approaches):
-            if not pr_num:
-                pr_num = list(pr_rec.keys())[-1]
-            
-            if "Feedback" in pr_rec[pr_num].keys(): 
-                # to know how many feedback rounds in current approach
-                feedback_round_num = len(pr_rec[pr_num]["Feedback"].keys())
-                feedback_round_max = max(feedback_round_max, feedback_round_num)
-
-        feedback_round_max_list.append(feedback_round_max)
-
-    return feedback_round_max_list
+from testora.visualization.CoverageUtils import get_feedback_round_max_list
 
 
 def table_coverages(all_data, all_version_id, caption, label, tex_file):
@@ -54,7 +36,7 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
     pr_block_feedback_start_line_prefix = "& & & \multirow[t]{{{feedback_round_max}}}{{*}}{{Feedback}} & R-1 & -- & -- "
     
     grouped = list(zip(*all_data))
-    feedback_round_max_list = get_feedback_round_max_num(grouped)
+    feedback_round_max_list = get_feedback_round_max_list(grouped)
 
     for pr_idx, (pr_rec_cross_approaches, feedback_round_max) in enumerate(zip(grouped, feedback_round_max_list)):
         # A PR block contains the following three parts 
