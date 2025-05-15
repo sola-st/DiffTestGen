@@ -505,8 +505,12 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         return
 
     # analyze behavior of executions
-    # TODO do we want to filter out the test that covers no modified lines? since the execution is already there, maybe keep it.
     # TODO add covered lines to show which lines introduce the behavioral differences.
+
+    # to separate the test genration and classification phase, here we store the breakpoint data.
+    old_executions_differ_relevant = []
+    new_executions_differ_relevant = []
+
     for (old_execution, new_execution, old_covered, new_covered) in zip(
             old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new):
         assert old_execution.output is not None
@@ -536,27 +540,59 @@ def check_pr(github_repo, cloned_repo_manager, pr):
                 message=f"Different outputs\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
                 test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
 
-        # if difference found, reduce the test while still observing a difference
-        old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
-        assert old_execution.output != new_execution.output
+        if Config.phase_selection == "all": # run the entire workflow, including test genration and classification. 
+            # if difference found, reduce the test while still observing a difference
+            old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
+            assert old_execution.output != new_execution.output
 
-        # check if new output is still present in head of current main branch
-        if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
-            append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
+            # check if new output is still present in head of current main branch
+            if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
+                append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
 
-        # find docstrings
-        cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
-        docstrings = retrieve_relevant_docstrings(cloned_repo_of_new_commit, new_execution.code)
+            # find docstrings
+            cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
+            docstrings = retrieve_relevant_docstrings(cloned_repo_of_new_commit, new_execution.code)
 
-        # if difference found, classify regression
-        assert old_execution.code == new_execution.code
-        is_regression_bug = classify_regression(
-            github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
+            # if difference found, classify regression
+            assert old_execution.code == new_execution.code
+            is_regression_bug = classify_regression(
+                github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
 
-        # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
-        if is_regression_bug:
-            select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
+            # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
+            if is_regression_bug:
+                select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
 
+        elif Config.phase_selection == "test_generation":
+            '''
+            store the breakpoint infomation for later continuing work:
+            * changed_functions
+            * old_excution (from the tests still show the output difference at this point)
+            * new_excution (the same as above)
+            '''
+            
+            simplified_old_execution = simplify_test_execution(old_execution)
+            simplified_new_execution = simplify_test_execution(new_execution)
+            old_executions_differ_relevant.append(simplified_old_execution)
+            new_executions_differ_relevant.append(simplified_new_execution)
+
+    # When need to further classify the different outputs, read the test info from stored files.
+    # organize and write the breakpoint data to a local/db file
+    if old_executions_differ_relevant:
+        breakpoint_data_str = {
+            "changed_functions": changed_functions,
+            "old_executions_differ_relevant": f"{old_executions_differ_relevant}",
+            "new_executions_differ_relevant": f"{new_executions_differ_relevant}"
+        }
+
+        with open(f"{github_repo.name}_{pr.number}_breakpoint_data.json", "w") as f:
+            json.dump(breakpoint_data_str, f, indent=2)
+
+def simplify_test_execution(execution):
+    # simplify the execution by removing the redundant information.
+    # keep only '.code' and '.output' is enough for further reduction and classification.
+    simplified_execution = TestExecution(execution.code)
+    simplified_execution.output = execution.output
+    return simplified_execution
 
 def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
             old_executions:list=[], new_executions:list=[], all_covered_modified_stmts_old:list=[], all_covered_modified_stmts_new:list=[], 

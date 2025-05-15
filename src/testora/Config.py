@@ -51,6 +51,8 @@ context_version = 2 # available from 1 to 5 (with 2 and 3 direct to the same inp
 # file, function, a set of lines
 # context_type
 
+phase_selection = "test_generation" # valid values: "test_generation", "all"
+
 # KEEP THIS AT THE END: log the current configuration
 current_globals = set(globals().keys())
 config_parameters = current_globals - initial_globals

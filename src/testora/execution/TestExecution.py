@@ -16,5 +16,5 @@ class TestExecution:
     # line number sets
     all_executable_modified_stmts_num: Optional[dict] = None 
     all_covered_exec_modified_stms_num: Optional[dict] = None
-    all_uncovered_exec_modified_stmts_num: Optional[dict] = None # file_path: uncovered statement numbers
+    all_uncovered_exec_modified_stmts_num: Optional[dict] = None # file_path: a set of uncovered statement numbers
 

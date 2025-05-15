@@ -18,7 +18,8 @@ and achieve the highest possible coverage of the specified lines in both the old
 
 The diff affects the following functions: {fut_qualified_names}.
 
-For each information block below, generate one usage example that attempts to cover all the specified lines across all mentioned files in both the old and new versions. Ideally, the example should run without errors and help expose the behavioral differences between the old and new versions. 
+The following lists several pieces of information specifying the lines that should be covered in both the old and new versions of the code.
+Generate one usage example for each piece of the information. 
 
 {all_uncovered_modified_stmts_info}
 

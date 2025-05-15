@@ -1,3 +1,4 @@
+import requests
 from unidiff import PatchSet
 import urllib.request
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
@@ -34,19 +35,23 @@ class PullRequest:
         self.new_context_with_line_num = {}
 
     def _pr_url_to_patch(self):
-        diff_url = self.github_pr.html_url + ".diff"
+        # diff_url = self.github_pr.html_url + ".diff"
         # diff = urllib.request.urlopen(diff_url)
-        # the diff_url hits GitHub’s web servers (not the API), and GitHub does throttle access to these URLs.
-        # urllib.request.urlopen() by default sends no User-Agent, which looks like a bot/scraper.
-        # we use the following instead:
+        # encoding = diff.headers.get_charsets()[0]
+        # self.patch = PatchSet(diff, encoding=encoding)
+
+        diff_url = self.github_pr.url
         token = open(".github_token", "r").read().strip()
-        req = urllib.request.Request(
-            diff_url,
-            headers={'User-Agent': 'Mozilla/5.0 (compatible; MyScript/1.0)', 'Authorization': f'token {token}'}
-        )
-        diff = urllib.request.urlopen(req)
-        encoding = diff.headers.get_charsets()[0]
-        self.patch = PatchSet(diff, encoding=encoding)
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3.patch"
+        }
+
+        response = requests.get(diff_url, headers=headers)
+        response.raise_for_status()
+
+        # Load diff with unidiff PatchSet
+        self.patch = PatchSet(response.text)
 
     def _compute_non_test_modified_files(self):
         module_name = self.cloned_repo_manager.module_name
