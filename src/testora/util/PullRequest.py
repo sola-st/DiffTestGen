@@ -35,23 +35,24 @@ class PullRequest:
         self.new_context_with_line_num = {}
 
     def _pr_url_to_patch(self):
-        # diff_url = self.github_pr.html_url + ".diff"
-        # diff = urllib.request.urlopen(diff_url)
-        # encoding = diff.headers.get_charsets()[0]
-        # self.patch = PatchSet(diff, encoding=encoding)
+        diff_url = self.github_pr.html_url + ".diff"
+        diff = urllib.request.urlopen(diff_url)
+        encoding = diff.headers.get_charsets()[0]
+        self.patch = PatchSet(diff, encoding=encoding)
 
-        diff_url = self.github_pr.url
-        token = open(".github_token", "r").read().strip()
-        headers = {
-            "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3.patch"
-        }
+        # # if the above code hits the request limit, use the following instead.
+        # diff_url = self.github_pr.url
+        # token = open(".github_token", "r").read().strip()
+        # headers = {
+        #     "Authorization": f"token {token}",
+        #     "Accept": "application/vnd.github.v3.patch"
+        # }
 
-        response = requests.get(diff_url, headers=headers)
-        response.raise_for_status()
+        # response = requests.get(diff_url, headers=headers)
+        # response.raise_for_status()
 
-        # Load diff with unidiff PatchSet
-        self.patch = PatchSet(response.text)
+        # # Load diff with unidiff PatchSet
+        # self.patch = PatchSet(response.text, encoding=response.encoding)
 
     def _compute_non_test_modified_files(self):
         module_name = self.cloned_repo_manager.module_name
