@@ -90,7 +90,7 @@ def table_coverages(all_data, all_version_id, caption, label, tex_file):
         f.write(latex_table.replace("%", "\%") + "\n")
     print(f"The comparison table is written to {tex_file}")
 
-def main():
+def main_single_pr_at_local(): # single pr at local
     iteration = 2
 
     all_data = []
@@ -124,6 +124,41 @@ def main():
     table_coverages(all_data, all_version_id, caption, label, tex_file)
 
 
-if __name__=="__main__":
-    main()
+def main_db(): # db
+    target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+    all_data = []
+    all_version_id = ["1_0_1"]
 
+    results_folder = join("data", "results")
+    table_output_folder = join(results_folder, "table_and_plots", f"meta")
+    makedirs(table_output_folder, exist_ok=True)
+
+    for version_id in all_version_id:
+        version_data = []
+        log_folder_parent = join(results_folder, f"log_{version_id}")
+        for project in target_projects:
+            log_folder = join(log_folder_parent, project)
+            init = CoverageComparison(log_folder, version_id)
+            all_from_cur_version = init.get_multiple_pr_coverage_info(project)
+            # write a meta file for a version
+            meta_file = join(table_output_folder, f"coverage_comparison_meta_{project}_{version_id}.json")
+            with open(meta_file, "w") as f:
+                json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
+            print(f"Collected coverage information is written to {meta_file}")
+
+            version_data.extend(all_from_cur_version)
+        all_data.append(version_data)
+
+    # generate the table
+    caption = "Coverage Comparison between Testora and Our Approach"
+    label="coverage_comparison"
+    tex_file = join(table_output_folder, "coverage_comparison.tex")
+    table_coverages(all_data, all_version_id, caption, label, tex_file)
+
+
+if __name__=="__main__":
+    mode = "db" # valid values: "db", "pr"
+    if mode == "db":
+        main_db()
+    else:
+        main_single_pr_at_local()

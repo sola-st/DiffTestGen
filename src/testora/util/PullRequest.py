@@ -242,7 +242,7 @@ class PullRequest:
     def _compute_modified_lines(self):
         self.old_file_path_to_all_modified_lines = {}
         self.new_file_path_to_all_modified_lines = {}
-        patch = PatchSet(self.full_diff)
+        patch = PatchSet(self.full_diff) # always compute for all touched files (add, delete, modify)
 
         for patched_file in patch:
             self.old_file_path_to_all_modified_lines[patched_file.path] = set()

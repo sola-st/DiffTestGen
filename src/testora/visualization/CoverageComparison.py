@@ -3,7 +3,7 @@ import json
 import copy
 from os import listdir, makedirs
 from testora.execution.CoverageAnalyzer import range_to_set
-from os.path import join
+from os.path import join, isfile
 
 
 def nested_dict():
@@ -43,12 +43,15 @@ class CoverageComparison():
                 total_num += len(list(ran))
         return total_num
 
-    def get_single_log_file_coverage_dtg(self, log_file):
+    def get_single_log_file_coverage_dtg(self, log_file, project_name):
         with open(log_file, "r") as f:
             info = json.load(f)
         
-        pr_num = info[1]["pr_nb"]
-        project_name = info[1]["url"].split("/")[-3]
+        pr_num = info[0]["pr_nb"]
+        if not project_name:
+            # db mode only records configuration event for the first PR processing, so for db loaded logs, here should use info[0]
+            project_name = info[1]["url"].split("/")[-3] # for single pr at local mode
+
         pre_round = -1
         for info_block in info:
             if "details" in info_block.keys():
@@ -132,10 +135,13 @@ class CoverageComparison():
             new_info_str = f"{new_percentage:.2%} ({union_covered['new_len_cross_file']}/{self.all_executable_modified_lines_new_len})"
         return old_info_str, new_info_str
 
-    def get_multiple_pr_coverage_info(self):
+    def get_multiple_pr_coverage_info(self, project=""):
         log_files = listdir(self.log_folder)
-        for log_file in log_files:
-            self.get_single_log_file_coverage_dtg(join(self.log_folder, log_file))
+        for file in log_files:
+            log_file = join(self.log_folder, file)
+            if isfile(log_file) and "breakpoint" not in file:
+                # exclude archive folder and breakpoint_data files
+                self.get_single_log_file_coverage_dtg(log_file, project)
 
         self.all_from_cur_version = sorted(self.all_from_cur_version, key=lambda d: list(d.keys())[3])
         return self.all_from_cur_version

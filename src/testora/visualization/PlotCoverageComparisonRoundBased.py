@@ -134,7 +134,7 @@ def main():
             log_folder = join(results_folder, project, f"logs_iter{iteration}", f"log_{version_id}")
             init = CoverageComparison(log_folder, version_id)
           
-            all_from_cur_version = init.get_multiple_pr_coverage_info()
+            all_from_cur_version = init.get_multiple_pr_coverage_info(project)
             # write a meta file for a version
             meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
             with open(meta_file, "w") as f:
