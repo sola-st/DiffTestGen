@@ -240,22 +240,26 @@ def remove_tests_with_private_call(tests):
 
 def generate_tests(pr, github_repo, changed_functions):
     # prepare context used by one or more prompts
-    full_diff = pr.get_full_diff()
-    filtered_diff = pr.get_filtered_diff()
+    # full_diff is already computed (pr.full_diff) when the pull request is instantiated
+    pr.get_filtered_diff() # this adds filtered_diff info to pr.filtered_diff 
 
     all_tests = []
+    full_diff_len_fit = False
+    filtered_diff_len_nonequal_fit = False
 
-    if len(full_diff.split("\n")) <= 200:
+    if len(pr.full_diff.split("\n")) <= 200:
+        full_diff_len_fit = True
         # full diff with GPT4
-        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, pr.old_context, pr.new_context)
+        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
         # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, "full_diff", nb_samples=10))
 
-    if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
+    if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
+        filtered_diff_len_nonequal_fit = True
         # filtered diff with GPT4
-        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, pr.old_context, pr.new_context)
+        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -270,7 +274,9 @@ def generate_tests(pr, github_repo, changed_functions):
 
     append_event(Event(pr_nb=pr.number,
             message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
-    return all_tests
+    
+    # also return the bool values to not check multiple times in the feedback rounds
+    return all_tests, full_diff_len_fit, filtered_diff_len_nonequal_fit 
 
 def get_str_from_dict(uncover_dict:dict):
     # a util function for 'generate_replacement_tests'
@@ -283,18 +289,15 @@ def get_str_from_dict(uncover_dict:dict):
         uncovered_str = "No specified lines.\n"
     return uncovered_str
 
-def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info_dict, round, all_uncovered_only_for_to_cover_mark:dict=None):
+def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len_fit, filtered_diff_len_nonequal_fit,
+            all_uncovered_modified_stmts_info_dict, round, all_uncovered_only_for_to_cover_mark:dict=None):
     '''
     Generate replacment tests for the ones that failed to reach the changed lines, 
     and keep different with the exisiting reached tests.
      * Has a similar body to function generate_test, but with different inputs and prompt class.
     ''' 
 
-    # prepare context used by one or more prompts
-    full_diff = pr.get_full_diff()
-    filtered_diff = pr.get_filtered_diff()
-
-    # get a model easy-to-foolow string of uncovered info
+    # get a model easy-to-follow string of uncovered info
     all_uncovered_modified_stmts_info = ""
     old_uncovered_list, new_uncovered_list = all_uncovered_modified_stmts_info_dict.values()
     for i, (single_old, single_new) in enumerate(zip(old_uncovered_list, new_uncovered_list)):
@@ -319,18 +322,18 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
 
     all_tests = []
 
-    if len(full_diff.split("\n")) <= 200:
+    if full_diff_len_fit == True:
         # full diff with GPT4
-        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, full_diff, 
+        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, 
                 all_uncovered_modified_stmts_info, old_context, new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", round=round))
 
         # full diff with GPT3.5
         # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, "full_diff", nb_samples=10, round=round))
 
-    if len(filtered_diff.split("\n")) <= 200 and filtered_diff != full_diff:
+    if filtered_diff_len_nonequal_fit == True:
         # filtered diff with GPT4
-        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, filtered_diff, 
+        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, 
                 all_uncovered_modified_stmts_info, old_context, new_context)
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", round=round))
 
@@ -498,9 +501,10 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # TODO extract existing tests
 
     # generate tests via LLM
-    generated_tests = generate_tests(pr, github_repo, changed_functions)
+    generated_tests, full_diff_len_fit, filtered_diff_len_nonequal_fit = generate_tests(pr, github_repo, changed_functions)
     old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
-            run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests)
+            run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, \
+                    generated_tests, full_diff_len_fit, filtered_diff_len_nonequal_fit)
     if all_covered_modified_stmts_old == None:
         return
 
@@ -595,6 +599,7 @@ def simplify_test_execution(execution):
     return simplified_execution
 
 def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
+            full_diff_len_fit, filtered_diff_len_nonequal_fit,
             old_executions:list=[], new_executions:list=[], all_covered_modified_stmts_old:list=[], all_covered_modified_stmts_new:list=[], 
             round=0, total_exec_recorded=False):
     ''' 
@@ -724,8 +729,10 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 append_event(CoverageEvent(pr_nb=pr.number, 
                         message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
                 
-                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info, round, all_uncovered_only_for_to_cover_mark)
+                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, 
+                        full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_uncovered_only_for_to_cover_mark)
                 run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
+                        full_diff_len_fit, filtered_diff_len_nonequal_fit,
                         old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
             # else:
             #     if is_coverage_changed == True:

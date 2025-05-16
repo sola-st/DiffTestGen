@@ -23,7 +23,13 @@ class PullRequest:
 
         self._pr_url_to_patch()
         self._compute_non_test_modified_files()
-        self._compute_modified_lines() # all modified lines, includes the non-excutable ones
+
+        self.full_diff = self.get_full_diff() 
+        self._compute_modified_lines() # extract from full_diff, all modified lines, includes the non-excutable ones
+
+        # only compute diffs once, full_diff at above location, and filtered diff at the initial round test generation
+        # all the following feedback rounds will get the diff strs by these two attributes.
+        self.filtered_diff = ""
 
         # a extra context provider. 
         # could contains different types of contexts, e.g., the entire file contents, only the modified functions, etc.
@@ -34,12 +40,18 @@ class PullRequest:
         self.old_context_with_line_num = {}
         self.new_context_with_line_num = {}
 
-    def _pr_url_to_patch(self):
+    def _pr_url_to_patch(self): 
+        ''' 
+        The target is to get the modified files from the patch.
+        (all the touch files in a PR , **exclude** deleted and newly added files). 
+        '''
+        # # option 1
         # diff_url = self.github_pr.html_url + ".diff"
         # diff = urllib.request.urlopen(diff_url)
         # encoding = diff.headers.get_charsets()[0]
         # self.patch = PatchSet(diff, encoding=encoding)
 
+        # # option 2
         # if the above code hits the request limit, use the following instead.
         diff_url = self.github_pr.url
         token = open(".github_token", "r").read().strip()
@@ -53,6 +65,10 @@ class PullRequest:
 
         # Load diff with unidiff PatchSet
         self.patch = PatchSet(response.text)
+
+        # # option 3
+        # self.github_pr.get_files() # then check the 'status' of every listed file.
+        # reference: https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests-files 
 
     def _compute_non_test_modified_files(self):
         module_name = self.cloned_repo_manager.module_name
@@ -127,7 +143,8 @@ class PullRequest:
             #     with open(f"{post_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
             #         self.new_context.update({file_path: f.read()})
 
-        return "\n\n".join(diff_parts)
+        # return "\n\n".join(diff_parts)
+        self.filtered_diff = "\n\n".join(diff_parts)
 
     def get_full_diff(self):
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
@@ -225,10 +242,7 @@ class PullRequest:
     def _compute_modified_lines(self):
         self.old_file_path_to_all_modified_lines = {}
         self.new_file_path_to_all_modified_lines = {}
-
-        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
-        diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit)
-        patch = PatchSet(diff)
+        patch = PatchSet(self.full_diff)
 
         for patched_file in patch:
             self.old_file_path_to_all_modified_lines[patched_file.path] = set()
