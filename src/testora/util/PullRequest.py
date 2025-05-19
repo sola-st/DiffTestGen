@@ -57,7 +57,7 @@ class PullRequest:
         token = open(".github_token", "r").read().strip()
         headers = {
             "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3.patch"
+            "Accept": "application/vnd.github.v3.diff"
         }
 
         response = requests.get(diff_url, headers=headers)
@@ -205,7 +205,7 @@ class PullRequest:
                 function_names = None
                 functions_code = None
                 functions_code_with_line_num = None
-                if Config.context_version == 1: # return only function names
+                if Config.context_version in [1, 8]: # return only function names
                     function_names, __, __ = get_function_names(file_content, patch_ranges)
                 elif Config.context_version in [2, 3]: # return function names and code
                     function_names, functions_code, __ = get_function_names_code(file_content, patch_ranges)
