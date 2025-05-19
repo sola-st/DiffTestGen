@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # 1
     target_projects = ["scipy", "marshmallow", "pandas", "keras"]
     for target_project in target_projects:
-        with open(f"data/{target_project}_PRs_subset15.txt", "r") as f:
+        with open(f"data/{target_project}_PRs_subset10.txt", "r") as f:
             prs = f.readlines()
         pr_list = [int(pr) for pr in prs]
 
