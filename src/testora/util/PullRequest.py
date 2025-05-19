@@ -188,6 +188,7 @@ class PullRequest:
     def get_helper(self, cloned_repo, version):
         changed_functions = []
         code_context = ""
+        code_context_with_line_num_str = ""
         code_context_with_line_num = {}
 
         for modified_file in self.patch.modified_files:
@@ -209,19 +210,24 @@ class PullRequest:
                     function_names, __, __ = get_function_names(file_content, patch_ranges)
                 elif Config.context_version in [2, 3]: # return function names and code
                     function_names, functions_code, __ = get_function_names_code(file_content, patch_ranges)
-                elif Config.context_version in [4, 7]: # return function names and code with line numbers
-                    # 4 with line numbers. | 7 without diff, but with the @@ line mappings
+                elif Config.context_version in [7]: # return function names and code with line numbers
+                    # 7 without diff, but with the @@ line mappings
                     # here the functions_code is with line numbers
                     function_names, functions_code, __ = get_function_names_code_with_line_num(file_content, patch_ranges)
-                elif Config.context_version in [5, 6]: 
+                elif Config.context_version in [4, 5, 6]: 
                     function_names, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
                     code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
+
+                    if Config.context_version in [4, 6]:
+                        code_context_with_line_num_str += f"The following are the affected functions from file <{modified_file.path}>:\n"
+                        code_context_with_line_num_str += "\n\n".join(functions_code_with_line_num)
+                        code_context_with_line_num_str += "\n"
 
                 for func_name in function_names:
                     changed_functions.append(f"{module_name}.{func_name}")
 
                 if functions_code:
-                    code_context += f"The following are the affected functions from file <{modified_file.path}>.\n"
+                    code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
                     code_context += "\n\n".join(functions_code)
                     code_context += "\n"
         
@@ -230,12 +236,16 @@ class PullRequest:
         else:
             self.new_context = code_context 
 
-        if Config.context_version in [5, 6]:
-            # only needed when add "to_cover" mark to code
+        if Config.context_version == 5:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num 
             else:
                 self.new_context_with_line_num = code_context_with_line_num 
+        elif Config.context_version in [4, 6]:
+            if version == "old":
+                self.old_context_with_line_num = code_context_with_line_num_str 
+            else:
+                self.new_context_with_line_num = code_context_with_line_num_str 
                 
         return changed_functions
 

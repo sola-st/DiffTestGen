@@ -313,9 +313,6 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
 
         details = f"All uncovered for to_cover marks: Old: {overall_uncovered_old}, New: {overall_uncovered_new}"
         append_event(CoverageEvent(pr_nb=pr.number, message=f"All uncovered, round {round}", details=f"{details}"))
-    elif Config.context_version == 6:
-        old_context = pr.old_context_with_line_num # code lines with line numbers marked
-        new_context = pr.new_context_with_line_num
     elif Config.context_version == 8:
         test_code_list, old_uncovered_list, new_uncovered_list = all_uncovered_for_further_needs.values()
         for i, (test_code, old_uncover, new_uncover) in enumerate(zip(test_code_list, old_uncovered_list, new_uncovered_list)):
@@ -327,8 +324,12 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
             all_uncovered_modified_stmts_info += \
                 f"Existing usage example {i+1}:\n{tect_code_with_no_example_name}\nCorresponding uncovered lines:\nOld:\n{old_uncovered_str}New:\n{new_uncovered_str}\n"
     else:
-        old_context = pr.old_context # generally without line numbers, exclude for context_version == 4. 
-        new_context = pr.new_context
+        if Config.context_version in [4, 6]:
+            old_context = pr.old_context_with_line_num # code lines with line numbers marked
+            new_context = pr.new_context_with_line_num
+        else:
+            old_context = pr.old_context # generally without line numbers, exclude for context_version == 7. 
+            new_context = pr.new_context
 
         # get a model easy-to-follow string of uncovered info
         all_uncovered_modified_stmts_info = ""
