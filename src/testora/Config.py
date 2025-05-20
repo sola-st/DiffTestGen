@@ -1,7 +1,7 @@
-from testora.util.Logs import Event, append_event
+# from testora.util.Logs import Event, append_event
 
 # KEEP THIS AT THE TOP: needed to log the current configuration
-initial_globals = set(globals().keys())
+# initial_globals = set(globals().keys())
 
 # analyze only PRs that have code changes in files in specific programming languages
 code_change_pl = "all"  # "all" or "python"
@@ -53,11 +53,11 @@ context_version = 2 # available from 1 to 5 (with 2 and 3 direct to the same inp
 
 phase_selection = "test_generation" # valid values: "test_generation", "all"
 
-# KEEP THIS AT THE END: log the current configuration
-current_globals = set(globals().keys())
-config_parameters = current_globals - initial_globals
-config_parameters = config_parameters - \
-    {"initial_globals", "current_globals", "config_parameters"}
-config_dict = {p: v for p, v in globals().items() if p in config_parameters}
-append_event(
-    Event(pr_nb=0, message=f"Configuration: {config_dict}"))
+# # KEEP THIS AT THE END: log the current configuration
+# current_globals = set(globals().keys())
+# config_parameters = current_globals - initial_globals
+# config_parameters = config_parameters - \
+#     {"initial_globals", "current_globals", "config_parameters"}
+# config_dict = {p: v for p, v in globals().items() if p in config_parameters}
+# append_event(
+#     Event(pr_nb=0, message=f"Configuration: {config_dict}"))

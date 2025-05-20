@@ -1,4 +1,5 @@
 import argparse
+import ast
 import glob
 import json
 from typing import List
@@ -888,7 +889,8 @@ def fetch_and_check_prs():
         # store log on disk and into DB
         store_logs()
         log = get_logs_as_json()
-        EvalTaskManager.write_results(project, pr_nb, log)
+        timestamp = json.loads(log)[-1]["timestamp"]
+        EvalTaskManager.write_results(project, pr_nb, timestamp, log)
         reset_logs()
 
         project, pr_nb = EvalTaskManager.fetch_task()
@@ -899,6 +901,7 @@ def fetch_and_check_prs():
 def main():
     parser = argparse.ArgumentParser(description="Testora's main entry point")
     parser.add_argument("--db", action="store_true", help="Run on PRs fetched from the database")
+    parser.add_argument("--paras", type=ast.literal_eval, help="To help run exepeimenta non-stop")
     parser.add_argument("--project", type=str,
                         help="Project to analyze",
                         choices=["keras", "marshmallow", "pandas", "scipy"])
@@ -907,11 +910,25 @@ def main():
 
     start_logging()
     if args.db:
+        Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version = args.paras
+
+        config_dict = {
+            k: v for k, v in vars(Config).items()
+            if not k.startswith("__") and not callable(v)
+        }
+        append_event(Event(pr_nb=0, message=f"Configuration: {config_dict}"))
+        
         if args.project or args.pr:
             raise ValueError("When using --db, cannot use --project and --pr")
         EvalTaskManager.initialize()
         fetch_and_check_prs()
     else:
+        config_dict = {
+            k: v for k, v in vars(Config).items()
+            if not k.startswith("__") and not callable(v)
+        }
+        append_event(Event(pr_nb=0, message=f"Configuration: {config_dict}"))
+        
         if not args.project or not args.pr:
             raise ValueError("Must specify --project and --pr")
         check_single_pr(args.project, args.pr)

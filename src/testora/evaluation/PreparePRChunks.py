@@ -49,20 +49,26 @@ if __name__ == "__main__":
     EvalTaskManager.initialize()
 
     # 1
-    target_projects = ["scipy", "marshmallow", "pandas", "keras"]
-    for target_project in target_projects:
-        with open(f"data/{target_project}_PRs_subset10.txt", "r") as f:
-            prs = f.readlines()
-        pr_list = [int(pr) for pr in prs]
+    # 1.1 add tasks for all projects
+    # target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+    # for target_project in target_projects:
 
-        if target_project == "scipy":
-            write_specific_PR_tasks_into_database("scipy", "scipy/scipy", pr_list)
-        elif target_project == "marshmallow":
-            write_specific_PR_tasks_into_database("marshmallow", "marshmallow-code/marshmallow", pr_list)
-        elif target_project == "pandas":
-            write_specific_PR_tasks_into_database("pandas", "pandas-dev/pandas", pr_list)
-        elif target_project == "keras":
-            write_specific_PR_tasks_into_database("keras", "keras-team/keras", pr_list)
+    # 1.2 add tasks for current container project
+    with open(".target_project", "r") as f:
+        target_project = f.read().strip()
+        
+    with open(f"data/{target_project}_PRs_subset10.txt", "r") as f:
+        prs = f.readlines()
+    pr_list = [int(pr) for pr in prs]
+
+    if target_project == "scipy":
+        write_specific_PR_tasks_into_database("scipy", "scipy/scipy", pr_list)
+    elif target_project == "marshmallow":
+        write_specific_PR_tasks_into_database("marshmallow", "marshmallow-code/marshmallow", pr_list)
+    elif target_project == "pandas":
+        write_specific_PR_tasks_into_database("pandas", "pandas-dev/pandas", pr_list)
+    elif target_project == "keras":
+        write_specific_PR_tasks_into_database("keras", "keras-team/keras", pr_list)
 
     # 2
     # write_range_of_PR_tasks_into_database(
