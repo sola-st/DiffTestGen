@@ -163,13 +163,21 @@ def show_status():
     connect_and_do(inner)
 
 
-def fetch_results(is_classification):
+def fetch_results(is_classification, fetch_single_project=False):
     def inner(connection, cursor):
-        projects_query = f"SELECT DISTINCT project FROM {table_name}"
-        cursor.execute(projects_query)
-        projects = [row[0] for row in cursor.fetchall()]
+        # get the name of desired projects
+        projects = []
+        if fetch_single_project == True:
+            target_project_file = Path(".target_project")
+            with open(target_project_file, "r") as f:
+                target_project = f.read().strip()
+                projects.append(target_project)
+        else:
+            projects_query = f"SELECT DISTINCT project FROM {table_name}"
+            cursor.execute(projects_query)
+            projects = [row[0] for row in cursor.fetchall()]
 
-        project_to_prs_and_timestamps = current_results()
+        project_to_prs_and_timestamps = current_results(projects=projects)
         nb_results = sum([len(rs) for _, rs in project_to_prs_and_timestamps.items()])
         print(f"Found {nb_results} existing results")
 
@@ -194,7 +202,7 @@ def fetch_results(is_classification):
                     )
                     cursor.execute(select_query, (project, pr, timestamp))
                     result = cursor.fetchone()[0]
-                    add_result(project, pr, timestamp, result, is_classification)
+                    add_result(project, pr, timestamp, result, is_classification, projects=projects)
                     nb_new_results += 1
 
             print(f"Added {nb_new_results} new results for {project}")
@@ -252,6 +260,8 @@ if __name__ == "__main__":
                         help="Remove all unfinished tasks for a specific project")
     parser.add_argument("--classification", action="store_true",
                         help="Apply to classification tasks")
+    parser.add_argument("--fetch_single_project", action="store_true",
+                        help="Fetch results of finished tasks from the target project")
 
     args = parser.parse_args()
 
@@ -262,6 +272,8 @@ if __name__ == "__main__":
         show_status()
     elif args.fetch:
         fetch_results(args.classification)
+    elif args.fetch_single_project:
+        fetch_results(args.classification, True)
     elif args.schedule:
         if args.classification:
             schedule_classification_tasks()
