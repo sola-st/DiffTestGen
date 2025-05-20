@@ -880,7 +880,14 @@ def fetch_and_check_prs():
     project, pr_nb = EvalTaskManager.fetch_task()
     while project and pr_nb:
         try:
-            check_single_pr(project, pr_nb)
+            # write configuration for every fetched task
+            config_dict = {
+                k: v for k, v in vars(Config).items()
+                if not k.startswith("__") and not callable(v)
+            }
+            append_event(Event(pr_nb=0, message=f"Configuration: {config_dict}"))
+
+            # check_single_pr(project, pr_nb)
         except TestoraException as e:
             append_event(ErrorEvent(
                 pr_nb=pr_nb, message="Caught TestoraError; will continue with next PR", details=str(e)))
@@ -889,8 +896,7 @@ def fetch_and_check_prs():
         # store log on disk and into DB
         store_logs()
         log = get_logs_as_json()
-        timestamp = json.loads(log)[-1]["timestamp"]
-        EvalTaskManager.write_results(project, pr_nb, timestamp, log)
+        EvalTaskManager.write_results(project, pr_nb, log)
         reset_logs()
 
         project, pr_nb = EvalTaskManager.fetch_task()
@@ -910,27 +916,23 @@ def main():
 
     start_logging()
     if args.db:
+        # auto-updates the prompt versions
         Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version = args.paras
-
-        config_dict = {
-            k: v for k, v in vars(Config).items()
-            if not k.startswith("__") and not callable(v)
-        }
-        append_event(Event(pr_nb=0, message=f"Configuration: {config_dict}"))
         
         if args.project or args.pr:
             raise ValueError("When using --db, cannot use --project and --pr")
         EvalTaskManager.initialize()
         fetch_and_check_prs()
     else:
+        if not args.project or not args.pr:
+            raise ValueError("Must specify --project and --pr")
+        
         config_dict = {
             k: v for k, v in vars(Config).items()
             if not k.startswith("__") and not callable(v)
         }
         append_event(Event(pr_nb=0, message=f"Configuration: {config_dict}"))
-        
-        if not args.project or not args.pr:
-            raise ValueError("Must specify --project and --pr")
+
         check_single_pr(args.project, args.pr)
         store_logs()
 

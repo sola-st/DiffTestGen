@@ -47,9 +47,8 @@ class CoverageComparison():
         with open(log_file, "r") as f:
             info = json.load(f)
         
-        pr_num = max(info[0]["pr_nb"], info[1]["pr_nb"])
+        pr_num = info[1]["pr_nb"]
         if not project_name:
-            # db mode only records configuration event for the first PR processing, so for db loaded logs, here should use info[0]
             project_name = info[1]["url"].split("/")[-3] # for single pr at local mode
 
         pre_round = -1
