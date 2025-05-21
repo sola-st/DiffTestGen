@@ -180,6 +180,8 @@ def evaluate():
     log = get_logs_as_json()
     EvalTaskManager.write_results(target_project, classification_pr_nb,
                                   log, table_name="classification_tasks")
+    # TODO: passing None as timestamp will cause old classification results
+    # for the same project to be overwritten log, timestamp=None, table_name="classification_tasks")
     reset_logs()
 
 
