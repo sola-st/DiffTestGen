@@ -62,11 +62,13 @@ def check_diff_for_single_pr(project, pr_nums):
         # 3.1 added files in new version
         non_test_added_files = filter_files(module_name, pr, "add")
         if non_test_added_files:
-            total_modified_num += get_number_of_lines(pr, file, "new")
+            for file in non_test_added_files:
+                total_modified_num += get_number_of_lines(pr, file, "new")
         # 3.2 deleted files in old version
         non_test_deleted_files = filter_files(module_name, pr, "remove")
         if non_test_deleted_files:
-            total_modified_num += get_number_of_lines(pr, file, "old")
+            for file in non_test_deleted_files:
+                total_modified_num += get_number_of_lines(pr, file, "old")
         
         diff_locs_from_touched.append(total_modified_num)
 
@@ -78,7 +80,7 @@ def main():
     with open(".target_project", "r") as f:
         project = f.read().strip()
 
-    meta_folder = join("data", "diff_loc", "meta")
+    meta_folder = join("data", "meta", "diff_loc")
     makedirs(meta_folder, exist_ok=True)
     meta_file = join(meta_folder, f"{project}_loc_in_diff_meta.txt")
     if exists(meta_file):
