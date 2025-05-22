@@ -4,10 +4,15 @@ from os import makedirs
 from matplotlib import pyplot as plt
 
 
-def plot_diff_locs(diff_modified_locs, diff_touched_locs, title, result_pdf):
+def plot_diff_locs(diff_modified_locs, diff_touched_locs, title, result_pdf, group_zise=20):
     # Get groups
-    groups = list(range(0, 181, 20)) # hard code
-    group_labels = [f"[{groups[i]}, {groups[i+1]})" for i in range(len(groups) - 1)]
+    max_modified= max(diff_modified_locs)
+    groups = list(range(1, max_modified, group_zise)) # hard code group size group_zise
+    group_labels = [f"[{groups[i]},\n {groups[i+1]-1}]" for i in range(len(groups) - 1)]
+
+    group_labels.append(f"[{groups[-1]},\n {max_modified}]")
+    to_add = ((max_modified // group_zise) +1 ) * group_zise
+    groups.append(to_add)
     
     # Create a figure with two subplots (1 row, 2 columns)
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
@@ -21,7 +26,7 @@ def plot_diff_locs(diff_modified_locs, diff_touched_locs, title, result_pdf):
     # Set custom x-tick labels
     axes[0].set_xticks([groups[i] for i in range(len(groups) - 1)])
     axes[0].set_xticklabels(group_labels)
-    axes[0].tick_params(axis='x', labelrotation=30)
+    # axes[0].tick_params(axis='x', labelrotation=90)
 
     # Add count labels to bars
     for count, patch in zip(n1, patches1):
@@ -32,14 +37,29 @@ def plot_diff_locs(diff_modified_locs, diff_touched_locs, title, result_pdf):
 
 
     # Plot histogram for diff_touched_locs
-    n2, bins2, patches2 = axes[1].hist(diff_touched_locs, bins=groups, color='salmon', edgecolor='black', align='left', rwidth=0.4)
+    groups_touched = list(range(1, max_modified, group_zise)) # a list of range start numbers
+    group_labels = [f"[{groups_touched[i]},\n {groups_touched[i+1]-1}]" for i in range(len(groups_touched) - 1)]
+
+    max_touched = max(diff_touched_locs)
+    group_labels.append(f"[{groups_touched[-1]},\n {max_touched}]")
+    to_add = ((max_touched // group_zise) +1 ) * group_zise
+    groups_touched.append(to_add)
+
+    n2, bins2, patches2 = axes[1].hist(diff_touched_locs, bins=groups_touched, color='salmon', edgecolor='black', align='left', rwidth=0.4)
     axes[1].set_title(f"{title} (Touched)")
     axes[1].set_xlabel('LoC')
     axes[1].set_ylabel('Number of PRs')
 
-    axes[1].set_xticks([groups[i] for i in range(len(groups) - 1)])
+    axes[1].set_xticks([groups_touched[i] for i in range(len(groups_touched) - 1)])
     axes[1].set_xticklabels(group_labels)
-    axes[1].tick_params(axis='x', labelrotation=30)
+    # axes[1].tick_params(axis='x', labelrotation=90)
+
+    # Fix the width of the last bar
+    # TODO butifiy the last bin (bar)
+    if patches2:
+        last_patch = patches2[-1]
+        last_patch.set_width(group_zise / 2)
+        last_patch.set_x(bins2[-2])  # start of the last bin
 
     for count, patch in zip(n2, patches2):
         if count > 0:
@@ -47,8 +67,6 @@ def plot_diff_locs(diff_modified_locs, diff_touched_locs, title, result_pdf):
             axes[1].text(patch.get_x() + patch.get_width() / 2, height, int(count),
                         ha='center', va='bottom', fontsize=9)
 
-
-    # Adjust layout to prevent overlap
     plt.tight_layout()
     plt.savefig(result_pdf)
 
@@ -68,10 +86,6 @@ def main():
         sub_diff_touched_locs = json.loads(meta_info["diff_touched_locs"]) 
         diff_touched_locs.extend(sub_diff_touched_locs)
 
-    print(max(sub_diff_modified_locs))
-    print(min(sub_diff_modified_locs))
-    print(max(sub_diff_touched_locs))
-    print(min(sub_diff_touched_locs))
     title = "LoC in diff of Non-test Main Files"
     result_folder = join("data", "results", "table_and_plots")
     makedirs(result_folder, exist_ok=True)
