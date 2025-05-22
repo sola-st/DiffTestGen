@@ -27,6 +27,7 @@ def main(target_projects):
         selected2 = 0
         may_non_executable = []
         remained_pr_nums = []
+        exclude_ignored_pr_nums = []
 
         files = listdir(target_folder)
         for file in files:
@@ -36,7 +37,9 @@ def main(target_projects):
             if not '"message": "Ignoring' in json.dumps(info):
                 shutil.copyfile(join(target_folder, file), join(exclude_ignores, file))
                 selected1 +=1
-            
+                pr_num = file.split("_")[0]
+                exclude_ignored_pr_nums.append(pr_num)
+
                 all_old_covered = 0
                 all_new_covered = 0
                 for info_block in info:
@@ -51,10 +54,13 @@ def main(target_projects):
                 else:
                     selected2 += 1
                     shutil.copyfile(join(target_folder, file), join(executable, file))
-                    remained_pr_nums.append(file.split("_")[0])
+                    remained_pr_nums.append(pr_num)
         
-        with open(f"data/{target_project}_PRs.txt", "w") as f:
+        with open(f"data/{target_project}_PRs.txt", "w") as f: # high possiblity with executable modified lines
             f.writelines("\n".join(remained_pr_nums))
+
+        with open(f"data/{target_project}_PRs_all.txt", "w") as f: # all non-ignored
+            f.writelines("\n".join(exclude_ignored_pr_nums))
 
         print(f"Filtering for project {target_project} done.")
         print(f"Not ignored: {selected1}")

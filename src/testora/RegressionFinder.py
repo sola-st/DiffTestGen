@@ -887,7 +887,7 @@ def fetch_and_check_prs():
             }
             append_event(Event(pr_nb=0, message=f"Configuration: {config_dict}"))
 
-            # check_single_pr(project, pr_nb)
+            check_single_pr(project, pr_nb)
         except TestoraException as e:
             append_event(ErrorEvent(
                 pr_nb=pr_nb, message="Caught TestoraError; will continue with next PR", details=str(e)))
