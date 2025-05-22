@@ -75,19 +75,19 @@ def check_diff_for_single_pr(project, pr_nums):
 def main():
     diff_modified_locs = []
     diff_touched_locs = []
+    with open(".target_project", "r") as f:
+        project = f.read().strip()
 
-    meta_folder = join("data", "meta")
+    meta_folder = join("data", "diff_loc", "meta")
     makedirs(meta_folder, exist_ok=True)
-    meta_file = join(meta_folder, "loc_in_diff_meta.txt")
+    meta_file = join(meta_folder, f"{project}_loc_in_diff_meta.txt")
     if exists(meta_file):
         with open(meta_file, "r") as f:
             meta_info = json.load(f) 
         diff_modified_locs = json.loads(meta_info["diff_modified_locs"])    
         diff_touched_locs = json.loads(meta_info["diff_touched_locs"]) 
     else:
-        with open(".target_project", "r") as f:
-            project = f.read().strip()
-        project_pr_file = join("data", f"{project}_PRs_all.txt")
+        project_pr_file = join("data", "meta", "pr_nums", f"{project}_PRs_all.txt")
         with open(project_pr_file, "r") as f:
             pr_nums = f.readlines()
         diff_modified_locs, diff_touched_locs = check_diff_for_single_pr(project, pr_nums)
