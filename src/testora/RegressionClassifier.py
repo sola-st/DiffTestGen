@@ -62,6 +62,7 @@ def check_single_pr(project, pr_nb):
 
 
 def fetch_and_check_prs():
+    # TODO handle the database overwritten issue
     project, pr_nb = EvalTaskManager.fetch_task()
     while project and pr_nb:
         try:
