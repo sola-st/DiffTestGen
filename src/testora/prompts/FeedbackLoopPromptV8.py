@@ -1,20 +1,20 @@
 class FeedbackTestGeneratorPromptV8:
     '''
-    Given the uncovered lines and pre-round generated tests, let LLM generate some new tests that cover the lines.
-    diff + test code + uncovered stmts (configuration 1_8_8).
-     * format of all_uncovered_modified_stmts_info: 
-            Existing usage example # 1:
+    Given the covered lines and pre-round generated tests, let LLM generate some new tests that cover more changed lines.
+    diff + test code + covered stmts (configuration 1_8_8).
+     * format of all_covered_modified_stmts_info: 
+            Example # 1:
             {test_code}
-            Corresponding uncovered lines:
-            Old:
-            New:
+            Corresponding covered lines:
+            Old: {}
+            New: {}
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, old_context, new_context):
+    def __init__(self, project_name, fut_qualified_names, diff, all_covered_modified_stmts_info, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
         # test code and uncovered statements of both versions
-        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info 
+        self.all_covered_modified_stmts_info = all_covered_modified_stmts_info 
         self.old_context = old_context
         self.new_context = new_context
         self.use_json_output = False
@@ -28,10 +28,10 @@ and achieve the highest possible coverage of the specified lines in both the old
 
 The diff affects the following functions: {fut_qualified_names}.
 
-The following lists existing usage examples along with the lines of code they do not cover in both the old and new versions. 
+The following lists some existing usage examples along with the lines of code they covered in both the old and new versions. 
 Based on the information given for each existing usage example, write one or more (if necessary) new usage examples to increase coverage of the uncovered lines, aiming to cover as many of the changed lines as possible.
 
-{all_uncovered_modified_stmts_info}
+{all_covered_modified_stmts_info}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 Each example must be an executable piece of Python code, including all necessary imports.
@@ -50,7 +50,7 @@ etc.
 """
 
         return template.format(diff=self.diff, project_name=self.project_name, 
-                               all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
+                               all_covered_modified_stmts_info=self.all_covered_modified_stmts_info,
                                fut_qualified_names=", ".join(self.fut_qualified_names))
 
     def remove_unnecessary_indentation(self, code):

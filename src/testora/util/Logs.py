@@ -61,6 +61,8 @@ class ErrorEvent(Event):
 class CoverageEvent(Event):
     details: str
 
+class ReferenceTestEvent(Event):
+    details: str
 
 class ClassifierEvalEvent(Event):
     label: str

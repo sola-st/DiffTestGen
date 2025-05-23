@@ -35,9 +35,12 @@ from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
 from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
-from testora.util.Logs import CoverageEvent, PreClassificationEvent, start_logging, ClassificationEvent, ErrorEvent, PREvent, SelectBehaviorEvent, TestExecutionEvent, append_event, Event, ComparisonEvent, LLMEvent, get_logs_as_json, store_logs, reset_logs
+from testora.util.Logs import (CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
+        ClassificationEvent, ErrorEvent, PREvent, SelectBehaviorEvent, TestExecutionEvent, append_event, 
+        Event, ComparisonEvent, LLMEvent, get_logs_as_json, store_logs, reset_logs)
 from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
 from testora.util.PythonCodeUtil2 import mark_to_cover_code_stmt
+from testora.util.ReferenceTestsFilter import filter_tests_by_line_distance, get_str_from_dict
 from testora.util.UndefinedRefsFinder import get_undefined_references
 from testora.evaluation import EvalTaskManager
 from testora import Config
@@ -282,16 +285,6 @@ def generate_tests(pr, github_repo, changed_functions):
     # also return the bool values to not check multiple times in the feedback rounds
     return all_tests, full_diff_len_fit, filtered_diff_len_nonequal_fit 
 
-def get_str_from_dict(uncover_dict:dict):
-    # a util function for 'generate_replacement_tests'
-    uncovered_str = ""
-    for file_path, uncovered_nums in uncover_dict.items():
-        if uncovered_nums:
-            uncovered_str += f"{file_path}: lines {uncovered_nums}\n"
-
-    if not uncovered_str:
-        uncovered_str = "No specified lines.\n"
-    return uncovered_str
 
 def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len_fit, filtered_diff_len_nonequal_fit,
             all_uncovered_modified_stmts_info_dict, round, all_uncovered_for_further_needs:dict=None):
@@ -315,15 +308,11 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
         details = f"All uncovered for to_cover marks: Old: {overall_uncovered_old}, New: {overall_uncovered_new}"
         append_event(CoverageEvent(pr_nb=pr.number, message=f"All uncovered, round {round}", details=f"{details}"))
     elif Config.context_version == 8:
-        test_code_list, old_uncovered_list, new_uncovered_list = all_uncovered_for_further_needs.values()
-        for i, (test_code, old_uncover, new_uncover) in enumerate(zip(test_code_list, old_uncovered_list, new_uncovered_list)):
-            test_code_left, test_code_with_no_name_tmp = test_code.split("# Round ", 1) # test_code_left could be reference fixed lines
-            test_code_right = test_code_with_no_name_tmp.split("_diff): ", 1)[1]
-            tect_code_with_no_example_name = test_code_left + "# " + test_code_right # from # Round 0 Example 4 (filtered_diff): ... to # ...
-            old_uncovered_str = get_str_from_dict(old_uncover)
-            new_uncovered_str = get_str_from_dict(new_uncover)
-            all_uncovered_modified_stmts_info += \
-                f"Existing usage example {i+1}:\n{tect_code_with_no_example_name}\nCorresponding uncovered lines:\nOld:\n{old_uncovered_str}New:\n{new_uncovered_str}\n"
+        # Notes: 
+        # 1. all_uncovered_for_further_needs stores the old and new executions
+        # 2. all_uncovered_modified_stmts_info = test_code_and_covered_info
+        all_uncovered_modified_stmts_info, event_detail = filter_tests_by_line_distance(all_uncovered_for_further_needs)
+        append_event(ReferenceTestEvent(pr_nb=pr.number, message=f"Reference test filtering, round {round}", details=event_detail))
     else:
         if Config.context_version in [4, 6]:
             old_context = pr.old_context_with_line_num # code lines with line numbers marked
@@ -677,7 +666,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     # analyze coverage during test execution
     fail_to_cover_all_indices = []
     all_uncovered_modified_stmts_info = {"old": [], "new": []}
-    all_uncovered_for_further_needs =  {"test_code": [], "old": [], "new": []} # Config.context_version = 5 or 8
+    # all_uncovered_for_further_needs could be all uncovered info, or all covered info
+    all_uncovered_for_further_needs =  {"old": [], "new": []} # Config.context_version = 5 or 8
     full_coverage_exists = False
 
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
@@ -719,9 +709,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     all_uncovered_for_further_needs["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
                     all_uncovered_for_further_needs["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
                 elif Config.context_version == 8:
-                    all_uncovered_for_further_needs["test_code"].append(old_execution.code)
-                    all_uncovered_for_further_needs["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
-                    all_uncovered_for_further_needs["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
+                    all_uncovered_for_further_needs["old"].append(old_execution)
+                    all_uncovered_for_further_needs["new"].append(new_execution)
                 else:
                     all_uncovered_modified_stmts_info["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
                     all_uncovered_modified_stmts_info["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
