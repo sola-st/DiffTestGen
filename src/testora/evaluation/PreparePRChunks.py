@@ -57,7 +57,7 @@ if __name__ == "__main__":
     with open(".target_project", "r") as f:
         target_project = f.read().strip()
         
-    with open(f"data/{target_project}_PRs_subset10.txt", "r") as f:
+    with open(f"data/meta/pr_nums/{target_project}_PRs_subset10.txt", "r") as f:
         prs = f.readlines()
     pr_list = [int(pr) for pr in prs]
 
