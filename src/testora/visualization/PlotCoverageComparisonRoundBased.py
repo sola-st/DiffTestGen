@@ -1,5 +1,5 @@
 import json
-from os import makedirs
+from os import makedirs, listdir
 from os.path import join
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
@@ -9,7 +9,7 @@ from testora.visualization.CoverageComparison import CoverageComparison
 from testora.visualization.CoverageUtils import get_feedback_round_max_num, get_overall_cov_rate
 
 
-def reorganize_coverages(all_data_approach_level):
+def reorganize_coverages(all_data_approach_level, base=False):
     # Both 1 and 2 are for all PRs across all projects
     initial_round_cov = [] # 1
     feedback_round_max = get_feedback_round_max_num(all_data_approach_level)
@@ -27,12 +27,21 @@ def reorganize_coverages(all_data_approach_level):
         # Feedback
         if "Feedback" in pr_info.keys():
             feedback_rounds = pr_info["Feedback"]
-            for i, (round_name, round_rec) in enumerate(feedback_rounds.items()):
+            i = 0
+            for round_name, round_rec in feedback_rounds.items():
                 if "--" in json.dumps(round_rec):
                     break
                 else:
                     union_old_new_cov_str = get_overall_cov_rate(round_rec)
                     feedback_rounds_cov[i].append(union_old_new_cov_str)
+                i += 1
+            # add unchanged coverage to further rounds
+            for j in range(i, feedback_round_max):
+                feedback_rounds_cov[j].append(union_old_new_cov_str)
+        else:
+            if base == False:
+                for j in range(0, feedback_round_max):
+                    feedback_rounds_cov[j].append(union_old_new_cov_str)
     
     all_rounds_cov = [initial_round_cov]
     if feedback_rounds_cov: # not extend for Testora
@@ -95,6 +104,14 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
         zorder=3
     )
 
+    for i, (arith, geom) in enumerate(zip(arith_means, geom_means), start=1):
+        # Arithmetic Mean label
+        plt.text(i + 0.1, arith + 0.5, f"{arith:.1f}%", color='blue', fontsize=8)
+
+        # Geometric Mean label
+        plt.text(i - 0.5, geom - 1.5, f"{geom:.1f}%", color='orange', fontsize=8)
+
+
     x_loc = range(0, feedback_round_max + 3)
     x_labels = ["", "Testora"] + list(range(0, feedback_round_max + 1))
     plt.xticks(x_loc, x_labels)
@@ -118,40 +135,55 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
 
 def main():
     iteration = 1
-    prompt_versions = ["1_0_1", "2_2_2"] # 1_0_1 is Testora, and 2nd element indicates the version of our approach
-    target_projects = ["scipy", "marshmallow", "pandas", "keras"]
-
-    baseline_data = []
-    our_approach_data = []
+    config_versions = [
+        # [1, 1, 1],
+        # [2, 2, 2],
+        # [3, 3, 3],
+        # [4, 4, 4],
+        # [5, 5, 5],
+        # [6, 6, 6],
+        # [7, 7, 7],
+        [1, 8, 8]
+        ]
     
-    results_folder = join("data", "results")
-    for version_id in prompt_versions:
-        all_data = [] # approach level
+    # TODO solve the data clean issue
+    for config in config_versions:
+        target_version = '_'.join(map(str, config))
+        prompt_versions = ["1_0_1", target_version] # 1_0_1 is Testora, and 2nd element indicates the version of our approach
+        target_projects = ["scipy", "marshmallow", "pandas", "keras"]
 
-        for project in target_projects:
-            output_folder = join(results_folder, "table_and_plots", project, f"meta_iter{iteration}")
-            makedirs(output_folder, exist_ok=True)
-            log_folder = join(results_folder, project, f"logs_iter{iteration}", f"log_{version_id}")
-            init = CoverageComparison(log_folder, version_id)
-          
-            all_from_cur_version = init.get_multiple_pr_coverage_info(project)
-            # write a meta file for a version
-            meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
-            with open(meta_file, "w") as f:
-                json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
-            print(f"Collected coverage information is written to {meta_file}")
+        baseline_data = []
+        our_approach_data = []
+        
+        results_folder = join("data", "results")
+        for version_id in prompt_versions:
+            all_data = [] # approach level
 
-            all_data.extend(all_from_cur_version)
+            for project in target_projects:
+                output_folder = join(results_folder, "table_and_plots", project, f"meta_iter{iteration}")
+                makedirs(output_folder, exist_ok=True)
+                log_folder = join(results_folder, f"log_{version_id}", project)
+                if listdir(log_folder):
+                    init = CoverageComparison(log_folder, version_id)
+                
+                    all_from_cur_version = init.get_multiple_pr_coverage_info(project)
+                    # write a meta file for a version
+                    meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
+                    with open(meta_file, "w") as f:
+                        json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
+                    print(f"Collected coverage information is written to {meta_file}")
 
-        if version_id == "1_0_1":
-            baseline_data, __ = reorganize_coverages(all_data)
-        else:
-            our_approach_data, feedback_round_max = reorganize_coverages(all_data)
+                    all_data.extend(all_from_cur_version)
 
-    # for the plot
-    title = "Coverage Comparison between Testora and Our Approach"
-    result_pdf = join(results_folder, "table_and_plots", "Comparison_round_based.pdf") 
-    plot_coverages_violin(baseline_data, our_approach_data, feedback_round_max, title, result_pdf)
+            if version_id == "1_0_1":
+                baseline_data, __ = reorganize_coverages(all_data, True)
+            else:
+                our_approach_data, feedback_round_max = reorganize_coverages(all_data)
+
+        # for the plot
+        title = "Coverage Comparison between Testora and Our Approach"
+        result_pdf = join(results_folder, "table_and_plots", f"Comparison_round_based_{prompt_versions[1]}.pdf") 
+        plot_coverages_violin(baseline_data, our_approach_data, feedback_round_max, title, result_pdf)
 
 
 if __name__=="__main__":
