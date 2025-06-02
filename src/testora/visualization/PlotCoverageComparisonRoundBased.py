@@ -21,6 +21,9 @@ def reorganize_coverages(all_data_approach_level, base=False):
 
         # Initial
         round_cov_pair_dict = pr_info["Initial"]["R-0"]
+        if "--" in json.dumps(round_cov_pair_dict):
+            print(pr_num)
+            break
         union_old_new_cov_str = get_overall_cov_rate(round_cov_pair_dict)
         initial_round_cov.append(union_old_new_cov_str)
         
