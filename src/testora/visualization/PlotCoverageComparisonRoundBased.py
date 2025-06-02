@@ -88,7 +88,20 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
     )
 
     # geometric means
-    geom_means = [gmean(group) for group in cleaned_data]
+    deltas = []
+    baseline_delta = [0] # also could be: [0] * len(cov_baseline)
+    deltas.append(baseline_delta)
+
+    clean_len = len(cleaned_data)
+    for i in range(1, clean_len):
+        delta_i = []
+        for pre, cur in zip(cleaned_data[0], cleaned_data[i]):
+            delta = cur - pre
+            if delta != 0: # avoid gmean is 0.
+                delta_i.append(round(delta, 2))
+        deltas.append(delta_i)
+
+    geom_means = [gmean(group) for group in deltas]
 
     plt.plot(
         range(1, len(geom_means) + 1),

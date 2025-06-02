@@ -6,12 +6,15 @@ import shutil
 
 base_folder = join("data", "results")
 
-target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+# option 1: for all projects
+# target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+
+# option 2: for a single project
+with open(".target_project", "r") as f:
+    target_project = f.read().strip()
+target_projects = [target_project]
+
 for target_project in target_projects:
-
-    # with open(".target_project", "r") as f:
-    #     target_project = f.read().strip()
-
     config_versions = [
         [1, 0, 1],
         [1, 1, 1],
@@ -32,7 +35,7 @@ for target_project in target_projects:
     log_results = join(base_folder, target_project)
     archive_results= join(log_results, "archive")
 
-    result_folder = [log_results]
+    result_folder = [log_results, archive_results]
 
     for log_folder in result_folder:
         log_files = listdir(log_folder)
@@ -48,5 +51,4 @@ for target_project in target_projects:
                 feedback_prompt = config_message["feedback_test_generation_prompt_version"]
                 context = config_message["context_version"]
                 version_id = f"{initial_prompt}_{feedback_prompt}_{context}"
-                # if version_id == "7_7_7" and not exists(join(base_folder, f"log_{version_id}", target_project, file)):
                 shutil.move(log_file_path, join(base_folder, f"log_{version_id}", target_project))
