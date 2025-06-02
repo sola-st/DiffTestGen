@@ -60,34 +60,6 @@ elif Config.classification_prompt_version == 5:
 elif Config.classification_prompt_version == 6:
     RegressionClassificationPrompt = RegressionClassificationPromptV6
 
-if Config.initial_test_generation_prompt_version == 1:
-    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV1
-elif Config.initial_test_generation_prompt_version == 2:
-    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV2
-elif Config.initial_test_generation_prompt_version in [3, 4, 5]:
-    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV345
-elif Config.initial_test_generation_prompt_version == 6:
-    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV6
-elif Config.initial_test_generation_prompt_version == 7:
-    RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV7
-
-if Config.feedback_test_generation_prompt_version == 1:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV1
-elif Config.feedback_test_generation_prompt_version == 2:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV2
-elif Config.feedback_test_generation_prompt_version == 3:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV3
-elif Config.feedback_test_generation_prompt_version == 4:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV4
-elif Config.feedback_test_generation_prompt_version == 5:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV5
-elif Config.feedback_test_generation_prompt_version == 6:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV6
-elif Config.feedback_test_generation_prompt_version == 7:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV7
-elif Config.feedback_test_generation_prompt_version == 8:
-    FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV8
-
 def clean_output(output):
     # remove warnings caused by coverage measurements
     cleaned_lines = []
@@ -849,6 +821,37 @@ def get_repo(project_name):
 
 
 def check_single_pr(project, pr_nb):
+    global RegressionTestGeneratorPrompt
+    global FeedbackTestGeneratorPrompt
+
+    if Config.initial_test_generation_prompt_version == 1:
+        RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV1
+    elif Config.initial_test_generation_prompt_version == 2:
+        RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV2
+    elif Config.initial_test_generation_prompt_version in [3, 4, 5]:
+        RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV345
+    elif Config.initial_test_generation_prompt_version == 6:
+        RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV6
+    elif Config.initial_test_generation_prompt_version == 7:
+        RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV7
+
+    if Config.feedback_test_generation_prompt_version == 1:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV1
+    elif Config.feedback_test_generation_prompt_version == 2:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV2
+    elif Config.feedback_test_generation_prompt_version == 3:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV3
+    elif Config.feedback_test_generation_prompt_version == 4:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV4
+    elif Config.feedback_test_generation_prompt_version == 5:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV5
+    elif Config.feedback_test_generation_prompt_version == 6:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV6
+    elif Config.feedback_test_generation_prompt_version == 7:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV7
+    elif Config.feedback_test_generation_prompt_version == 8:
+        FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV8
+
     github_repo, cloned_repo_manager = get_repo(project)
     github_pr = github_repo.get_pull(pr_nb)
     pr = PullRequest(github_pr, github_repo, cloned_repo_manager)

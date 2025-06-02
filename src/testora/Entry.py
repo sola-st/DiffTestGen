@@ -23,7 +23,7 @@ if exists(results_folder):
     rename(results_folder, f"{results_folder}_backup")
 
 breakpoints_data_folder = join("data", "results", "breakpoint")
-log_folder = join(results_folder, "logs")
+# log_folder = join(results_folder, "logs")
 
 for config in config_versions:
     version_id = '_'.join(map(str, config))
