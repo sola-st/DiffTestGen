@@ -22,14 +22,14 @@ results_folder = join("data", "results")
 if exists(results_folder):
     rename(results_folder, f"{results_folder}_backup")
 
-breakpoints_data_folder = join("data", "results", "breakpoint")
+breakpoints_data_folder = join(results_folder, "breakpoint")
 
 with open(".target_project", "r") as f:
     target_project = f.read().strip()
 
 with open(f"data/meta/pr_nums/{target_project}_PRs_subset10.txt", "r") as f:
     prs = f.readlines()
-    pr_list = [int(pr) for pr in prs]
+    pr_list = [int(pr) for pr in prs][:1]
 
 for config in config_versions:
     version_id = '_'.join(map(str, config))
@@ -42,7 +42,7 @@ for config in config_versions:
     bp_data_cur_version = join(breakpoints_data_folder, f"bp_{version_id}")
     makedirs(bp_data_cur_version, exist_ok=True)
     # store the log results
-    log_folder = join("data", "results", f"log_{version_id}", target_project)
+    log_folder = join(results_folder, f"log_{version_id}", target_project)
     makedirs(log_folder, exist_ok=True)
 
     for f in os.listdir('.'):
