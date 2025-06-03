@@ -51,4 +51,5 @@ for target_project in target_projects:
                 feedback_prompt = config_message["feedback_test_generation_prompt_version"]
                 context = config_message["context_version"]
                 version_id = f"{initial_prompt}_{feedback_prompt}_{context}"
+                # if not exists(join(base_folder, f"log_{version_id}", target_project, file)):
                 shutil.move(log_file_path, join(base_folder, f"log_{version_id}", target_project))

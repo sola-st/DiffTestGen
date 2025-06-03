@@ -22,9 +22,9 @@ def reorganize_coverages(all_data_approach_level, base=False):
         # Initial
         round_cov_pair_dict = pr_info["Initial"]["R-0"]
         if "--" in json.dumps(round_cov_pair_dict):
-            print(pr_num)
-            break
-        union_old_new_cov_str = get_overall_cov_rate(round_cov_pair_dict)
+            union_old_new_cov_str = "0.00%"
+        else:
+            union_old_new_cov_str = get_overall_cov_rate(round_cov_pair_dict)
         initial_round_cov.append(union_old_new_cov_str)
         
         # Feedback
@@ -33,7 +33,7 @@ def reorganize_coverages(all_data_approach_level, base=False):
             i = 0
             for round_name, round_rec in feedback_rounds.items():
                 if "--" in json.dumps(round_rec):
-                    break
+                    feedback_rounds_cov[i].append("0.00%")
                 else:
                     union_old_new_cov_str = get_overall_cov_rate(round_rec)
                     feedback_rounds_cov[i].append(union_old_new_cov_str)
@@ -125,7 +125,7 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
         plt.text(i + 0.1, arith + 0.5, f"{arith:.1f}%", color='blue', fontsize=8)
 
         # Geometric Mean label
-        plt.text(i - 0.5, geom - 1.5, f"{geom:.1f}%", color='orange', fontsize=8)
+        plt.text(i + 0.1, geom + 0.5, f"{geom:.1f}%", color='orange', fontsize=8)
 
 
     x_loc = range(0, feedback_round_max + 3)
@@ -150,7 +150,6 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
     plt.savefig(result_pdf)
 
 def main():
-    iteration = 1
     config_versions = [
         # [1, 1, 1],
         # [2, 2, 2],
@@ -176,7 +175,7 @@ def main():
             all_data = [] # approach level
 
             for project in target_projects:
-                output_folder = join(results_folder, "table_and_plots", project, f"meta_iter{iteration}")
+                output_folder = join(results_folder, "table_and_plots", project)
                 makedirs(output_folder, exist_ok=True)
                 log_folder = join(results_folder, f"log_{version_id}", project)
                 if listdir(log_folder):

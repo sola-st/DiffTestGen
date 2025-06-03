@@ -63,7 +63,7 @@ def filter_tests_by_line_distance(old_and_new_executions: dict, keep_at_most=2):
     old_executions, new_executions = old_and_new_executions.values()
     if len(old_executions) < 2:
         # no need to do further filterings
-        for i, old_execution, new_execution in enumerate(zip(old_executions, new_executions)):
+        for i, (old_execution, new_execution) in enumerate(zip(old_executions, new_executions)):
             info_str = represent_info(old_execution, new_execution, i)
             test_code_and_covered_info += info_str
         event_detail = f"No filtering. Keep all {len(old_executions)} tests as reference tests."
