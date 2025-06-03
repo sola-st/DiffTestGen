@@ -907,10 +907,11 @@ def main():
     args = parser.parse_args()
 
     start_logging()
-    if args.db:
-        # auto-updates the prompt versions
+    if args.paras:
+        # auto-updates the prompt versions, available for both db mode and single-pr mode
         Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version = args.paras
         
+    if args.db:
         if args.project or args.pr:
             raise ValueError("When using --db, cannot use --project and --pr")
         EvalTaskManager.initialize()
