@@ -119,7 +119,7 @@ class PRResult:
                 self.nb_generated_tests += int(
                     nb_generated_tests_match.group(1))
 
-            if entry["message"] == "Test execution":
+            if entry["message"].startswith("Test execution"):
                 self.nb_test_executions += 1
                 if "Traceback (most recent call last)" in entry["output"]:
                     self.nb_test_failures += 1
@@ -131,11 +131,12 @@ class PRResult:
                     entry["new_output"])
                 self.differentiating_tests.append(diff_test)
 
-            if entry["message"] == "Different outputs":
+            if entry["message"].startswith("Different outputs"):
                 self.nb_different_behavior += 1
 
-            if entry["message"] == "Diff coverage":
-                old_coverage_results, new_coverage_results = entry["details"].split(", ")
+            if entry["message"].startswith("Diff coverage, #"):
+                diff_cov = entry["details"].split("\n")[0]
+                old_coverage_results, new_coverage_results = diff_cov.split(", ")
 
                 old_has_diff_coverage, old_diff_coverage = self._extract_coverage_details(old_coverage_results)
                 new_has_diff_coverage, new_diff_coverage = self._extract_coverage_details(new_coverage_results)
@@ -242,16 +243,19 @@ class PRResult:
     def status(self):
         if self.ignored:
             return "ignored"
+        # Option 1: without running classification, easily show the test generation results.
+        return "checked"
 
-        final_classification = Classification.UNKNOWN
-        for cls in self.classification_results:
-            if cls.classification.value > final_classification.value:
-                final_classification = cls.classification
+        # Option 2: the original status display for Testora.
+        # final_classification = Classification.UNKNOWN
+        # for cls in self.classification_results:
+        #     if cls.classification.value > final_classification.value:
+        #         final_classification = cls.classification
 
-        if final_classification == Classification.UNKNOWN and self.nb_test_executions > 0:
-            return "checked"
-        else:
-            return final_classification.name.lower()
+        # if final_classification == Classification.UNKNOWN and self.nb_test_executions > 0:
+        #     return "checked"
+        # else:
+        #     return final_classification.name.lower()
 
     def summary(self):
         s = self.status()
