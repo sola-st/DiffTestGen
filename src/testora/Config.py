@@ -51,6 +51,7 @@ context_version = 2 # available from 1 to 5 (with 2 and 3 direct to the same inp
 # file, function, a set of lines
 # context_type
 
+full_coverage_level = "union" # valid values: "union", "single"
 phase_selection = "test_generation" # valid values: "test_generation", "all"
 
 # # KEEP THIS AT THE END: log the current configuration

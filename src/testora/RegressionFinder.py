@@ -579,10 +579,21 @@ def simplify_test_execution(execution):
     simplified_execution.output = execution.output
     return simplified_execution
 
+def check_union_coverage_full_cover_exist(missed_stmts:dict, covered_stmts:dict):
+    updated_missed_stmts = {}
+    uncover_exist = False
+    for file_path, missed in missed_stmts.items():
+        still_missed = missed - covered_stmts[file_path]
+        if still_missed:
+            uncover_exist = True
+        updated_missed_stmts.update({file_path: still_missed})
+
+    return updated_missed_stmts, uncover_exist
+
 def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
             full_diff_len_fit, filtered_diff_len_nonequal_fit,
             old_executions:list=[], new_executions:list=[], all_covered_modified_stmts_old:list=[], all_covered_modified_stmts_new:list=[], 
-            round=0, total_exec_recorded=False):
+            round=0, old_missed:dict={}, new_missed:dict={}):
     ''' 
     A recursive function to run the generated tests and use the feedback for the next round test generation.
     Loop ends when:
@@ -640,16 +651,19 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     all_uncovered_modified_stmts_info = {"old": [], "new": []}
     # all_uncovered_for_further_needs could be all uncovered info, or all covered info
     all_uncovered_for_further_needs =  {"old": [], "new": []} # Config.context_version = 5 or 8
-    full_coverage_exists = False
+    full_coverage_exists = False # union full coverage, or single test full coverage
 
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
-        assert old_execution.coverage_percentage is not None
-        assert new_execution.coverage_percentage is not None
+        # Check whether to enter to the feebackloop
+        uncovered_modified_stmts_old_exist = False
+        uncovered_modified_stmts_new_exist = False
         
-        if total_exec_recorded == False: # Record the event only once
+        if not old_missed: # Record the event only once
             details = f"All executable/coverable modified lines: Old: {old_execution.all_executable_modified_stmt_ranges}, New: {new_execution.all_executable_modified_stmt_ranges}"
             append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, all rounds", details=details))
-            total_exec_recorded = True
+            # for checking union coverage
+            old_missed = old_execution.all_executable_modified_stmts_num
+            new_missed = new_execution.all_executable_modified_stmts_num
 
         # Uncovered modified lines are recorded for further checking,
         # Covered modified lines are recorded for later union coverage calculating
@@ -658,18 +672,19 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 f"Covered modified lines: Old: {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, {old_execution.code.split(':', 1)[0]}", details=details))
 
-        # Check whether to enter to the feebackloop
-        uncovered_modified_stmts_old_exist = False
-        for uncover in old_execution.all_uncovered_exec_modified_stmts_num.values():
-            if uncover:
-                uncovered_modified_stmts_old_exist = True
-                break # uncovered statements exist
+        if Config.full_coverage_level == "union":
+            old_missed, uncovered_modified_stmts_old_exist = check_union_coverage_full_cover_exist(old_missed, old_execution.all_covered_exec_modified_stms_num)
+            new_missed, uncovered_modified_stmts_new_exist = check_union_coverage_full_cover_exist(new_missed, new_execution.all_covered_exec_modified_stms_num)
+        else:
+            for uncover in old_execution.all_uncovered_exec_modified_stmts_num.values():
+                if uncover:
+                    uncovered_modified_stmts_old_exist = True
+                    break # uncovered statements exist
         
-        uncovered_modified_stmts_new_exist = False
-        for uncover in new_execution.all_uncovered_exec_modified_stmts_num.values():
-            if uncover:
-                uncovered_modified_stmts_new_exist = True
-                break 
+            for uncover in new_execution.all_uncovered_exec_modified_stmts_num.values():
+                if uncover:
+                    uncovered_modified_stmts_new_exist = True
+                    break 
 
         if uncovered_modified_stmts_old_exist or uncovered_modified_stmts_new_exist:
             fail_to_cover_all_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
@@ -723,7 +738,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                         full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_uncovered_for_further_needs)
                 run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
                         full_diff_len_fit, filtered_diff_len_nonequal_fit,
-                        old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, total_exec_recorded)
+                        old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
         else:
             append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, full coverage exists."))
 
