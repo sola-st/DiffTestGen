@@ -29,8 +29,8 @@ and achieve the highest possible coverage of the specified lines in both the old
 The diff affects the following functions: {fut_qualified_names}.
 
 The following is an existing usage example, provided to show how the affected functions or code under test can be accessed and used. 
-It also includes the lines of code covered in both the old and new versions, and the specified lines that are expected to covered.
-Use the existing example as a reference for how to invoke the relevant functionality, write one or more (if necessary) new usage examples to increase coverage of the specified lines. 
+Below the example are the lines of code it covers in both the old and new versions, along with the specific lines expected to be covered.
+Use the example as a reference for how to invoke the relevant functionality, write one or more (if necessary) new usage examples to increase coverage of the specified lines. 
 
 {all_covered_modified_stmts_info}
 

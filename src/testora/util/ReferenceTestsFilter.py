@@ -121,8 +121,8 @@ def represent_info(old_execution, new_execution, old_files_to_union_uncovers_dic
     new_uncovered_str = get_str_from_dict(new_files_to_union_uncovers_dict)
     # the string that includes test code, covered stmts info by the selected test, and union (from all test) uncovered stmts info.
     test_code_cov_union_uncov_info = (
-        f"Example:\n{test_code_with_no_example_name}\n",
-        f"This example coveres the following lines:\nOld:\n{old_covered_str}New:\n{new_covered_str}\n",
+        f"Example:\n{test_code_with_no_example_name}\n"
+        f"This example coveres the following lines:\nOld:\n{old_covered_str}New:\n{new_covered_str}\n"
         f"Lines that are expected to be covered by the newly created usage example(s):\nOld:\n{old_uncovered_str}New:\n{new_uncovered_str}"
     )
     return test_code_cov_union_uncov_info
