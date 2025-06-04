@@ -49,23 +49,22 @@ def get_union_uncovered_stmts(test_executions: list):
     return union_uncovered
 
 def filter_tests_by_line_distance(old_and_new_executions: dict):
-    test_code_and_covered_info = ""
+    test_code_cov_union_uncov_info = ""
     event_detail = ""
 
     old_executions, new_executions = old_and_new_executions.values()
+    # get union uncovered stmts for the target old and new executions
+    old_files_to_union_uncovers_dict = get_union_uncovered_stmts(old_executions)
+    new_files_to_union_uncovers_dict = get_union_uncovered_stmts(new_executions)
+    
     test_num_before_filtering = len(old_executions)
     if test_num_before_filtering < 2:
         # no need to do further filterings
         for i, (old_execution, new_execution) in enumerate(zip(old_executions, new_executions)):
-            info_str = represent_info(old_execution, new_execution)
-            test_code_and_covered_info += info_str
+            test_code_cov_union_uncov_info = represent_info(old_execution, new_execution, old_files_to_union_uncovers_dict, new_files_to_union_uncovers_dict)
         event_detail = f"No filtering. Keep all {test_num_before_filtering} tests as the reference test."
     else:
-        # get union uncovered stmts for the target old and new executions
-        old_files_to_union_uncovers_dict = get_union_uncovered_stmts(old_executions)
-        new_files_to_union_uncovers_dict = get_union_uncovered_stmts(new_executions)
-
-        # calculate line disntance
+        # calculate line distance
         old_dist_lists = compute_line_distance(old_executions, old_files_to_union_uncovers_dict)
         new_dist_lists = compute_line_distance(new_executions, new_files_to_union_uncovers_dict)
 
@@ -102,21 +101,29 @@ def filter_tests_by_line_distance(old_and_new_executions: dict):
         idx = unique_check[0]
         old_execution = old_executions[idx]
         new_execution = new_executions[idx]
-        info_str = represent_info(old_execution, new_execution)
-        test_code_and_covered_info += info_str
+        test_code_cov_union_uncov_info = represent_info(old_execution, new_execution, old_files_to_union_uncovers_dict, new_files_to_union_uncovers_dict)
 
         # to record the basic info of test examples, will be used to form a ReferenceTestEvent
-        event_detail = f"From {test_num_before_filtering} tests, keep the {idx}th test as the reference test."
+        event_detail = f"From {test_num_before_filtering} tests, keep the {idx}(th) (starts at 0) test as the reference test."
 
-    return test_code_and_covered_info, event_detail
+    return test_code_cov_union_uncov_info, event_detail
 
-def represent_info(old_execution, new_execution):
+def represent_info(old_execution, new_execution, old_files_to_union_uncovers_dict, new_files_to_union_uncovers_dict):
+    # part 1: test code
     test_code_left, test_code_with_no_name_tmp = old_execution.code.split("# Round ", 1) # test_code_left could be reference fixed lines
     test_code_right = test_code_with_no_name_tmp.split("_diff): ", 1)[1]
     test_code_with_no_example_name = test_code_left + "# " + test_code_right # from # Round 0 Example 4 (filtered_diff): ... to # ...
+    # part 2: covered stmts info
     old_covered_str = get_str_from_dict(old_execution.all_covered_exec_modified_stms_num)
     new_covered_str = get_str_from_dict(new_execution.all_covered_exec_modified_stms_num)
-    test_code_and_covered_info = \
-        f"Example:\n{test_code_with_no_example_name}\nThis example coveres the following lines:\nOld:\n{old_covered_str}New:\n{new_covered_str}\n"
-    return test_code_and_covered_info
+    # part 3: union uncovered stmts info
+    old_uncovered_str = get_str_from_dict(old_files_to_union_uncovers_dict)
+    new_uncovered_str = get_str_from_dict(new_files_to_union_uncovers_dict)
+    # the string that includes test code, covered stmts info by the selected test, and union (from all test) uncovered stmts info.
+    test_code_cov_union_uncov_info = (
+        f"Example:\n{test_code_with_no_example_name}\n",
+        f"This example coveres the following lines:\nOld:\n{old_covered_str}New:\n{new_covered_str}\n",
+        f"Lines that are expected to be covered by the newly created usage example(s):\nOld:\n{old_uncovered_str}New:\n{new_uncovered_str}"
+    )
+    return test_code_cov_union_uncov_info
 

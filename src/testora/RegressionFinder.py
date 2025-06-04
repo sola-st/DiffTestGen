@@ -282,7 +282,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
     elif Config.context_version == 8:
         # Notes: 
         # 1. all_uncovered_for_further_needs stores the old and new executions
-        # 2. all_uncovered_modified_stmts_info = test_code_and_covered_info
+        # 2. all_uncovered_modified_stmts_info = test_code_and_covered_info + union_uncovered_stmts
         all_uncovered_modified_stmts_info, event_detail = filter_tests_by_line_distance(all_uncovered_for_further_needs)
         append_event(ReferenceTestEvent(pr_nb=pr.number, message=f"Reference test filtering, round {round}", details=event_detail))
     else:
