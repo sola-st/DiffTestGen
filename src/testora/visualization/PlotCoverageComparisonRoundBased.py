@@ -9,10 +9,10 @@ from testora.visualization.CoverageComparison import CoverageComparison
 from testora.visualization.CoverageUtils import get_feedback_round_max_num, get_overall_cov_rate
 
 
-def reorganize_coverages(all_data_approach_level, base=False):
+def reorganize_coverages(all_data_approach_level, base=False, union_ending=False):
     # Both 1 and 2 are for all PRs across all projects
     initial_round_cov = [] # 1
-    feedback_round_max = get_feedback_round_max_num(all_data_approach_level)
+    feedback_round_max = get_feedback_round_max_num(all_data_approach_level, union_ending)
     feedback_rounds_cov = [[] for _ in range(feedback_round_max)] # 2
 
     for pr_rec in all_data_approach_level:
@@ -38,6 +38,9 @@ def reorganize_coverages(all_data_approach_level, base=False):
                     union_old_new_cov_str = get_overall_cov_rate(round_rec)
                     feedback_rounds_cov[i].append(union_old_new_cov_str)
                 i += 1
+                if union_ending == True and "100" in union_old_new_cov_str: 
+                    break # consider union coverage ends
+
             # add unchanged coverage to further rounds
             for j in range(i, feedback_round_max):
                 feedback_rounds_cov[j].append(union_old_new_cov_str)
@@ -70,8 +73,8 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
     # arithmetic means
     arith_means = [np.mean(group) for group in cleaned_data]
     plt.plot(
-        range(1, len(arith_means) + 1),
-        arith_means,
+        range(2, len(arith_means) + 1),
+        arith_means[1:],
         color='blue',
         linestyle='--',
         linewidth=2,
@@ -87,45 +90,49 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
         zorder=3
     )
 
-    # geometric means
-    deltas = []
-    baseline_delta = [0] # also could be: [0] * len(cov_baseline)
-    deltas.append(baseline_delta)
-
-    clean_len = len(cleaned_data)
-    for i in range(1, clean_len):
-        delta_i = []
-        for pre, cur in zip(cleaned_data[0], cleaned_data[i]):
-            delta = cur - pre
-            if delta != 0: # avoid gmean is 0.
-                delta_i.append(round(delta, 2))
-        deltas.append(delta_i)
-
-    geom_means = [gmean(group) for group in deltas]
-
-    plt.plot(
-        range(1, len(geom_means) + 1),
-        geom_means,
-        color='orange',
-        linestyle='--',
-        linewidth=2,
-        zorder=2
-    )
-    plt.scatter(
-        range(1, len(geom_means) + 1),  # x positions
-        geom_means,                     # y values (geometric means)
-        color='orange',
-        marker='o',
-        label='Geometric Mean',
-        zorder=3
-    )
-
-    for i, (arith, geom) in enumerate(zip(arith_means, geom_means), start=1):
+    for i, arith in enumerate(arith_means, start=1):
         # Arithmetic Mean label
-        plt.text(i + 0.1, arith + 0.5, f"{arith:.1f}%", color='blue', fontsize=8)
+        plt.text(i + 0.1, arith + 0.5, f"{arith:.3f}%", color='blue', fontsize=8)
 
-        # Geometric Mean label
-        plt.text(i + 0.1, geom + 0.5, f"{geom:.1f}%", color='orange', fontsize=8)
+    # # geometric means
+    # deltas = []
+    # baseline_delta = [0] # also could be: [0] * len(cov_baseline)
+    # deltas.append(baseline_delta)
+
+    # clean_len = len(cleaned_data)
+    # for i in range(1, clean_len):
+    #     delta_i = []
+    #     for pre, cur in zip(cleaned_data[0], cleaned_data[i]):
+    #         delta = cur - pre
+    #         if delta != 0: # avoid gmean is 0.
+    #             delta_i.append(round(delta, 2))
+    #     deltas.append(delta_i)
+
+    # geom_means = [gmean(group) for group in deltas]
+
+    # plt.plot(
+    #     range(1, len(geom_means) + 1),
+    #     geom_means,
+    #     color='orange',
+    #     linestyle='--',
+    #     linewidth=2,
+    #     zorder=2
+    # )
+    # plt.scatter(
+    #     range(1, len(geom_means) + 1),  # x positions
+    #     geom_means,                     # y values (geometric means)
+    #     color='orange',
+    #     marker='o',
+    #     label='Geometric Mean',
+    #     zorder=3
+    # )
+
+    # for i, (arith, geom) in enumerate(zip(arith_means, geom_means), start=1):
+    #     # Arithmetic Mean label
+    #     plt.text(i + 0.1, arith + 0.5, f"{arith:.3f}%", color='blue', fontsize=8)
+
+    #     # Geometric Mean label
+    #     plt.text(i + 0.1, geom + 0.5, f"{geom:.3f}%", color='orange', fontsize=8)
 
 
     x_loc = range(0, feedback_round_max + 3)
@@ -139,7 +146,7 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
 
     legend_elements = [
         Line2D([0], [0], marker='x', color='blue', label='Arithmetic Mean', linestyle='--', linewidth=2),
-        Line2D([0], [0], marker='o', color='orange', label='Geometric Mean', linestyle='--', linewidth=2),
+        # Line2D([0], [0], marker='o', color='orange', label='Geometric Mean', linestyle='--', linewidth=2),
     ]
     plt.legend(handles=legend_elements, loc='lower right')
 
@@ -150,15 +157,16 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
     plt.savefig(result_pdf)
 
 def main():
+    # union_ending
+    # True: union coverage reaches 100%. Not plotting the rounds that after the 1st time that the full coverage reaches.
+    # False: a single test coverage reaches 100%. Plot all the rounds in the results log.
+    union_ending = True 
+
     config_versions = [
         # [1, 1, 1],
-        # [2, 2, 2],
-        # [3, 3, 3],
         # [4, 4, 4],
-        # [5, 5, 5],
-        # [6, 6, 6],
-        # [7, 7, 7],
-        [1, 8, 8]
+        [5, 5, 5],
+        # [1, 8, 8]
         ]
     
     # TODO solve the data clean issue
@@ -191,9 +199,9 @@ def main():
                     all_data.extend(all_from_cur_version)
 
             if version_id == "1_0_1":
-                baseline_data, __ = reorganize_coverages(all_data, True)
+                baseline_data, __ = reorganize_coverages(all_data, base=True)
             else:
-                our_approach_data, feedback_round_max = reorganize_coverages(all_data)
+                our_approach_data, feedback_round_max = reorganize_coverages(all_data, union_ending=union_ending)
 
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"
