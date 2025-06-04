@@ -597,7 +597,6 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     ''' 
     A recursive function to run the generated tests and use the feedback for the next round test generation.
     Loop ends when:
-     ** reach the specified max round, or 
      ** one or more of the generated tests covers all the changed lines [may impractical], or 
      ** the coverage is not increased.
 
@@ -675,7 +674,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         if Config.full_coverage_level == "union":
             old_missed, uncovered_modified_stmts_old_exist = check_union_coverage_full_cover_exist(old_missed, old_execution.all_covered_exec_modified_stms_num)
             new_missed, uncovered_modified_stmts_new_exist = check_union_coverage_full_cover_exist(new_missed, new_execution.all_covered_exec_modified_stms_num)
-        else:
+        else: # Config.full_coverage_level == "single"
             for uncover in old_execution.all_uncovered_exec_modified_stmts_num.values():
                 if uncover:
                     uncovered_modified_stmts_old_exist = True

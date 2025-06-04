@@ -135,13 +135,10 @@ class PRResult:
                 self.nb_different_behavior += 1
 
             if entry["message"] == "Diff coverage":
-                old_coverage_results, new_coverage_results = entry["details"].split(
-                    ", ")
+                old_coverage_results, new_coverage_results = entry["details"].split(", ")
 
-                old_has_diff_coverage, old_diff_coverage = self._extract_coverage_details(
-                    old_coverage_results)
-                new_has_diff_coverage, new_diff_coverage = self._extract_coverage_details(
-                    new_coverage_results)
+                old_has_diff_coverage, old_diff_coverage = self._extract_coverage_details(old_coverage_results)
+                new_has_diff_coverage, new_diff_coverage = self._extract_coverage_details(new_coverage_results)
                 if old_has_diff_coverage or new_has_diff_coverage:
                     self.nb_diff_covered_tests += 1
                 old_diff_coverages.append(old_diff_coverage)
@@ -189,11 +186,9 @@ class PRResult:
         update_time_taken(self.entries[-1])
 
         if len(old_diff_coverages) > 0:
-            self.avg_old_diff_coverage = sum(
-                old_diff_coverages) / len(old_diff_coverages)
+            self.avg_old_diff_coverage = sum(old_diff_coverages) / len(old_diff_coverages)
         if len(new_diff_coverages) > 0:
-            self.avg_new_diff_coverage = sum(
-                new_diff_coverages) / len(new_diff_coverages)
+            self.avg_new_diff_coverage = sum(new_diff_coverages) / len(new_diff_coverages)
 
         # extract classification details
         for entry_idx, entry in enumerate(self.entries):
@@ -240,8 +235,7 @@ class PRResult:
         pattern = r"\((\d+)/(\d+)\)"
         match = re.search(pattern, s)
         has_diff_coverage = int(match.group(1)) > 0
-        diff_coverage = (int(match.group(1)) / int(match.group(2))
-                         ) if int(match.group(2)) > 0 else 0.0
+        diff_coverage = (int(match.group(1)) / int(match.group(2))) if int(match.group(2)) > 0 else 0.0
 
         return has_diff_coverage, diff_coverage
 
