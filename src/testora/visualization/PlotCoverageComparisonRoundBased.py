@@ -9,10 +9,10 @@ from testora.visualization.CoverageComparison import CoverageComparison
 from testora.visualization.CoverageUtils import get_feedback_round_max_num, get_overall_cov_rate
 
 
-def reorganize_coverages(all_data_approach_level, base=False, union_ending=False):
+def reorganize_coverages(all_data_approach_level, base=False):
     # Both 1 and 2 are for all PRs across all projects
     initial_round_cov = [] # 1
-    feedback_round_max = get_feedback_round_max_num(all_data_approach_level, union_ending)
+    feedback_round_max = get_feedback_round_max_num(all_data_approach_level)
     feedback_rounds_cov = [[] for _ in range(feedback_round_max)] # 2
 
     for pr_rec in all_data_approach_level:
@@ -38,8 +38,6 @@ def reorganize_coverages(all_data_approach_level, base=False, union_ending=False
                     union_old_new_cov_str = get_overall_cov_rate(round_rec)
                     feedback_rounds_cov[i].append(union_old_new_cov_str)
                 i += 1
-                if union_ending == True and "100" in union_old_new_cov_str: 
-                    break # consider union coverage ends
 
             # add unchanged coverage to further rounds
             for j in range(i, feedback_round_max):
@@ -157,16 +155,11 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
     plt.savefig(result_pdf)
 
 def main():
-    # union_ending
-    # True: union coverage reaches 100%. Not plotting the rounds that after the 1st time that the full coverage reaches.
-    # False: a single test coverage reaches 100%. Plot all the rounds in the results log.
-    union_ending = True 
-
     config_versions = [
         # [1, 1, 1],
-        # [4, 4, 4],
-        [5, 5, 5],
-        # [1, 8, 8]
+        [4, 4, 4],
+        # [5, 5, 5],
+        # [4, 8, 8]
         ]
     
     # TODO solve the data clean issue
@@ -201,7 +194,7 @@ def main():
             if version_id == "1_0_1":
                 baseline_data, __ = reorganize_coverages(all_data, base=True)
             else:
-                our_approach_data, feedback_round_max = reorganize_coverages(all_data, union_ending=union_ending)
+                our_approach_data, feedback_round_max = reorganize_coverages(all_data)
 
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"

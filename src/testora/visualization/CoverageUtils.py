@@ -19,20 +19,17 @@ def get_feedback_round_max_list(grouped_data):
 
     return feedback_round_max_list
 
-def get_feedback_round_max_num(single_approach_data, union_ending=False):
+def get_feedback_round_max_num(single_approach_data):
     feedback_round_max = 0
     for pr_rec in single_approach_data:
         pr_num = list(pr_rec.keys())[-1]
         
         if "Feedback" in pr_rec[pr_num].keys(): 
             feedback_round_num = 0
-            if union_ending == False:
-                feedback_round_num = len(pr_rec[pr_num]["Feedback"].keys())
-            else:
-                for i, (round_name, round_rec) in enumerate(pr_rec[pr_num]["Feedback"].items()):
-                    if json.dumps(round_rec).count("100") == 2:
-                        feedback_round_num = i + 1
-                        break
+            for i, (round_name, round_rec) in enumerate(pr_rec[pr_num]["Feedback"].items()):
+                if json.dumps(round_rec).count("100") == 2:
+                    feedback_round_num = i + 1
+                    break
             feedback_round_max = max(feedback_round_max, feedback_round_num)
 
     return feedback_round_max
