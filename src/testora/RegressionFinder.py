@@ -285,6 +285,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
         # 2. all_uncovered_modified_stmts_info = test_code_and_covered_info + union_uncovered_stmts
         all_uncovered_modified_stmts_info, event_detail = filter_tests_by_line_distance(all_uncovered_for_further_needs)
         append_event(ReferenceTestEvent(pr_nb=pr.number, message=f"Reference test filtering, round {round}", details=event_detail))
+        old_context = pr.old_context_with_line_num # code lines with line numbers marked
+        new_context = pr.new_context_with_line_num
     else:
         if Config.context_version in [4, 6]:
             old_context = pr.old_context_with_line_num # code lines with line numbers marked

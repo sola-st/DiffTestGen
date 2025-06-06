@@ -27,6 +27,15 @@ and achieve the highest possible coverage of the specified lines in both the old
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}.
+The following are the old and the new versions of these affected functions, where each line of code starts with its line number in the format <line_number> :
+
+Old version: 
+
+{old_context}
+
+New version:
+
+{new_context}
 
 The following is an existing usage example, provided to show how the affected functions or code under test can be accessed and used. 
 Below the example are the lines of code it covers in both the old and new versions, along with the specific lines expected to be covered.
@@ -52,6 +61,8 @@ etc.
 
         return template.format(diff=self.diff, project_name=self.project_name, 
                                all_covered_modified_stmts_info=self.all_covered_modified_stmts_info,
+                               old_context = self.old_context,
+                               new_context = self.new_context,
                                fut_qualified_names=", ".join(self.fut_qualified_names))
 
     def remove_unnecessary_indentation(self, code):

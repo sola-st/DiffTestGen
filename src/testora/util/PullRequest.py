@@ -125,25 +125,12 @@ class PullRequest:
             raise Exception(f"Unexpected configuration value: {Config.code_change_pl}")
 
     def get_filtered_diff(self):
-        # pre_commit_cloned_repo = None
-        # if Config.context_type == 1: # provide the entire file content as context for query.
-        #     pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         diff_parts = []
         for file_path in self._get_relevant_changed_files():
             raw_diff = post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit, file_path)
             diff_parts.append(raw_diff)
 
-            # if Config.context_type == 1:
-            #     # collect old and new file contents
-            #     with open(f"{pre_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
-            #         self.old_context.update({file_path: f.read()})
-                
-            #     with open(f"{post_commit_cloned_repo.repo.working_dir}/{file_path}", "r") as f:
-            #         self.new_context.update({file_path: f.read()})
-
-        # return "\n\n".join(diff_parts)
         self.filtered_diff = "\n\n".join(diff_parts)
 
     def get_full_diff(self):
@@ -206,7 +193,7 @@ class PullRequest:
                 function_names = None
                 functions_code = None
                 functions_code_with_line_num = None
-                if Config.context_version in [1, 8]: # return only function names
+                if Config.context_version in [1]: # return only function names
                     function_names, __, __ = get_function_names(file_content, patch_ranges)
                 elif Config.context_version in [2, 3]: # return function names and code
                     function_names, functions_code, __ = get_function_names_code(file_content, patch_ranges)
@@ -214,11 +201,11 @@ class PullRequest:
                     # 7 without diff, but with the @@ line mappings
                     # here the functions_code is with line numbers
                     function_names, functions_code, __ = get_function_names_code_with_line_num(file_content, patch_ranges)
-                elif Config.context_version in [4, 5, 6]: 
+                elif Config.context_version in [4, 5, 6, 8]: 
                     function_names, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
                     code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
 
-                    if Config.context_version in [4, 6]:
+                    if Config.context_version in [4, 6, 8]:
                         code_context_with_line_num_str += f"The following are the affected functions from file <{modified_file.path}>:\n"
                         code_context_with_line_num_str += "\n\n".join(functions_code_with_line_num)
                         code_context_with_line_num_str += "\n"
@@ -241,7 +228,7 @@ class PullRequest:
                 self.old_context_with_line_num = code_context_with_line_num 
             else:
                 self.new_context_with_line_num = code_context_with_line_num 
-        elif Config.context_version in [4, 6]:
+        elif Config.context_version in [4, 6, 8]:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num_str 
             else:

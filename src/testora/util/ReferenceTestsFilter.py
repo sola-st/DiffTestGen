@@ -72,13 +72,16 @@ def filter_tests_by_line_distance(old_and_new_executions: dict):
         for execution_level_dist_list, new in zip(old_dist_lists, new_dist_lists):
             execution_level_dist_list.extend(new) # extent to a long mad list
             # rank the long dist list, get the closest to any of the lines.
-            overall_dist_lists.append(sorted(execution_level_dist_list)) # the inner list could have different lengths
+            if execution_level_dist_list:
+                # to exclude the tests covers nothing, which has no distance.
+                # related to 'if covered_nums:' in function 'compute_line_distance'.
+                overall_dist_lists.append(sorted(execution_level_dist_list)) # the inner list could have different lengths
         
         # the length of the shortest exectuion level dist list represent the available max tries to get the unique closest
         max_num = min([len(dists) for dists in overall_dist_lists])
         idx = 0
         is_unique = False
-        while (idx + 1 < max_num) and (is_unique == False):
+        while (idx + 1 <= max_num) and (is_unique == False):
             execution_level_mins = [dists[idx] for dists in overall_dist_lists]
             overall_level_min = min(execution_level_mins)
             unique_check = [test_idx for test_idx, m in enumerate(execution_level_mins) if m == overall_level_min]
@@ -111,7 +114,7 @@ def filter_tests_by_line_distance(old_and_new_executions: dict):
 def represent_info(old_execution, new_execution, old_files_to_union_uncovers_dict, new_files_to_union_uncovers_dict):
     # part 1: test code
     test_code_left, test_code_with_no_name_tmp = old_execution.code.split("# Round ", 1) # test_code_left could be reference fixed lines
-    test_code_right = test_code_with_no_name_tmp.split("_diff): ", 1)[1]
+    test_code_right = test_code_with_no_name_tmp.split("_diff):", 1)[1]
     test_code_with_no_example_name = test_code_left + "# " + test_code_right # from # Round 0 Example 4 (filtered_diff): ... to # ...
     # part 2: covered stmts info
     old_covered_str = get_str_from_dict(old_execution.all_covered_exec_modified_stms_num)
