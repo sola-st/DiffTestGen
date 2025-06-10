@@ -1,5 +1,6 @@
 import argparse
 import ast
+import copy
 import glob
 import json
 from typing import List
@@ -158,7 +159,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
             for output, test_execution in zip(outputs, test_executions):
                 test_execution.output = output
                 append_event(TestExecutionEvent(pr_nb=pr.number,
-                                                message=f"Test execution ({version})",
+                                                message=f"Test execution ({version}, merge)",
                                                 code=test_execution.code,
                                                 output=output))
         else:
@@ -599,8 +600,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     ''' 
     A recursive function to run the generated tests and use the feedback for the next round test generation.
     Loop ends when:
-     ** one or more of the generated tests covers all the changed lines [may impractical], or 
-     ** the coverage is not increased.
+     ** one or more of the generated tests union-covers all the changed lines, or 
+     ** the union coverage is not increased.
 
     Initial generation is marked as round 0, and feedback loops marks start at round 1.
     '''
@@ -654,6 +655,11 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     all_uncovered_for_further_needs =  {"old": [], "new": []} # Config.context_version = 5 or 8
     full_coverage_exists = False # union full coverage, or single test full coverage
 
+    # here exactly use the missed info provided by the function call
+    # the for loop below will update the 'old_missed' and 'new_missed'
+    pre_round_old_missed = copy.deepcopy(old_missed) # after the update of 'old_missed', it will be the missed info for current round
+    pre_round_new_missed = copy.deepcopy(new_missed) # deepcopy to avoid changes in pre_round
+
     for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
         # Check whether to enter to the feebackloop
         uncovered_modified_stmts_old_exist = False
@@ -673,19 +679,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 f"Covered modified lines: Old: {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, {old_execution.code.split(':', 1)[0]}", details=details))
 
-        if Config.full_coverage_level == "union":
-            old_missed, uncovered_modified_stmts_old_exist = check_union_coverage_full_cover_exist(old_missed, old_execution.all_covered_exec_modified_stms_num)
-            new_missed, uncovered_modified_stmts_new_exist = check_union_coverage_full_cover_exist(new_missed, new_execution.all_covered_exec_modified_stms_num)
-        else: # Config.full_coverage_level == "single"
-            for uncover in old_execution.all_uncovered_exec_modified_stmts_num.values():
-                if uncover:
-                    uncovered_modified_stmts_old_exist = True
-                    break # uncovered statements exist
-        
-            for uncover in new_execution.all_uncovered_exec_modified_stmts_num.values():
-                if uncover:
-                    uncovered_modified_stmts_new_exist = True
-                    break 
+        old_missed, uncovered_modified_stmts_old_exist = check_union_coverage_full_cover_exist(old_missed, old_execution.all_covered_exec_modified_stms_num)
+        new_missed, uncovered_modified_stmts_new_exist = check_union_coverage_full_cover_exist(new_missed, new_execution.all_covered_exec_modified_stms_num)
 
         if uncovered_modified_stmts_old_exist or uncovered_modified_stmts_new_exist:
             fail_to_cover_all_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
@@ -708,20 +703,19 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
 
         if Config.feedback_test_generation_prompt_version != 0:
-            if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False:
-                # the test covers all the modified lines
+            if not old_missed and not new_missed:
+                # union coverage reaches 100%
                 full_coverage_exists = True
                 # still keep checking the coverage information
 
     if Config.feedback_test_generation_prompt_version != 0: # 0 means to run original Testora, which does not have a feedback loop
-        if (fail_to_cover_all_indices and full_coverage_exists == False): # no full coverage exists in all the tests
+        if full_coverage_exists == False: # no full coverage exists in all the tests
             is_coverage_changed = True
             if round > 0: # initail round is 0, and feedback loop starts from 1
-                # start from the first round of feedback, if the coverage info in not change anymore, stop the feedback loop.
-                if (Config.context_version in [5, 8] and not all_uncovered_for_further_needs["old"]) or \
-                    (Config.context_version not in [5, 8] and not all_uncovered_modified_stmts_info["old"]):
+                # start from the first round of feedback, if the union coverage (round level) does not change, even have not reaches 100%, stop the feedback loop.
+                if pre_round_old_missed == old_missed and pre_round_new_missed == new_missed:
                     is_coverage_changed = False
-                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, coverage info does not change anymore."))
+                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, union coverage info does not change anymore."))
             
             # feedback loop to get new tests that are expected to cover more modified lines.
             if is_coverage_changed == True: # and round < Config.max_round:
