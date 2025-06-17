@@ -22,6 +22,7 @@ from testora.prompts.FeedbackLoopPromptV5 import FeedbackTestGeneratorPromptV5
 from testora.prompts.FeedbackLoopPromptV6 import FeedbackTestGeneratorPromptV6
 from testora.prompts.FeedbackLoopPromptV7 import FeedbackTestGeneratorPromptV7
 from testora.prompts.FeedbackLoopPromptV8 import FeedbackTestGeneratorPromptV8
+from testora.prompts.RuntimeErrorsFixingPrompt import RuntimeErrorsFixingPrompt, extract_error_message
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
 from testora.prompts.RegressionClassificationPromptV1 import RegressionClassificationPromptV1
@@ -640,12 +641,42 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     # execute tests
     old_executions_cur_round = [TestExecution(t) for t in generated_tests]
     new_executions_cur_round = [TestExecution(t) for t in generated_tests]
-    old_executions.extend(old_executions_cur_round) # get the executions for all the rounds
-    new_executions.extend(new_executions_cur_round)
 
     execute_tests_on_commit(cloned_repo_manager, pr, old_executions_cur_round, pr.pre_commit, "old")
     execute_tests_on_commit(cloned_repo_manager, pr, new_executions_cur_round, pr.post_commit, "new")
 
+    if Config.use_error_feedabck == True:
+        # runtime error feedabck
+        error_fixed_tests_indices = []
+        error_fixed_tests = [] # ideally fixed
+        for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
+            error_exist_in_old = extract_error_message(old_execution.code, old_execution.output)
+            error_exist_in_new = extract_error_message(new_execution.code, new_execution.output)
+            if error_exist_in_old == True and error_exist_in_new == True: # both failed to run
+                # refine the test by fixing the error
+                # assuming that they are the same error message
+                prompt = RuntimeErrorsFixingPrompt(old_execution.code, old_execution.output) #, new_execution.output)
+                raw_answer = llm.query(prompt)[0]
+                append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
+                fixed_test = prompt.parse_answer(raw_answer)
+                append_event(LLMEvent(pr_nb=pr.number, message="Fixed runtime errors", content=fixed_test)) # a mark to show which test
+                error_fixed_tests_indices.append(test_i)
+                error_fixed_tests.append(fixed_test)
+        
+        # rerun the fixed tests 
+        fixed_executions_old = [TestExecution(t) for t in error_fixed_tests]
+        fixed_executions_new = [TestExecution(t) for t in error_fixed_tests]
+        execute_tests_on_commit(cloned_repo_manager, pr, fixed_executions_old, pr.pre_commit, "old_error_fix")
+        execute_tests_on_commit(cloned_repo_manager, pr, fixed_executions_new, pr.post_commit, "new_error_fix")
+
+        # replace the old failed tests
+        append_event(Event(pr_nb=pr.number, message=f"Round #{round}. Discard {len(error_fixed_tests)} error tests."))
+        for idx, old_execution, new_execution in zip(error_fixed_tests_indices, fixed_executions_old, fixed_executions_new):
+            old_executions_cur_round[idx] = old_execution
+            new_executions_cur_round[idx] = new_execution
+            
+    old_executions.extend(old_executions_cur_round) # get the executions for all the rounds
+    new_executions.extend(new_executions_cur_round)
     assert None not in [e.output for e in old_executions_cur_round]
 
     # analyze coverage during test execution
