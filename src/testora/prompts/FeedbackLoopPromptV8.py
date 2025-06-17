@@ -1,19 +1,13 @@
 class FeedbackTestGeneratorPromptV8:
     '''
     Given the covered lines and pre-round generated tests, let LLM generate some new tests that cover more changed lines.
-    diff + test code + covered stmts (configuration 1_8_8).
-     * format of all_covered_modified_stmts_info: 
-            Example # 1:
-            {test_code}
-            Corresponding covered lines:
-            Old: {}
-            New: {}
+    diff + test code + covered stmts (configuration 5_8_8).
     '''
     def __init__(self, project_name, fut_qualified_names, diff, all_covered_modified_stmts_info, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        # test code and uncovered statements of both versions
+        # prompt 5-based: test code
         self.all_covered_modified_stmts_info = all_covered_modified_stmts_info 
         self.old_context = old_context
         self.new_context = new_context
@@ -27,7 +21,13 @@ and achieve the highest possible coverage of the specified lines in both the old
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}.
-The following are the old and the new versions of these affected functions, where each line of code starts with its line number in the format <line_number> :
+
+The following is an existing usage example, provided to show how the affected functions or code under test can be accessed and used. 
+Below the example are the old and the new versions of these affected functions. Some lines in these functions end with a comment: '# COVERED' indicates the line is covered by the existing example, '#TO_COVER' marks lines that should be covered by the newly generated usgae examples.
+Since some # COVERED lines are near the # TO_COVER lines, you can use the existing example as a reference to understand how to invoke the relevant functionality. 
+Write at least one new usage example to increase coverage of the # TO_COVER lines. If one example is not sufficient to cover all lines marked # TO_COVER, e.g., due to branching, add additional examples as needed.
+
+{all_covered_modified_stmts_info}
 
 Old version: 
 
@@ -36,12 +36,6 @@ Old version:
 New version:
 
 {new_context}
-
-The following is an existing usage example, provided to show how the affected functions or code under test can be accessed and used. 
-Below the example are the lines of code it covers in both the old and new versions, along with the specific lines expected to be covered.
-Use the example as a reference for how to invoke the relevant functionality, write one or more (if necessary) new usage examples to increase coverage of the specified lines. 
-
-{all_covered_modified_stmts_info}
 
 The usage examples you create may use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 Each example must be an executable piece of Python code, including all necessary imports.

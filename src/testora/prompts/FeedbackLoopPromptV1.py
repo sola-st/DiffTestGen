@@ -29,10 +29,14 @@ Print all relevant values, including intermediate values, in a human-readable fo
 
 Wrap each individual example into Python code blocks by using the following output format:
 ```python
-# Example N:
+# Example 1:
 ...
 ```
-Where N is the example number, starting at 1 and increasing sequentially for each generated example.
+```python
+# Example 2:
+...
+```
+etc.
 """
 
         return template.format(diff=self.diff, project_name=self.project_name, 

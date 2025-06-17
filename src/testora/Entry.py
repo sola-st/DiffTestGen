@@ -8,9 +8,8 @@ import os
 
 config_versions = [
     # [1, 0, 1],
-    # [4, 4, 4],
     # [5, 5, 5],
-    [4, 8, 8]
+    [5, 8, 8]
     ]
 
 results_folder = join("data", "results")

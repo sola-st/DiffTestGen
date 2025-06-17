@@ -205,7 +205,7 @@ class PullRequest:
                     function_names, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
                     code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
 
-                    if Config.context_version in [4, 6, 8]:
+                    if Config.context_version in [4, 6]:
                         code_context_with_line_num_str += f"The following are the affected functions from file <{modified_file.path}>:\n"
                         code_context_with_line_num_str += "\n\n".join(functions_code_with_line_num)
                         code_context_with_line_num_str += "\n"
@@ -223,12 +223,12 @@ class PullRequest:
         else:
             self.new_context = code_context 
 
-        if Config.context_version == 5:
+        if Config.context_version in [5, 8]:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num 
             else:
                 self.new_context_with_line_num = code_context_with_line_num 
-        elif Config.context_version in [4, 6, 8]:
+        elif Config.context_version in [4, 6]:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num_str 
             else:
