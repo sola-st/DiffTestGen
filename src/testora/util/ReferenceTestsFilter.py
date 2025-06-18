@@ -35,7 +35,7 @@ def compute_line_distance(test_executions: list, files_to_union_uncovers: dict):
 
     return mad_distances # a list with each element is the mad list of the test / execution
 
-def get_union_uncovered_stmts(test_executions: list):
+def get_union_uncovered_stmts(test_executions: list, record_None: bool):
     union_uncovered = {}
 
     for i, exec in enumerate(test_executions):
@@ -43,7 +43,9 @@ def get_union_uncovered_stmts(test_executions: list):
             if file_path in union_uncovered.keys():
                 union_uncovered[file_path] = union_uncovered[file_path].union(uncovered_nums)
             else:
-                if uncovered_nums: # if with no uncovered_nums, not record the file
+                if uncovered_nums and record_None == False: # if with no uncovered_nums, not record the file
+                    union_uncovered.update({file_path: uncovered_nums})
+                else:
                     union_uncovered.update({file_path: uncovered_nums})
 
     return union_uncovered
@@ -57,8 +59,11 @@ def filter_tests_by_line_distance(old_and_new_executions: dict, prompt_base: int
 
     old_executions, new_executions = old_and_new_executions.values()
     # get union uncovered stmts for the target old and new executions
-    old_files_to_union_uncovers_dict = get_union_uncovered_stmts(old_executions)
-    new_files_to_union_uncovers_dict = get_union_uncovered_stmts(new_executions)
+    record_None = False
+    if prompt_base == 5: 
+        record_None = True
+    old_files_to_union_uncovers_dict = get_union_uncovered_stmts(old_executions, record_None)
+    new_files_to_union_uncovers_dict = get_union_uncovered_stmts(new_executions, record_None)
     
     test_num_before_filtering = len(old_executions)
     if test_num_before_filtering < 2:
@@ -68,6 +73,8 @@ def filter_tests_by_line_distance(old_and_new_executions: dict, prompt_base: int
                 old_files_to_union_uncovers_dict, new_files_to_union_uncovers_dict, prompt_base)
             if prompt_base == 5:
                 union_uncovered = {"old": old_files_to_union_uncovers_dict, "new": new_files_to_union_uncovers_dict}
+                old_covered_info = old_execution.all_covered_exec_modified_stms_num
+                new_covered_info = new_execution.all_covered_exec_modified_stms_num
 
         event_detail = f"No filtering. Keep all {test_num_before_filtering} tests as the reference test."
     else:
