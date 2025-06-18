@@ -157,9 +157,8 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
 def main():
     config_versions = [
         # [1, 1, 1],
-        [4, 4, 4],
         # [5, 5, 5],
-        # [4, 8, 8]
+        [5, 8, 8]
         ]
     
     # TODO solve the data clean issue

@@ -25,11 +25,11 @@ def get_feedback_round_max_num(single_approach_data):
         pr_num = list(pr_rec.keys())[-1]
         
         if "Feedback" in pr_rec[pr_num].keys(): 
-            feedback_round_num = 0
-            for i, (round_name, round_rec) in enumerate(pr_rec[pr_num]["Feedback"].items()):
-                if json.dumps(round_rec).count("100") == 2:
-                    feedback_round_num = i + 1
-                    break
+            feedback_round_num = len(pr_rec[pr_num]["Feedback"])
+            # for i, (round_name, round_rec) in enumerate(pr_rec[pr_num]["Feedback"].items()):
+            #     if json.dumps(round_rec).count("100") == 2: # issue: should repeat at least twice, fix later if needed
+            #         feedback_round_num = i + 1
+            #         break
             feedback_round_max = max(feedback_round_max, feedback_round_num)
 
     return feedback_round_max

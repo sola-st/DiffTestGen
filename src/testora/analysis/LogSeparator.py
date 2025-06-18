@@ -17,9 +17,8 @@ target_projects = [target_project]
 for target_project in target_projects:
     config_versions = [
         # [1, 0, 1],
-        # [4, 4, 4],
         # [5, 5, 5],
-        [4, 8, 8]
+        [5, 8, 8]
         ]
 
     for config in config_versions:
