@@ -7,10 +7,10 @@ import os
 
 
 config_versions = [
-    # [1, 0, 1],
-    # [4, 4, 4],
-    # [5, 5, 5],
-    [4, 8, 8]
+    # [1, 0, 1, False],
+    # [5, 5, 5, False],
+    # [5, 8, 8, False],
+    [5, 8, 8, True]
     ]
 
 results_folder = join("data", "results")
@@ -24,7 +24,7 @@ with open(".target_project", "r") as f:
 
 with open(f"data/meta/pr_nums/{target_project}_PRs_subset10.txt", "r") as f:
     prs = f.readlines()
-    pr_list = [int(pr) for pr in prs][:1]
+    pr_list = [int(pr) for pr in prs]
 
 for config in config_versions:
     version_id = '_'.join(map(str, config))

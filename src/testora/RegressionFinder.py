@@ -950,7 +950,8 @@ def main():
     start_logging()
     if args.paras:
         # auto-updates the prompt versions, available for both db mode and single-pr mode
-        Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version = args.paras
+        Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, \
+                Config.context_version, Config.use_error_feedabck = args.paras
         
     if args.db:
         if args.project or args.pr:

@@ -55,6 +55,9 @@ class DockerExecutor:
         self.container.exec_run("rm -rf /tmp/Testora")
         self.container.exec_run("mkdir /tmp/Testora")
 
+        if len(code.splitlines()) == 1:
+            self.container.exec_run('/bin/sh -c "cd /home/keras && pip install -e ./"')
+
         self.copy_code_to_container(code, "/tmp/Testora/Testora_test_code.py")
         coverage_files = ",".join(f"\"{f}\"" for f in self.coverage_files)
         # -u to avoid non-deterministic buffering
