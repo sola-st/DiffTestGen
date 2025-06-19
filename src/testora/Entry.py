@@ -9,7 +9,7 @@ import os
 config_versions = [
     # [1, 0, 1, False],
     # [5, 5, 5, False],
-    [5, 8, 8, False]
+    [5, 8, 8, False],
     [5, 8, 8, True]
     ]
 
