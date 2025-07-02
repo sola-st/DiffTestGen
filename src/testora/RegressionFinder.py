@@ -483,7 +483,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # extract diff and names of changed functions. changed_function : qualified names
     # this function call wil also add the desired context to the pr.
     # old_changed_functions available if needed.
-    changed_functions = pr.get_changed_function_names_and_context() 
+    changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
     # note: the initial round do not have converage info.
 
     # # extract call gragh and dependency gragh

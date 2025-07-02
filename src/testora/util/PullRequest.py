@@ -165,14 +165,14 @@ class PullRequest:
         result = list(dict.fromkeys(result))
         return result
     
-    def get_changed_function_names_and_context(self):
+    def get_changed_function_names_and_context(self, prompt_base):
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-        changed_function_qualified_names_old = self.get_helper(pre_commit_cloned_repo, "old") # target on getting old context
+        changed_function_qualified_names_old = self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
-        changed_function_qualified_names_new = self.get_helper(post_commit_cloned_repo, "new")
+        changed_function_qualified_names_new = self.get_helper(post_commit_cloned_repo, "new", prompt_base)
         return changed_function_qualified_names_new
     
-    def get_helper(self, cloned_repo, version):
+    def get_helper(self, cloned_repo, version, prompt_base):
         changed_functions = []
         code_context = ""
         code_context_with_line_num_str = ""
@@ -205,7 +205,7 @@ class PullRequest:
                     function_names, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
                     code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
 
-                    if Config.context_version in [4, 6]:
+                    if Config.context_version in [4, 6] or prompt_base == 4:
                         code_context_with_line_num_str += f"The following are the affected functions from file <{modified_file.path}>:\n"
                         code_context_with_line_num_str += "\n\n".join(functions_code_with_line_num)
                         code_context_with_line_num_str += "\n"
@@ -223,12 +223,12 @@ class PullRequest:
         else:
             self.new_context = code_context 
 
-        if Config.context_version in [5, 8]:
+        if Config.context_version == 5 or prompt_base == 5:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num 
             else:
                 self.new_context_with_line_num = code_context_with_line_num 
-        elif Config.context_version in [4, 6]:
+        elif Config.context_version in [4, 6] or prompt_base == 4:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num_str 
             else:
