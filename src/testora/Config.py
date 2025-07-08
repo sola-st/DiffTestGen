@@ -52,6 +52,7 @@ context_version = 2 # available from 1 to 5 (with 2 and 3 direct to the same inp
 phase_selection = "test_generation" # valid values: "test_generation", "all"
 
 use_error_feedabck = True
+error_feedback_max = 3
 
 # # KEEP THIS AT THE END: log the current configuration
 # current_globals = set(globals().keys())

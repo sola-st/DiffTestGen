@@ -3,7 +3,7 @@
 import json
 from os.path import join, isfile
 from os import listdir
-from testora.prompts.RuntimeErrorsFixingPrompt import extract_error_message
+from testora.prompts.RuntimeErrorsFixingPrompt import check_whether_error_exist
 
 base_folder = join("data", "results")
 
@@ -47,17 +47,17 @@ for target_project in target_projects:
                 for info_block in info:
                     try:
                         msg = info_block["message"]
-                        # "Generated 4 more tests. (4 tests before deduplication and cleaning)"
+                        # e.g., "Generated 4 more tests. (4 tests before deduplication and cleaning)"
                         if 'before deduplication and cleaning' in msg:
                             current_round_test_num = int(msg.split(" ", 2)[1])
                             project_level_test += current_round_test_num
-                        elif msg == "Fixed runtime errors":
+                        elif msg.startswith("Fixed runtime errors"):
                             project_level_need_fix += 1
                             test_name = info_block["content"].split("(", 1)[0]
                             project_level_need_fix_test_names.update({test_name: {"num": 0, "pr": info_block["pr_nb"]}})
                         elif "_error_fix)" in msg:
                             test_name = info_block["code"].split("(", 1)[0]
-                            error_exist = extract_error_message(info_block["code"], info_block["output"])
+                            error_exist = check_whether_error_exist(info_block["code"], info_block["output"])
                             if error_exist == True:
                                 project_level_need_fix_test_names[test_name]["num"] += 1
                     except:
@@ -68,9 +68,13 @@ for target_project in target_projects:
         if pass_num != 0: # pass 1 or 2 of the code versions
             project_level_fixed += 1 # the number of fixed test
             fixed_relevant_pr.add(pr_nb)
+        else:
+            print(pr_nb)
 
     print(f"Project {target_project} has {project_level_test} tests, {project_level_need_fix} of them need fix.")
-    print(f"--With {project_level_fixed} tests fixed, relvant to {len(fixed_relevant_pr)} PRs.\n")
+    print(f"--With {project_level_fixed} tests fixed, relvant to {len(fixed_relevant_pr)} PRs.")
+    print(fixed_relevant_pr)
+    print()
     overall_level_test += project_level_test
     overall_need_fix_tests += project_level_need_fix
     overall_fixed_tests+= project_level_fixed
