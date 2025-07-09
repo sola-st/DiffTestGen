@@ -22,7 +22,7 @@ from testora.prompts.FeedbackLoopPromptV5 import FeedbackTestGeneratorPromptV5
 from testora.prompts.FeedbackLoopPromptV6 import FeedbackTestGeneratorPromptV6
 from testora.prompts.FeedbackLoopPromptV7 import FeedbackTestGeneratorPromptV7
 from testora.prompts.FeedbackLoopPromptV8 import FeedbackTestGeneratorPromptV8
-from testora.prompts.RuntimeErrorsFixingPrompt import RuntimeErrorsFixingPrompt, extract_error_type
+from testora.prompts.RuntimeErrorsFixingPrompt import RuntimeErrorsFixingPrompt, check_whether_error_exist, extract_error_type
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
 from testora.prompts.RegressionClassificationPromptV1 import RegressionClassificationPromptV1
@@ -515,7 +515,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
         # check for behavioral differences
         difference_found = old_execution.output != new_execution.output
-        if is_crash(old_execution.output) and is_crash(new_execution.output):
+        # if is_crash(old_execution.output) and is_crash(new_execution.output):
+        if check_whether_error_exist(old_execution.code, old_execution.output) and check_whether_error_exist(new_execution.code, new_execution.output):
             # ignore differences if both tests crash
             append_event(ComparisonEvent(pr_nb=pr.number,
                     message=f"Both tests failed, considering them the same\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
@@ -659,17 +660,24 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         fixed_executions_old = []
         fixed_executions_new = []
         error_fixed_tests = [] # ideally fixed
+        pre_error_types = []
         for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
             error_type_in_old = extract_error_type(old_execution.code, old_execution.output)
             error_type_in_new = extract_error_type(new_execution.code, new_execution.output)
 
             inner_round = 0 # decide when to stop the inner feddback loop for a single test
             fixed_test = None # from last inner round
+            end_event_recorded = False
             while error_type_in_old and error_type_in_new: # both failed to run
-                if inner_round >= Config.error_feedback_max:
+                # if inner_round >= Config.error_feedback_max:
+                    # # max attempt to fix the test, but still fails on both versions of the code
+                    # append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Max attempt reaches."))
+                    # break
+                
+                if [error_type_in_old, error_type_in_new] in pre_error_types:
                     # TODO same type error, or same type but different location
-                    # max attempt to fix the test, but still fails on both versions of the code
-                    append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Max attempt reaches."))
+                    append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Error type does not change."))
+                    end_event_recorded = True
                     break
 
                 # refine the test by fixing the error
@@ -677,7 +685,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 raw_answer = llm.query(prompt)[0]
                 append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
                 fixed_test = prompt.parse_answer(raw_answer)
-                if "#Round" not in fixed_test:
+                if "# Round" not in fixed_test:
                     print(test_i)
                 message = f"Fix runtime errors. Error types: old: {error_type_in_old}, new: {error_type_in_new}"
                 append_event(LLMEvent(pr_nb=pr.number, message=message, content=fixed_test)) # a mark to show which test
@@ -692,16 +700,18 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 # check whether the test need more rounds of error message feedback
                 old_execution = fixed_executions_new_single[0]
                 new_execution = fixed_executions_new_single[0]
+                pre_error_types.append([error_type_in_old, error_type_in_new])
                 error_type_in_old = extract_error_type(old_execution.code, old_execution.output)
                 error_type_in_new = extract_error_type(new_execution.code, new_execution.output)
 
-            # recodrs the fixed tests from the last inner rounds
-            error_fixed_tests_indices.append(test_i)
-            error_fixed_tests.append(fixed_test)
-            fixed_executions_old.append(old_execution)
-            fixed_executions_new.append(new_execution)
-            if inner_round < Config.error_feedback_max:
-                append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Test passes at least one of the code versions."))
+            if fixed_test: # only consider the tests that fails at leat at one side
+                # recodrs the fixed tests from the last inner rounds
+                error_fixed_tests_indices.append(test_i)
+                error_fixed_tests.append(fixed_test)
+                fixed_executions_old.append(old_execution)
+                fixed_executions_new.append(new_execution)
+                if end_event_recorded == False:
+                    append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Test passes at least one of the code versions."))
 
         # replace the old failed tests with the last fix
         append_event(Event(pr_nb=pr.number, message=f"Round #{round}. Discard {len(error_fixed_tests)} error tests."))
