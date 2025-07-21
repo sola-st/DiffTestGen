@@ -51,11 +51,11 @@ for target_project in target_projects:
                         if 'before deduplication and cleaning' in msg:
                             current_round_test_num = int(msg.split(" ", 2)[1])
                             project_level_test += current_round_test_num
-                        elif msg.startswith("Fixed runtime errors"):
+                        elif msg.startswith("Fix runtime errors"):
                             project_level_need_fix += 1
                             test_name = info_block["content"].split("(", 1)[0]
                             project_level_need_fix_test_names.update({test_name: {"num": 0, "pr": info_block["pr_nb"]}})
-                        elif "_error_fix)" in msg:
+                        elif "_error_fix" in msg:
                             test_name = info_block["code"].split("(", 1)[0]
                             error_exist = check_whether_error_exist(info_block["code"], info_block["output"])
                             if error_exist == True:
