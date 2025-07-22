@@ -4,7 +4,6 @@ from os.path import join
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
-from scipy.stats import gmean
 from testora.visualization.CoverageComparison import CoverageComparison
 from testora.visualization.CoverageUtils import get_feedback_round_max_num, get_overall_cov_rate
 
@@ -92,47 +91,6 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
         # Arithmetic Mean label
         plt.text(i + 0.1, arith + 0.5, f"{arith:.3f}%", color='blue', fontsize=8)
 
-    # # geometric means
-    # deltas = []
-    # baseline_delta = [0] # also could be: [0] * len(cov_baseline)
-    # deltas.append(baseline_delta)
-
-    # clean_len = len(cleaned_data)
-    # for i in range(1, clean_len):
-    #     delta_i = []
-    #     for pre, cur in zip(cleaned_data[0], cleaned_data[i]):
-    #         delta = cur - pre
-    #         if delta != 0: # avoid gmean is 0.
-    #             delta_i.append(round(delta, 2))
-    #     deltas.append(delta_i)
-
-    # geom_means = [gmean(group) for group in deltas]
-
-    # plt.plot(
-    #     range(1, len(geom_means) + 1),
-    #     geom_means,
-    #     color='orange',
-    #     linestyle='--',
-    #     linewidth=2,
-    #     zorder=2
-    # )
-    # plt.scatter(
-    #     range(1, len(geom_means) + 1),  # x positions
-    #     geom_means,                     # y values (geometric means)
-    #     color='orange',
-    #     marker='o',
-    #     label='Geometric Mean',
-    #     zorder=3
-    # )
-
-    # for i, (arith, geom) in enumerate(zip(arith_means, geom_means), start=1):
-    #     # Arithmetic Mean label
-    #     plt.text(i + 0.1, arith + 0.5, f"{arith:.3f}%", color='blue', fontsize=8)
-
-    #     # Geometric Mean label
-    #     plt.text(i + 0.1, geom + 0.5, f"{geom:.3f}%", color='orange', fontsize=8)
-
-
     x_loc = range(0, feedback_round_max + 3)
     x_labels = ["", "Testora"] + list(range(0, feedback_round_max + 1))
     plt.xticks(x_loc, x_labels)
@@ -144,7 +102,6 @@ def plot_coverages_violin(cov_baseline, cov_our_approach, feedback_round_max, ti
 
     legend_elements = [
         Line2D([0], [0], marker='x', color='blue', label='Arithmetic Mean', linestyle='--', linewidth=2),
-        # Line2D([0], [0], marker='o', color='orange', label='Geometric Mean', linestyle='--', linewidth=2),
     ]
     plt.legend(handles=legend_elements, loc='lower right')
 
@@ -194,6 +151,7 @@ def main():
                 baseline_data, __ = reorganize_coverages(all_data, base=True)
             else:
                 our_approach_data, feedback_round_max = reorganize_coverages(all_data)
+                print(all_data)
 
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"

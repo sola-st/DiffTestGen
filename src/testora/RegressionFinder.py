@@ -3,6 +3,7 @@ import ast
 import copy
 import glob
 import json
+import re
 from typing import List
 from github import Github, Auth
 from testora.execution.DockerExecutor import DockerExecutor
@@ -23,6 +24,7 @@ from testora.prompts.FeedbackLoopPromptV6 import FeedbackTestGeneratorPromptV6
 from testora.prompts.FeedbackLoopPromptV7 import FeedbackTestGeneratorPromptV7
 from testora.prompts.FeedbackLoopPromptV8 import FeedbackTestGeneratorPromptV8
 from testora.prompts.RuntimeErrorsFixingPrompt import RuntimeErrorsFixingPrompt, check_whether_error_exist, extract_error_type
+from testora.prompts.TestPythonBlockSeparatorPrompt import TestPythonBlockSeparatorPrompt
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
 from testora.prompts.RegressionClassificationPromptV1 import RegressionClassificationPromptV1
@@ -186,6 +188,15 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
 
     generated_tests = prompt.parse_answer(raw_answer)
+    # Separate the examples if the model answers in a big python code block.
+    if len(generated_tests) == 1:
+        matches = re.findall(r'Example \d+', str(generated_tests))
+        if matches > 1: # multiple usgae example in one python block
+            speparator_prompt = TestPythonBlockSeparatorPrompt(generated_tests[0])
+            separate_raw_answer = llm.query(speparator_prompt)
+            append_event(LLMEvent(pr_nb=pr.number, message="Separate raw answer", content="\n---(next sample)---".join(separate_raw_answer)))
+            generated_tests = prompt.parse_answer(raw_answer)
+        
     name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
         # for test:

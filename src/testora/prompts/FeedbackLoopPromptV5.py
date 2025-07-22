@@ -30,7 +30,8 @@ The usage examples you create may use only the public API of the {project_name} 
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
-Wrap each individual example into Python code blocks by using the following output format:
+If multiples examples are generated, do not combine them as a single Python code block. Instead, wrap each individual example in its own separate Python code block using the following output format:
+
 ```python
 # Example 1:
 ...
