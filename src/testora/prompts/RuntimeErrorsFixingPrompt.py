@@ -80,7 +80,8 @@ def check_whether_error_exist(test_code, execution_output):
 
     return error_exist
 
-def extract_error_type(test_code, execution_output):
+def extract_error_type_2_kinds(test_code, execution_output):
+    # focus on both traceback and try-catched errors.
     error_type = None
 
     # if error exists, extract the error message
@@ -113,5 +114,20 @@ def extract_error_type(test_code, execution_output):
                 if msg_prefix in execution_output:
                     error_type = re.findall(r'\b\S*Error\b', except_line)
                     break
+
+    return error_type
+
+def extract_error_type(execution_output):
+    # only focus on tracback reported errors.
+    error_type = None
+
+    # if error exists, extract the error message
+    if "Traceback (most recent call last)" in execution_output:
+        output_lines:list = execution_output.splitlines()
+        output_lines.reverse()
+        for line in output_lines:
+            error_type = re.findall(r'^(\S*Error)\b', line)
+            if error_type:
+                break
 
     return error_type

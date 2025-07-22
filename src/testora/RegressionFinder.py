@@ -673,8 +673,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         error_fixed_tests = [] # ideally fixed
         pre_error_types = []
         for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
-            error_type_in_old = extract_error_type(old_execution.code, old_execution.output)
-            error_type_in_new = extract_error_type(new_execution.code, new_execution.output)
+            error_type_in_old = extract_error_type(old_execution.output)
+            error_type_in_new = extract_error_type(new_execution.output)
 
             inner_round = 0 # decide when to stop the inner feddback loop for a single test
             fixed_test = None # from last inner round
@@ -712,8 +712,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 old_execution = fixed_executions_new_single[0]
                 new_execution = fixed_executions_new_single[0]
                 pre_error_types.append([error_type_in_old, error_type_in_new])
-                error_type_in_old = extract_error_type(old_execution.code, old_execution.output)
-                error_type_in_new = extract_error_type(new_execution.code, new_execution.output)
+                error_type_in_old = extract_error_type(old_execution.output)
+                error_type_in_new = extract_error_type(new_execution.output)
 
             if fixed_test: # only consider the tests that fails at leat at one side
                 # recodrs the fixed tests from the last inner rounds
