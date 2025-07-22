@@ -44,7 +44,7 @@ class LLMCache:
         print(
             f"LLMCache of {self.llm_module.model} with {len(self.cache)} entries saved. {self.nb_hits} hits, {self.nb_misses} misses.")
 
-    def query(self, prompt, nb_samples=1, temperature=1, no_cache=False):
+    def query(self, prompt, nb_samples=1, temperature=1, no_cache=False, add_to_cache=True):
         prompt_str = prompt.create_prompt()
 
         # check for cached answer
@@ -74,7 +74,7 @@ class LLMCache:
             return result
 
         # update cache (only if answer is non-empty)
-        if result:
+        if result and add_to_cache == True:
             self.cache[prompt_str] = result
             self.nb_unwritten_updates += 1
 

@@ -666,12 +666,17 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     execute_tests_on_commit(cloned_repo_manager, pr, new_executions_cur_round, pr.post_commit, "new")
 
     if Config.use_error_feedabck == True:
+        '''
+        Two options for giving the feedback:
+        1. max attempts
+        2. the error type does not changes
+        '''
         # runtime error feedabck
         error_fixed_tests_indices = []
         fixed_executions_old = []
         fixed_executions_new = []
         error_fixed_tests = [] # ideally fixed
-        pre_error_types = []
+        # pre_error_types = [] # option 2
         for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
             error_type_in_old = extract_error_type(old_execution.output)
             error_type_in_new = extract_error_type(new_execution.output)
@@ -680,20 +685,22 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             fixed_test = None # from last inner round
             end_event_recorded = False
             while error_type_in_old and error_type_in_new: # both failed to run
-                # if inner_round >= Config.error_feedback_max:
-                    # # max attempt to fix the test, but still fails on both versions of the code
-                    # append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Max attempt reaches."))
-                    # break
-                
-                if [error_type_in_old, error_type_in_new] in pre_error_types:
-                    # TODO same type error, or same type but different location
-                    append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Error type does not change."))
-                    end_event_recorded = True
+                # option 1
+                if inner_round >= Config.error_feedback_max:
+                    # max attempt to fix the test, but still fails on both versions of the code
+                    append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Max attempt ({Config.error_feedback_max}) reaches."))
                     break
+                
+                # option 2
+                # if [error_type_in_old, error_type_in_new] in pre_error_types:
+                #     # TODO same type error, or same type but different location
+                #     append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Error type does not change."))
+                #     end_event_recorded = True
+                #     break
 
                 # refine the test by fixing the error
                 prompt = RuntimeErrorsFixingPrompt(old_execution.code, old_execution.output) #, new_execution.output)
-                raw_answer = llm.query(prompt)[0]
+                raw_answer = llm.query(prompt, add_to_cache=False)[0] # add_to_cache set to false, allow the model to get different answers with the sme error message.
                 append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
                 fixed_test = prompt.parse_answer(raw_answer)
                 if "# Round" not in fixed_test:
@@ -711,7 +718,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 # check whether the test need more rounds of error message feedback
                 old_execution = fixed_executions_new_single[0]
                 new_execution = fixed_executions_new_single[0]
-                pre_error_types.append([error_type_in_old, error_type_in_new])
+                # pre_error_types.append([error_type_in_old, error_type_in_new]) # option 2
                 error_type_in_old = extract_error_type(old_execution.output)
                 error_type_in_new = extract_error_type(new_execution.output)
 
