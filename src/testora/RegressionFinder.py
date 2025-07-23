@@ -703,8 +703,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 raw_answer = llm.query(prompt, add_to_cache=False)[0] # add_to_cache set to false, allow the model to get different answers with the sme error message.
                 append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
                 fixed_test = prompt.parse_answer(raw_answer)
-                if "# Round" not in fixed_test:
-                    print(test_i)
+                # if "# Round" not in fixed_test:
+                #     print(test_i)
                 message = f"Fix runtime errors. Error types: old: {error_type_in_old}, new: {error_type_in_new}"
                 append_event(LLMEvent(pr_nb=pr.number, message=message, content=fixed_test)) # a mark to show which test
                 inner_round += 1
@@ -716,7 +716,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 execute_tests_on_commit(cloned_repo_manager, pr, fixed_executions_new_single, pr.post_commit, f"new_error_fix_inner_r{inner_round})")
 
                 # check whether the test need more rounds of error message feedback
-                old_execution = fixed_executions_new_single[0]
+                old_execution = fixed_executions_old_single[0]
                 new_execution = fixed_executions_new_single[0]
                 # pre_error_types.append([error_type_in_old, error_type_in_new]) # option 2
                 error_type_in_old = extract_error_type(old_execution.output)

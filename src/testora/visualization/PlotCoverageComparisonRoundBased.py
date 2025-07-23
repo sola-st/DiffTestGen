@@ -117,7 +117,7 @@ def main():
         # [5, 5, 5],
         [5, 8, 8]
         ]
-    
+    iteration = 0
     # TODO solve the data clean issue
     for config in config_versions:
         target_version = '_'.join(map(str, config))
@@ -132,9 +132,13 @@ def main():
             all_data = [] # approach level
 
             for project in target_projects:
-                output_folder = join(results_folder, "table_and_plots", project)
-                makedirs(output_folder, exist_ok=True)
                 log_folder = join(results_folder, f"log_{version_id}", project)
+                if version_id != "1_0_1":
+                    log_folder = join(results_folder, f"iter_{iteration}", f"log_{version_id}", project)
+                
+                output_folder = join(results_folder, "table_and_plots", f"iter_{iteration}", project)
+                makedirs(output_folder, exist_ok=True)
+
                 if listdir(log_folder):
                     init = CoverageComparison(log_folder, version_id)
                 

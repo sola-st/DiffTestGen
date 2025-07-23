@@ -80,30 +80,32 @@ class CoverageComparison():
                         covered_lines_new_ranges_dict = json.loads(new)
                         info_block_msg = info_block["message"]
                         if "Diff coverage, # Round " in info_block_msg:
-                            pre_round = self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, info_block_msg, "old", pre_round)
-                            pre_round = self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, info_block_msg, "new", pre_round)
+                            round = int(info_block_msg.split("# Round ", 1)[1].split(" ", 1)[0])
+                            if pre_round != round: # another round starts, record all the collected info for round {round}
+                                if self.union_covered_lines_single_round["old"].keys():
+                                    self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))
+                                    pre_round = round
+                                elif pre_round == -1:
+                                    self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
+                                    self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
+                            else: # update self.union_covered_lines_single_round
+                                self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
+                                self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
 
         # append the last round, related to get_union_numbers_form_dict
         self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))
         self.format_coverage_info(pr_num, project_name)
 
-    def get_union_numbers_form_dict(self, range_dict:dict, info_block_msg, version, pre_round):
+    def get_union_numbers_form_dict(self, range_dict:dict, version):
         for file, range_list_str in range_dict.items():
             stmt_num_ranges:list = eval(range_list_str)
             covered_stmts_tmp = range_to_set(stmt_num_ranges)
             covered_stmts = set(covered_stmts_tmp)
 
-            round = int(info_block_msg.split("# Round ", 1)[1].split(" ", 1)[0])
-            if pre_round != round: # another round starts, record all the collected info for round {round}
-                if self.union_covered_lines_single_round["old"].keys():
-                    self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))
-
             try:
                 self.union_covered_lines_single_round[version][file] = set(self.union_covered_lines_single_round[version][file]).union(covered_stmts)
             except:
                 self.union_covered_lines_single_round[version].update({file: covered_stmts})
-            pre_round = round
-        return pre_round
             
     def format_coverage_info(self, pr_num, project_name):
         json_str = nested_dict()
