@@ -191,7 +191,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     # Separate the examples if the model answers in a big python code block.
     if len(generated_tests) == 1:
         matches = re.findall(r'Example \d+', str(generated_tests))
-        if matches > 1: # multiple usgae example in one python block
+        if len(matches) > 1: # multiple usgae example in one python block
             speparator_prompt = TestPythonBlockSeparatorPrompt(generated_tests[0])
             separate_raw_answer = llm.query(speparator_prompt)
             append_event(LLMEvent(pr_nb=pr.number, message="Separate raw answer", content="\n---(next sample)---".join(separate_raw_answer)))
@@ -810,15 +810,18 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             if is_coverage_changed == True: # and round < Config.max_round:
                 round+=1
                 deduplicated_len = len(all_uncovered_modified_stmts_info["old"])
-                details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"
-                append_event(CoverageEvent(pr_nb=pr.number, 
-                        message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
-                
-                refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, 
-                        full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_for_further_needs)
-                run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
-                        full_diff_len_fit, filtered_diff_len_nonequal_fit,
-                        old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
+                if deduplicated_len > 0:
+                    details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"
+                    append_event(CoverageEvent(pr_nb=pr.number, 
+                            message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
+                    
+                    refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, 
+                            full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_for_further_needs)
+                    run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
+                            full_diff_len_fit, filtered_diff_len_nonequal_fit,
+                            old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
+                else:
+                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, union coverage reaches 100%."))
         else:
             append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, full coverage exists."))
 

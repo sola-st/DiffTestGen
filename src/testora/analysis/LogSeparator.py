@@ -5,6 +5,7 @@ from os import listdir, makedirs
 import shutil
 
 base_folder = join("data", "results")
+iteration = 0
 
 # option 1: for all projects
 # target_projects = ["scipy", "marshmallow", "pandas", "keras"]
@@ -18,18 +19,18 @@ for target_project in target_projects:
     config_versions = [
         # [1, 0, 1],
         # [5, 5, 5],
-        [5, 8, 8]
+        [5, 8, 8, True]
         ]
 
     for config in config_versions:
         version_id = '_'.join(map(str, config))
-        separated_results_folder = join(base_folder, f"log_{version_id}", target_project)
+        separated_results_folder = join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
         makedirs(separated_results_folder, exist_ok=True)
 
     log_results = join(base_folder, target_project)
-    archive_results= join(log_results, "archive")
+    # archive_results= join(log_results, "archive")
 
-    result_folder = [log_results, archive_results]
+    result_folder = [log_results] #, archive_results]
 
     for log_folder in result_folder:
         log_files = listdir(log_folder)
@@ -44,6 +45,7 @@ for target_project in target_projects:
                 initial_prompt = config_message["initial_test_generation_prompt_version"]
                 feedback_prompt = config_message["feedback_test_generation_prompt_version"]
                 context = config_message["context_version"]
-                version_id = f"{initial_prompt}_{feedback_prompt}_{context}"
+                whether_feedback = config_message["use_error_feedabck"]
+                version_id = f"{initial_prompt}_{feedback_prompt}_{context}_{whether_feedback}"
                 # if not exists(join(base_folder, f"log_{version_id}", target_project, file)):
-                shutil.move(log_file_path, join(base_folder, f"log_{version_id}", target_project))
+                shutil.move(log_file_path, join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project))
