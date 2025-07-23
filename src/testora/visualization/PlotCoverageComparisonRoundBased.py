@@ -151,7 +151,6 @@ def main():
                 baseline_data, __ = reorganize_coverages(all_data, base=True)
             else:
                 our_approach_data, feedback_round_max = reorganize_coverages(all_data)
-                print(all_data)
 
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"
@@ -162,3 +161,6 @@ def main():
 if __name__=="__main__":
     main()
 
+# TODO:
+# different iterations may have different max feedback rounds.
+# iter-0 as a base, or iter-max rounds as a base.
