@@ -700,7 +700,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
                 # refine the test by fixing the error
                 prompt = RuntimeErrorsFixingPrompt(old_execution.code, old_execution.output) #, new_execution.output)
-                raw_answer = llm.query(prompt, add_to_cache=False)[0] # add_to_cache set to false, allow the model to get different answers with the sme error message.
+                raw_answer = llm.query(prompt, no_cache=True)[0] # no_cache set to true, allow the model to get different answers with the same error message.
                 append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
                 fixed_test = prompt.parse_answer(raw_answer)
                 # if "# Round" not in fixed_test:
