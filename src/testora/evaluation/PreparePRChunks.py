@@ -61,13 +61,13 @@ if __name__ == "__main__":
     # for target_project in target_projects:
 
     # 1.2 add tasks for current container project
+    with open(".target_project", "r") as f:
+        target_project = f.read().strip()
+
     pr_list = []
     if args.prs:
         pr_list = args.prs
     else:
-        with open(".target_project", "r") as f:
-            target_project = f.read().strip()
-
         pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
         with open(pr_file, "r") as f:
             prs = f.readlines()
