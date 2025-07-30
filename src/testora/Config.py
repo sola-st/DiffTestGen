@@ -32,6 +32,9 @@ classification_temp = 1.0
 # max round for feedback loop
 # max_round = 3
 
+# to record repetitions, convinient for separate the logs.
+iteration = 0
+
 # different prompts for classification task
 classification_prompt_version = 4
 

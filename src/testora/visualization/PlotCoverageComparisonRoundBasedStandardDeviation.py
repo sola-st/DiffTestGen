@@ -51,10 +51,7 @@ def reorganize_coverages(all_data_approach_level, base=False):
         all_rounds_cov.extend(feedback_rounds_cov)
     return all_rounds_cov, feedback_round_max # max feedback round is 0 for Testora 
     
-def plot_coverages_violin_deviation(cov_baseline, cov_our_approach_list, feedback_round_max, title, result_pdf):
-    cov_our_approach = cov_our_approach_list[0]
-    other_repetitions_cov_our_approach = cov_our_approach_list[1:]
-
+def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_round_max, title, result_pdf):
     cleaned_data = [
         [float(cov.strip('%')) for cov in pr_level_rates]
         for pr_level_rates in (cov_baseline + cov_our_approach)
@@ -90,30 +87,30 @@ def plot_coverages_violin_deviation(cov_baseline, cov_our_approach_list, feedbac
     )
 
 
-    # standard deviation
-    other_cleaned_data = [
-        [float(cov.strip('%')) for cov in pr_level_rates]
-        for single_iter in other_repetitions_cov_our_approach
-        for pr_level_rates in single_iter 
-    ]
+    # # standard deviation
+    # other_cleaned_data = [
+    #     [float(cov.strip('%')) for cov in pr_level_rates]
+    #     for single_iter in other_repetitions_cov_our_approach
+    #     for pr_level_rates in single_iter 
+    # ]
 
-    all_arith_means = [arith_means]
-    for cov_single_iter in other_cleaned_data:
-        cov_arith_means = [np.mean(group) for group in cov_single_iter]
-        all_arith_means.append(cov_arith_means)
+    # all_arith_means = [arith_means]
+    # for cov_single_iter in other_cleaned_data:
+    #     cov_arith_means = [np.mean(group) for group in cov_single_iter]
+    #     all_arith_means.append(cov_arith_means)
 
-    arith_stds = [np.std(group) for group in list(map(list, zip(*all_arith_means)))]
-    # Add error bars (standard deviation) for the second and subsequent columns
-    plt.errorbar(
-        range(2, len(arith_means) + 1),  # x positions (skip first)
-        arith_means[1:],                 # means (skip first)
-        yerr=arith_stds[1:],             # stds (skip first)
-        fmt='none',
-        ecolor='orange',
-        elinewidth=2,
-        capsize=5,
-        label='Std Dev'
-    )
+    # arith_stds = [np.std(group) for group in list(map(list, zip(*all_arith_means)))]
+    # # Add error bars (standard deviation) for the second and subsequent columns
+    # plt.errorbar(
+    #     range(2, len(arith_means) + 1),  # x positions (skip first)
+    #     arith_means[1:],                 # means (skip first)
+    #     yerr=arith_stds[1:],             # stds (skip first)
+    #     fmt='none',
+    #     ecolor='orange',
+    #     elinewidth=2,
+    #     capsize=5,
+    #     label='Std Dev'
+    # )
 
     for i, arith in enumerate(arith_means, start=1):
         # Arithmetic Mean label
@@ -140,32 +137,29 @@ def plot_coverages_violin_deviation(cov_baseline, cov_our_approach_list, feedbac
     plt.savefig(result_pdf)
 
 def main():
-    iterations = 3
+    iterations = 2
     config_versions = [
-        # [5, 5, 5],
-        [9, 9, 9],
-        ]
+        # [5, 5, 5, False],
+        # [5, 8, 8, False],
+        [5, 8, 8, True]
+    ]
     
     for config in config_versions:
         target_version = '_'.join(map(str, config))
-        prompt_versions = ["1_0_1", target_version] # 1_0_1 is Testora, and 2nd element indicates the version of our approach
+        prompt_versions = ["1_0_1_False", target_version] # 1_0_1 is Testora, and 2nd element indicates the version of our approach
         target_projects = ["marshmallow"]
 
         baseline_data = []
-        our_approach_data_multi_iterations = []
+        our_approach_data = []
         feedback_round_max = 0
         
         results_folder = join("data", "results")
         for version_id in prompt_versions:
-
             for iter in range(iterations):
                 all_data = [] # approach level
                 for project in target_projects:
-                    output_folder = join(results_folder, "table_and_plots", project)
-                    log_folder = join(results_folder, f"log_{version_id}", project)
-                    if version_id != "1_0_1":
-                        output_folder = join(output_folder, f"iter_{iter}")
-                        log_folder = join(log_folder, f"iter_{iter}")
+                    output_folder = join(results_folder, "table_and_plots", f"iter_{iter}", project)
+                    log_folder = join(results_folder, f"iter_{iter}", f"log_{version_id}", project)
                     makedirs(output_folder, exist_ok=True)
                     
                     if listdir(log_folder):
@@ -173,25 +167,37 @@ def main():
                     
                         all_from_cur_version = init.get_multiple_pr_coverage_info(project)
                         # write a meta file for a version
-                        # meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
-                        # with open(meta_file, "w") as f:
-                        #     json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
-                        # print(f"Collected coverage information is written to {meta_file}")
+                        meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
+                        with open(meta_file, "w") as f:
+                            json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
+                        print(f"Collected coverage information is written to {meta_file}")
 
                         all_data.extend(all_from_cur_version)
 
-                if version_id == "1_0_1":
-                    baseline_data, __ = reorganize_coverages(all_data, base=True)
+                if version_id == "1_0_1_False":
+                    baseline_data_iter, __ = reorganize_coverages(all_data, base=True)
+                    # baseline_data.extend(baseline_data_iter)
+                    for k, round_cov in enumerate(baseline_data_iter):
+                        try: 
+                            baseline_data[k].extend(round_cov)
+                        except:
+                            baseline_data.append(round_cov)
                 else:
-                    our_approach_data, feedback_round_max_single_iter = reorganize_coverages(all_data)
-                    our_approach_data_multi_iterations.append(our_approach_data)
+                    our_approach_data_iter, feedback_round_max_single_iter = reorganize_coverages(all_data)
+                    print(feedback_round_max_single_iter)
+                    for k, round_cov in enumerate(our_approach_data_iter):
+                        try: 
+                            our_approach_data[k].extend(round_cov)
+                        except:
+                            our_approach_data.append(round_cov)
+
                     if iter == 0:
                         feedback_round_max = feedback_round_max_single_iter
 
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"
-        result_pdf = join(results_folder, "table_and_plots", f"Comparison_round_based_deviation_{prompt_versions[1]}_test.pdf") 
-        plot_coverages_violin_deviation(baseline_data, our_approach_data_multi_iterations, feedback_round_max, title, result_pdf)
+        result_pdf = join(results_folder, "table_and_plots", f"Comparison_round_based_deviation_{prompt_versions[1]}.pdf") 
+        plot_coverages_violin_deviation([baseline_data[0]], our_approach_data, feedback_round_max, title, result_pdf)
 
 
 if __name__=="__main__":

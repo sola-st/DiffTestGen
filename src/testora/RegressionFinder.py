@@ -1008,7 +1008,7 @@ def main():
     if args.paras:
         # auto-updates the prompt versions, available for both db mode and single-pr mode
         Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, \
-                Config.context_version, Config.use_error_feedabck = args.paras
+                Config.context_version, Config.use_error_feedabck, Config.iteration = args.paras
         
     if args.db:
         if args.project or args.pr:

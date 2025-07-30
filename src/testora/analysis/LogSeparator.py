@@ -4,8 +4,9 @@ from os.path import join, isfile, exists
 from os import listdir, makedirs
 import shutil
 
+
+iterations = [0, 1]
 base_folder = join("data", "results")
-iteration = 0
 
 # option 1: for all projects
 # target_projects = ["scipy", "marshmallow", "pandas", "keras"]
@@ -17,20 +18,18 @@ target_projects = [target_project]
 
 for target_project in target_projects:
     config_versions = [
-        # [1, 0, 1],
-        # [5, 5, 5],
+        [1, 0, 1, False],
+        [5, 5, 5, False],
+        [5, 8, 8, False],
         [5, 8, 8, True]
-        ]
+    ]
 
-    for config in config_versions:
-        version_id = '_'.join(map(str, config))
-        separated_results_folder = join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
-        makedirs(separated_results_folder, exist_ok=True)
-
+    version_ids_with_iter = ['_'.join(map(str, config)) + f"_{iter}" for config in config_versions]
+    
     log_results = join(base_folder, target_project)
-    # archive_results= join(log_results, "archive")
+    archive_results= join(log_results, "archive")
 
-    result_folder = [log_results] #, archive_results]
+    result_folder = [log_results, archive_results]
 
     for log_folder in result_folder:
         log_files = listdir(log_folder)
@@ -47,5 +46,9 @@ for target_project in target_projects:
                 context = config_message["context_version"]
                 whether_feedback = config_message["use_error_feedabck"]
                 version_id = f"{initial_prompt}_{feedback_prompt}_{context}_{whether_feedback}"
-                # if not exists(join(base_folder, f"log_{version_id}", target_project, file)):
-                shutil.move(log_file_path, join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project))
+                iteration = config_message["iteration"]
+                if f"{version_id}_{iteration}" in version_ids_with_iter:
+                    separated_results_folder = join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
+                    makedirs(separated_results_folder, exist_ok=True)
+                    # if not exists(join(separated_results_folder, file)):
+                    shutil.move(log_file_path, join(base_folder, separated_results_folder))
