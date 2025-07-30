@@ -1,12 +1,12 @@
 # Only needed if running different versions of prompts non-stop.
-import ast
+# import ast
 import shutil
 import subprocess
 from os.path import join, isfile, exists
 from os import makedirs, rename
 import os
 
-max_iteration = 2
+max_iteration = 5
 pr_split_num = 1 # could be 1, 2, or 3
 
 with open(".target_project", "r") as f:
@@ -53,8 +53,8 @@ for iteration in range(max_iteration):
         subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks", f"--prs={pr_list}"])
 
         # run RegressionFinder
-        config.append(iteration) # config_with_iter
-        subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config}", f"--prs={pr_list}"])
+        config_with_iter = config + [iteration]
+        subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config_with_iter}", f"--prs={pr_list}"])
         
         # store the breakpoint data seperately
         bp_data_cur_version = join(breakpoints_data_folder, f"bp_{version_id}")
