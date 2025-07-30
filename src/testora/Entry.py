@@ -36,8 +36,8 @@ for iteration in range(max_iteration):
         subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks"])
 
         # run RegressionFinder
-        config_with_iter = config.append(iter)
-        subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config_with_iter}"])
+        config.append(iteration) # config_with_iter
+        subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config}"])
         
         # store the breakpoint data seperately
         bp_data_cur_version = join(breakpoints_data_folder, f"bp_{version_id}")

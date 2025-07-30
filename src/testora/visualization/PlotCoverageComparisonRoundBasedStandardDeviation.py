@@ -184,7 +184,7 @@ def main():
                             baseline_data.append(round_cov)
                 else:
                     our_approach_data_iter, feedback_round_max_single_iter = reorganize_coverages(all_data)
-                    print(feedback_round_max_single_iter)
+                    # print(feedback_round_max_single_iter)
                     for k, round_cov in enumerate(our_approach_data_iter):
                         try: 
                             our_approach_data[k].extend(round_cov)

@@ -88,6 +88,7 @@ class CoverageComparison():
                                 elif pre_round == -1:
                                     self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
                                     self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
+                                    pre_round = round
                             else: # update self.union_covered_lines_single_round
                                 self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
                                 self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
