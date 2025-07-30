@@ -1,3 +1,5 @@
+import argparse
+from os.path import join
 from github import Github, Auth
 from testora.RegressionFinder import get_merged_prs
 from testora.evaluation import EvalTaskManager
@@ -45,7 +47,11 @@ def write_range_of_PR_tasks_into_database(project_name, project_id, start_pr_nb,
     EvalTaskManager.write_tasks(project_name, result_pr_nbs, "tasks")
 
 
-if __name__ == "__main__":
+def main():
+    parser = argparse.ArgumentParser(description="PrepairPRChunks entry point")
+    parser.add_argument("--prsplit", type=int, help="which PR split to analyze")
+    args = parser.parse_args()
+    
     EvalTaskManager.initialize()
 
     # 1
@@ -56,8 +62,12 @@ if __name__ == "__main__":
     # 1.2 add tasks for current container project
     with open(".target_project", "r") as f:
         target_project = f.read().strip()
-        
-    with open(f"data/meta/pr_nums/{target_project}_PRs_subset10.txt", "r") as f:
+    
+    pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
+    if args.prsplit:
+        pr_file = pr_file.replace(".txt", f"_{args.prsplit}.txt")
+    
+    with open(pr_file, "r") as f:
         prs = f.readlines()
     pr_list = [int(pr) for pr in prs]
 
@@ -69,6 +79,8 @@ if __name__ == "__main__":
         write_specific_PR_tasks_into_database("pandas", "pandas-dev/pandas", pr_list)
     elif target_project == "keras":
         write_specific_PR_tasks_into_database("keras", "keras-team/keras", pr_list)
+
+    return pr_list
 
     # 2
     # write_range_of_PR_tasks_into_database(
@@ -82,3 +94,7 @@ if __name__ == "__main__":
 
     # write_range_of_PR_tasks_into_database(
     #     "marshmallow", "marshmallow-code/marshmallow", 2804, 300)
+
+
+if __name__ == "__main__":
+    main()

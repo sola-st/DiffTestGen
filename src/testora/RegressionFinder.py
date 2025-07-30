@@ -966,8 +966,10 @@ def check_single_pr(project, pr_nb):
                          title=pr.github_pr.title, url=pr.github_pr.html_url))
 
 
-def fetch_and_check_prs():
-    project, pr_nb, timestamp = EvalTaskManager.fetch_task()
+def fetch_and_check_prs(prs):
+    # project, pr_nb, timestamp = EvalTaskManager.fetch_task()
+    # Isolate the containers to fetch only the expected pr tasks
+    project, pr_nb, timestamp = EvalTaskManager.fetch_task_with_pr_filter(prs)
     while project and pr_nb:
         try:
             # write configuration for every fetched task
@@ -989,7 +991,8 @@ def fetch_and_check_prs():
         EvalTaskManager.write_results(project, pr_nb, log, timestamp)
         reset_logs()
 
-        project, pr_nb, timestamp = EvalTaskManager.fetch_task()
+        # project, pr_nb, timestamp = EvalTaskManager.fetch_task()
+        project, pr_nb, timestamp = EvalTaskManager.fetch_task_with_pr_filter(prs)
 
     print("No more tasks to work on")
 
@@ -998,6 +1001,7 @@ def main():
     parser = argparse.ArgumentParser(description="Testora's main entry point")
     parser.add_argument("--db", action="store_true", help="Run on PRs fetched from the database")
     parser.add_argument("--paras", type=ast.literal_eval, help="To help run exepeimenta non-stop")
+    parser.add_argument("--prs", type=ast.literal_eval, help="To help isolate the running among different containers")
     parser.add_argument("--project", type=str,
                         help="Project to analyze",
                         choices=["keras", "marshmallow", "pandas", "scipy"])
@@ -1014,7 +1018,7 @@ def main():
         if args.project or args.pr:
             raise ValueError("When using --db, cannot use --project and --pr")
         EvalTaskManager.initialize()
-        fetch_and_check_prs()
+        fetch_and_check_prs(args.prs)
     else:
         if not args.project or not args.pr:
             raise ValueError("Must specify --project and --pr")

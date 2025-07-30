@@ -1,4 +1,5 @@
 # Only needed if running different versions of prompts non-stop.
+import ast
 import shutil
 import subprocess
 from os.path import join, isfile, exists
@@ -6,9 +7,8 @@ from os import makedirs, rename
 import os
 
 max_iteration = 2
-
-'''!!! To check the file in PreparePRChunks'''
-
+pr_split_num = 1 # could be 1, 2, or 3
+    
 config_versions = [
     [1, 0, 1, False],
     [5, 5, 5, False],
@@ -33,11 +33,12 @@ for iteration in range(max_iteration):
     for config in config_versions:
         version_id = '_'.join(map(str, config))
         # add tasks about current target project to database
-        subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks"])
+        result = subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks", f"--prsplit={pr_split_num}"])
+        pr_list = ast.literal_eval(result.stdout.strip())
 
         # run RegressionFinder
         config.append(iteration) # config_with_iter
-        subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config}"])
+        subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config}", f"--prs={pr_list}"])
         
         # store the breakpoint data seperately
         bp_data_cur_version = join(breakpoints_data_folder, f"bp_{version_id}")

@@ -103,6 +103,54 @@ def fetch_task(table_name="tasks"):
     return connect_and_do(inner)
 
 
+def fetch_task_with_pr_filter(allowed_prs, table_name="tasks"):
+    """
+    Fetch and assign a new task to this container only if the PR is in allowed_prs.
+    If an unfinished task is already assigned, return it regardless of allowed_prs.
+    """
+    def inner(connection, cursor):
+        connection.start_transaction()
+
+        # check if there's already an unfinished task assigned to this container; if yes, work on it
+        select_query = (
+            f"SELECT project, pr, timestamp FROM {table_name} "
+            f"WHERE worker=%s AND result IS NULL"
+        )
+        cursor.execute(select_query, (my_worker_id,))
+        row = cursor.fetchone()
+        if row:
+            return row[0], row[1], row[2]
+
+        # otherwise, fetch a new task and mark it as assigned to this container, but only if pr in allowed_prs
+        target_project_file = Path(".target_project")
+        with open(target_project_file, "r") as f:
+            target_project = f.read().strip()
+        # Fetch all unassigned tasks for the project
+        select_query = (
+            f"SELECT project, pr, timestamp FROM {table_name} "
+            f"WHERE worker IS NULL AND project=%s"
+        )
+        cursor.execute(select_query, (target_project,))
+        rows = cursor.fetchall()
+
+        # Find the first row with pr in allowed_prs
+        for row in rows:
+            project, pr, timestamp = row[0], row[1], row[2]
+            if pr in allowed_prs:
+                update_query = (
+                    f"UPDATE {table_name} SET worker = %s "
+                    f"WHERE project = %s AND pr = %s AND timestamp = %s AND worker IS NULL"
+                )
+                cursor.execute(update_query, (my_worker_id, project, pr, timestamp))
+                connection.commit()
+                return project, pr, timestamp
+
+        print("No eligible task found.")
+        return None, None, None
+
+    return connect_and_do(inner)
+
+
 def write_results(project, pr, result, timestamp, table_name="tasks"):
     def inner(connection, cursor):
         if timestamp is None:
