@@ -24,7 +24,7 @@ for target_project in target_projects:
         [5, 8, 8, True]
     ]
 
-    version_ids_with_iter = ['_'.join(map(str, config)) + f"_{iter}" for config in config_versions]
+    version_ids_with_iter = ['_'.join(map(str, config)) + f"_{iteration}" for config in config_versions for iteration in iterations]
     
     log_results = join(base_folder, target_project)
     archive_results= join(log_results, "archive")
@@ -44,11 +44,14 @@ for target_project in target_projects:
                 initial_prompt = config_message["initial_test_generation_prompt_version"]
                 feedback_prompt = config_message["feedback_test_generation_prompt_version"]
                 context = config_message["context_version"]
-                whether_feedback = config_message["use_error_feedabck"]
-                version_id = f"{initial_prompt}_{feedback_prompt}_{context}_{whether_feedback}"
-                iteration = config_message["iteration"]
-                if f"{version_id}_{iteration}" in version_ids_with_iter:
-                    separated_results_folder = join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
-                    makedirs(separated_results_folder, exist_ok=True)
-                    # if not exists(join(separated_results_folder, file)):
-                    shutil.move(log_file_path, join(base_folder, separated_results_folder))
+                try:
+                    whether_feedback = config_message["use_error_feedabck"]
+                    version_id = f"{initial_prompt}_{feedback_prompt}_{context}_{whether_feedback}"
+                    iteration = config_message["iteration"]
+                    if f"{version_id}_{iteration}" in version_ids_with_iter:
+                        separated_results_folder = join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
+                        makedirs(separated_results_folder, exist_ok=True)
+                        if not exists(join(separated_results_folder, file)):
+                            shutil.copy2(log_file_path, separated_results_folder)
+                except:
+                    pass # old executions with no the newly added configs
