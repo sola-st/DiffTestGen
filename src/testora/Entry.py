@@ -50,7 +50,7 @@ for iteration in range(max_iteration):
         #         capture_output=True, text=True)
         # pr_list = ast.literal_eval(result.stdout.rsplit("\n", 3)[-3].strip())
 
-        subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks", f"--prsplit={pr_split_num}"])
+        subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks", f"--prs={pr_list}"])
 
         # run RegressionFinder
         config.append(iteration) # config_with_iter

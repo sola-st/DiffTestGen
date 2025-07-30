@@ -1,4 +1,5 @@
 import argparse
+import ast
 from os.path import join
 from github import Github, Auth
 from testora.RegressionFinder import get_merged_prs
@@ -49,7 +50,7 @@ def write_range_of_PR_tasks_into_database(project_name, project_id, start_pr_nb,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PrepairPRChunks entry point")
-    parser.add_argument("--prsplit", type=int, help="which PR split to analyze")
+    parser.add_argument("--prs", type=ast.literal_eval, help="To help isolate the running among different containers")
     args = parser.parse_args()
     
     EvalTaskManager.initialize()
@@ -60,16 +61,17 @@ if __name__ == "__main__":
     # for target_project in target_projects:
 
     # 1.2 add tasks for current container project
-    with open(".target_project", "r") as f:
-        target_project = f.read().strip()
-    
-    pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
-    if args.prsplit:
-        pr_file = pr_file.replace(".txt", f"_{args.prsplit}.txt")
-    
-    with open(pr_file, "r") as f:
-        prs = f.readlines()
-    pr_list = [int(pr) for pr in prs]
+    pr_list = []
+    if args.prs:
+        pr_list = args.prs
+    else:
+        with open(".target_project", "r") as f:
+            target_project = f.read().strip()
+
+        pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
+        with open(pr_file, "r") as f:
+            prs = f.readlines()
+        pr_list = [int(pr) for pr in prs]
 
     if target_project == "scipy":
         write_specific_PR_tasks_into_database("scipy", "scipy/scipy", pr_list)
@@ -79,8 +81,6 @@ if __name__ == "__main__":
         write_specific_PR_tasks_into_database("pandas", "pandas-dev/pandas", pr_list)
     elif target_project == "keras":
         write_specific_PR_tasks_into_database("keras", "keras-team/keras", pr_list)
-
-    # print(pr_list)
 
     # 2
     # write_range_of_PR_tasks_into_database(
