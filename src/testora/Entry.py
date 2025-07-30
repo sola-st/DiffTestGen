@@ -8,6 +8,17 @@ import os
 
 max_iteration = 2
 pr_split_num = 1 # could be 1, 2, or 3
+
+with open(".target_project", "r") as f:
+        target_project = f.read().strip()
+    
+pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
+if pr_split_num:
+    pr_file = pr_file.replace(".txt", f"_{pr_split_num}.txt")
+
+with open(pr_file, "r") as f:
+    prs = f.readlines()
+pr_list = [int(pr) for pr in prs]
     
 config_versions = [
     [1, 0, 1, False],
@@ -33,8 +44,13 @@ for iteration in range(max_iteration):
     for config in config_versions:
         version_id = '_'.join(map(str, config))
         # add tasks about current target project to database
-        result = subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks", f"--prsplit={pr_split_num}"])
-        pr_list = ast.literal_eval(result.stdout.strip())
+        
+        # result = subprocess.run(
+        #         ["python", "-m", "testora.evaluation.PreparePRChunks", f"--prsplit={pr_split_num}"],
+        #         capture_output=True, text=True)
+        # pr_list = ast.literal_eval(result.stdout.rsplit("\n", 3)[-3].strip())
+
+        subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks", f"--prsplit={pr_split_num}"])
 
         # run RegressionFinder
         config.append(iteration) # config_with_iter

@@ -47,7 +47,7 @@ def write_range_of_PR_tasks_into_database(project_name, project_id, start_pr_nb,
     EvalTaskManager.write_tasks(project_name, result_pr_nbs, "tasks")
 
 
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PrepairPRChunks entry point")
     parser.add_argument("--prsplit", type=int, help="which PR split to analyze")
     args = parser.parse_args()
@@ -80,7 +80,7 @@ def main():
     elif target_project == "keras":
         write_specific_PR_tasks_into_database("keras", "keras-team/keras", pr_list)
 
-    return pr_list
+    # print(pr_list)
 
     # 2
     # write_range_of_PR_tasks_into_database(
@@ -94,7 +94,3 @@ def main():
 
     # write_range_of_PR_tasks_into_database(
     #     "marshmallow", "marshmallow-code/marshmallow", 2804, 300)
-
-
-if __name__ == "__main__":
-    main()
