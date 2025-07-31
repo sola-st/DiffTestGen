@@ -133,9 +133,13 @@ def filter_tests_by_line_distance(old_and_new_executions: dict, prompt_base: int
 
 def represent_info(old_execution, new_execution, old_files_to_union_uncovers_dict, new_files_to_union_uncovers_dict, prompt_base):
     # part 1: test code
-    test_code_left, test_code_with_no_name_tmp = old_execution.code.split("# Round ", 1) # test_code_left could be reference fixed lines
-    test_code_right = test_code_with_no_name_tmp.split("_diff):", 1)[1]
-    test_code_with_no_example_name = test_code_left + "# " + test_code_right # from # Round 0 Example 4 (filtered_diff): ... to # ...
+    test_code_with_no_example_name = ""
+    try:
+        test_code_left, test_code_with_no_name_tmp = old_execution.code.split("# Round ", 1) # test_code_left could be reference fixed lines
+        test_code_right = test_code_with_no_name_tmp.split("_diff):", 1)[1]
+        test_code_with_no_example_name = test_code_left + "# " + test_code_right # from # Round 0 Example 4 (filtered_diff): ... to # ...
+    except:
+        test_code_with_no_example_name = old_execution.code
 
     if prompt_base == 4:
         # part 2: covered stmts info
