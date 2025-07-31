@@ -22,6 +22,7 @@ def reorganize_coverages(all_data_approach_level, base=False):
         round_cov_pair_dict = pr_info["Initial"]["R-0"]
         if "--" in json.dumps(round_cov_pair_dict):
             union_old_new_cov_str = "0.00%"
+            print(f"IHUX_{pr_num}")
         else:
             union_old_new_cov_str = get_overall_cov_rate(round_cov_pair_dict)
         initial_round_cov.append(union_old_new_cov_str)
@@ -33,6 +34,7 @@ def reorganize_coverages(all_data_approach_level, base=False):
             for round_name, round_rec in feedback_rounds.items():
                 if "--" in json.dumps(round_rec):
                     feedback_rounds_cov[i].append("0.00%")
+                    print(f"FHUX_{pr_num}")
                 else:
                     union_old_new_cov_str = get_overall_cov_rate(round_rec)
                     feedback_rounds_cov[i].append(union_old_new_cov_str)
@@ -51,12 +53,38 @@ def reorganize_coverages(all_data_approach_level, base=False):
         all_rounds_cov.extend(feedback_rounds_cov)
     return all_rounds_cov, feedback_round_max # max feedback round is 0 for Testora 
     
-def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_round_max, title, result_pdf):
+def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_round_max, iterations, title, result_pdf):
     cleaned_data = [
         [float(cov.strip('%')) for cov in pr_level_rates]
         for pr_level_rates in (cov_baseline + cov_our_approach)
     ]
-    
+
+    our_final_cov = cleaned_data[-1]
+    sub_len = int(len(our_final_cov) / iterations)
+    our_final_cov_with_sub = [our_final_cov[i:i+sub_len] for i in range(0, iterations)]
+    groups = list(zip(*our_final_cov_with_sub))
+
+    # Compute standard deviation for each group
+    stds = [np.std(group) for group in groups]
+    means = [np.mean(group) for group in groups]
+    x = np.arange(1, len(stds) + 1)
+
+    # Plot standard deviation as error bars
+    plt.figure(figsize=(8, 5))
+    plt.errorbar(x, means, yerr=stds, fmt='o', capsize=5, color='orange', label='Std Dev')
+    plt.plot(x, means, color='blue', linestyle='--', marker='x', label='Mean')
+
+    plt.title(title + ' (Std Dev)')
+    plt.xlabel('Test Generation Rounds')
+    plt.ylabel('Coverage (%)')
+    plt.grid(True)
+    plt.legend()
+    labels = [str(i+1) for i in range(len(stds))]
+    plt.xticks(x, labels)
+    plt.tight_layout()
+    plt.savefig(result_pdf.replace('.pdf', '_stddev.pdf'))
+    plt.close()
+
     violin_parts = plt.violinplot(cleaned_data, showmeans=False)
 
     # set different colors for baseline
@@ -86,32 +114,6 @@ def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_rou
         zorder=3
     )
 
-
-    # # standard deviation
-    # other_cleaned_data = [
-    #     [float(cov.strip('%')) for cov in pr_level_rates]
-    #     for single_iter in other_repetitions_cov_our_approach
-    #     for pr_level_rates in single_iter 
-    # ]
-
-    # all_arith_means = [arith_means]
-    # for cov_single_iter in other_cleaned_data:
-    #     cov_arith_means = [np.mean(group) for group in cov_single_iter]
-    #     all_arith_means.append(cov_arith_means)
-
-    # arith_stds = [np.std(group) for group in list(map(list, zip(*all_arith_means)))]
-    # # Add error bars (standard deviation) for the second and subsequent columns
-    # plt.errorbar(
-    #     range(2, len(arith_means) + 1),  # x positions (skip first)
-    #     arith_means[1:],                 # means (skip first)
-    #     yerr=arith_stds[1:],             # stds (skip first)
-    #     fmt='none',
-    #     ecolor='orange',
-    #     elinewidth=2,
-    #     capsize=5,
-    #     label='Std Dev'
-    # )
-
     for i, arith in enumerate(arith_means, start=1):
         # Arithmetic Mean label
         plt.text(i + 0.1, arith + 0.5, f"{arith:.3f}%", color='blue', fontsize=8)
@@ -137,7 +139,7 @@ def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_rou
     plt.savefig(result_pdf)
 
 def main():
-    iterations = 2
+    iterations = 5
     config_versions = [
         # [5, 5, 5, False],
         # [5, 8, 8, False],
@@ -147,7 +149,7 @@ def main():
     for config in config_versions:
         target_version = '_'.join(map(str, config))
         prompt_versions = ["1_0_1_False", target_version] # 1_0_1 is Testora, and 2nd element indicates the version of our approach
-        target_projects = ["marshmallow"]
+        target_projects = ["marshmallow", "pandas", "scipy", "keras"]
 
         baseline_data = []
         our_approach_data = []
@@ -191,13 +193,13 @@ def main():
                         except:
                             our_approach_data.append(round_cov)
 
-                    if iter == 0:
+                    if feedback_round_max_single_iter > feedback_round_max:
                         feedback_round_max = feedback_round_max_single_iter
 
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"
-        result_pdf = join(results_folder, "table_and_plots", f"Comparison_round_based_deviation_{prompt_versions[1]}.pdf") 
-        plot_coverages_violin_deviation([baseline_data[0]], our_approach_data, feedback_round_max, title, result_pdf)
+        result_pdf = join(results_folder, "table_and_plots", f"Comparison_round_based_deviation_{prompt_versions[1]}_iter{iterations}.pdf") 
+        plot_coverages_violin_deviation([baseline_data[0]], our_approach_data, feedback_round_max, iterations, title, result_pdf)
 
 
 if __name__=="__main__":
