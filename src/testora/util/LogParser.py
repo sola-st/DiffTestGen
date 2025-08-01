@@ -7,7 +7,7 @@ import argparse
 from testora.util.Logs import Event
 
 
-nb_test_generated_pattern = r"^Generated (\d+) tests"
+nb_test_generated_patterns = [r"^Generated (\d+) tests", r"^Generated (\d+) more tests"]
 
 
 class Classification(Enum):
@@ -59,6 +59,7 @@ class PRResult:
         self.nb_generated_tests = 0
         self.nb_test_executions = 0
         self.nb_test_failures = 0
+        self.nb_test_fixed = 0
         self.nb_diff_covered_tests = 0
         self.avg_old_diff_coverage = 0.0
         self.avg_new_diff_coverage = 0.0
@@ -109,20 +110,27 @@ class PRResult:
                 self.title = entry["title"]
                 self.url = entry["url"]
 
-            if entry["message"].startswith("Ignoring"):
+            if entry["message"].startswith("Ignoring") and self.nb_generated_tests == 0:
+                # Now we have multiple round, if the 1st round is not ignored, we mark it as checked.
                 self.ignored = True
                 self.ignored_reason = entry["message"]
 
-            nb_generated_tests_match = re.search(
-                nb_test_generated_pattern, entry["message"])
-            if nb_generated_tests_match:
-                self.nb_generated_tests += int(
-                    nb_generated_tests_match.group(1))
+            for nb_test_generated_pattern in nb_test_generated_patterns:
+                nb_generated_tests_match = re.search(
+                    nb_test_generated_pattern, entry["message"])
+                if nb_generated_tests_match:
+                    self.nb_generated_tests += int(
+                        nb_generated_tests_match.group(1))
 
+            # include all the error tests (even been fixed later)
             if entry["message"].startswith("Test execution"):
                 self.nb_test_executions += 1
                 if "Traceback (most recent call last)" in entry["output"]:
                     self.nb_test_failures += 1
+                else:
+                    if "_error_fix_" in entry["message"]:
+                        self.nb_test_fixed += 1
+
 
             if entry["message"] == "Pre-classification":
                 diff_test = DifferentiatingTest(
@@ -146,6 +154,7 @@ class PRResult:
                 new_diff_coverages.append(new_diff_coverage)
 
             # keep track of phase we're in and update time taken for each phase
+            # TODO maybe also for newly added phases
             if entry["message"].startswith("Querying"):
                 if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
                     update_time_taken(entry)
@@ -262,7 +271,7 @@ class PRResult:
         if s == "ignored":
             return self.ignored_reason
         elif s == "checked":
-            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%)"
+            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs" # (N fail(s) to 1 fix)
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
         else:
@@ -285,6 +294,7 @@ class PRResult:
                 f"({100 * self.nb_diff_covered_tests / self.nb_generated_tests:.1f}%), "
                 f"{self.nb_test_failures} failures "
                 f"({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), "
+                f"{self.nb_test_fixed} fixed"
                 f"{len(self.classification_results)} differences("
                 f"{nb_intended_changes} intended, "
                 f"{nb_coincidental_fixes} coincidental, "
