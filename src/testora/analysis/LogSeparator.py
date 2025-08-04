@@ -5,16 +5,16 @@ from os import listdir, makedirs
 import shutil
 
 
-iterations = [0, 1]
+iterations = [0, 1, 2, 3, 4]
 base_folder = join("data", "results")
 
 # option 1: for all projects
-# target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+target_projects = ["scipy", "marshmallow", "pandas", "keras"]
 
 # option 2: for a single project
-with open(".target_project", "r") as f:
-    target_project = f.read().strip()
-target_projects = [target_project]
+# with open(".target_project", "r") as f:
+#     target_project = f.read().strip()
+# target_projects = [target_project]
 
 for target_project in target_projects:
     config_versions = [

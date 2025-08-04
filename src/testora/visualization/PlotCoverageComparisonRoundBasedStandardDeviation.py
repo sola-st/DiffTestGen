@@ -70,17 +70,47 @@ def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_rou
     x = np.arange(1, len(stds) + 1)
 
     # Plot standard deviation as error bars
-    plt.figure(figsize=(8, 5))
-    plt.errorbar(x, means, yerr=stds, fmt='o', capsize=5, color='orange', label='Std Dev')
-    plt.plot(x, means, color='blue', linestyle='--', marker='x', label='Mean')
+    from matplotlib import gridspec
 
-    plt.title(title + ' (Std Dev)')
-    plt.xlabel('Test Generation Rounds')
-    plt.ylabel('Coverage (%)')
-    plt.grid(True)
-    plt.legend()
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
+
+    # Main plot
+    ax_plot = fig.add_subplot(gs[0])
+    ax_plot.errorbar(x, means, yerr=stds, fmt='o', capsize=5, color='orange', label='Std Dev')
+    ax_plot.plot(x, means, color='blue', linestyle='--', marker='x', label='Mean')
+    ax_plot.set_title(title + ' (Std Dev)')
+    ax_plot.set_xlabel('Test Generation Rounds')
+    ax_plot.set_ylabel('Coverage (%)')
+    ax_plot.grid(True)
+    ax_plot.legend()
     labels = [str(i+1) for i in range(len(stds))]
-    plt.xticks(x, labels)
+    ax_plot.set_xticks(x)
+    ax_plot.set_xticklabels(labels)
+
+    # Table subplot
+    ax_table = fig.add_subplot(gs[1])
+    ax_table.axis('off')  # Hide axes
+
+    # Prepare max/min values for table
+    max_vals = [f"{np.max(group):.2f}%" for group in groups]
+    min_vals = [f"{np.min(group):.2f}%" for group in groups]
+
+    # Create table data
+    cell_text = [max_vals, min_vals]
+    row_labels = ['Max', 'Min']
+    col_labels = [str(i+1) for i in range(len(groups))]
+
+    table = ax_table.table(
+        cellText=cell_text,
+        rowLabels=row_labels,
+        colLabels=col_labels,
+        loc='center',
+        cellLoc='center'
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)  # Bigger font size
+
     plt.tight_layout()
     plt.savefig(result_pdf.replace('.pdf', '_stddev.pdf'))
     plt.close()
