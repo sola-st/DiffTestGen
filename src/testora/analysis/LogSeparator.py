@@ -25,7 +25,9 @@ for target_project in target_projects:
     ]
 
     version_ids_with_iter = ['_'.join(map(str, config)) + f"_{iteration}" for config in config_versions for iteration in iterations]
+    # version_ids_with_iter = ['_'.join(map(str, config)) for config in config_versions]
     
+
     log_results = join(base_folder, target_project)
     archive_results= join(log_results, "archive")
 
@@ -53,5 +55,14 @@ for target_project in target_projects:
                         makedirs(separated_results_folder, exist_ok=True)
                         if not exists(join(separated_results_folder, file)):
                             shutil.copy2(log_file_path, separated_results_folder)
+                    # try:
+                    #     iteration = config_message["iteration"]
+                    # except:
+                    #     if "07-28" in log_file_path:
+                    #         if f"{version_id}" in version_ids_with_iter:
+                    #             separated_results_folder = join(base_folder, f"iter_1", f"log_{version_id}", target_project)
+                    #             makedirs(separated_results_folder, exist_ok=True)
+                    #             if not exists(join(separated_results_folder, file)):
+                    #                 shutil.copy2(log_file_path, separated_results_folder)
                 except:
                     pass # old executions with no the newly added configs

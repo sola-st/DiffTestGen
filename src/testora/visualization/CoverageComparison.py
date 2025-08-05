@@ -18,6 +18,7 @@ class CoverageComparison():
         self.log_folder = log_folder
         self.version_id = version_id
         self.all_from_cur_version = [] # to return
+        self.outlier_pr = None # to return
 
         self.all_executable_modified_lines_old_len = 0
         self.all_executable_modified_lines_new_len = 0
@@ -52,11 +53,13 @@ class CoverageComparison():
             project_name = info[1]["url"].split("/")[-3] # for single pr at local mode
 
         pre_round = -1
+        coverage_exists = False
         for info_block in info:
             if "details" in info_block.keys():
                 info_block_details = info_block["details"]
                 if "Old: Coverage:" in info_block_details or \
                         "All executable/coverable modified lines:" in info_block_details:
+                    coverage_exists = True
                     if "Diff coverage, all rounds" in info_block["message"]:
                         if not self.all_executable_modified_lines_old_len and (not self.all_executable_modified_lines_new_len):
                             # pr_num = info_block["pr_nb"]
@@ -92,6 +95,10 @@ class CoverageComparison():
                             else: # update self.union_covered_lines_single_round
                                 self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
                                 self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
+        
+        if coverage_exists == False:
+            self.outlier_pr = pr_num
+
 
         # append the last round, related to get_union_numbers_form_dict
         self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))
@@ -138,6 +145,7 @@ class CoverageComparison():
         return old_info_str, new_info_str
 
     def get_multiple_pr_coverage_info(self, project=""):
+        # listdir in a random order
         log_files = listdir(self.log_folder)
         for file in log_files:
             log_file = join(self.log_folder, file)
