@@ -1,13 +1,14 @@
 from os.path import join
 from matplotlib import pyplot as plt
 import numpy as np
-from local.PlotCoverageComparisonRoundBased import reorganize_coverages
 from testora.visualization.CoverageComparison import CoverageComparison
 from matplotlib import gridspec
 import os
 
+from testora.visualization.PlotCoverageComparisonRoundBased import reorganize_coverages
+
     
-def plot_coverages_violin_deviation(coverages_pr_level, all_prs, title, result_pdf):
+def plot_coverages_deviation(coverages_pr_level, all_prs, title, result_pdf):
     cleaned_data = [
         [float(cov[0].strip('%')) for cov in pr_level_rates]
         for pr_level_rates in coverages_pr_level
@@ -19,7 +20,7 @@ def plot_coverages_violin_deviation(coverages_pr_level, all_prs, title, result_p
     x = np.arange(1, len(stds) + 1)
 
     # Plot standard deviation as error bars
-    fig = plt.figure(figsize=(24, 8))
+    fig = plt.figure(figsize=(26, 8))
     gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
 
     # Main plot
@@ -27,7 +28,7 @@ def plot_coverages_violin_deviation(coverages_pr_level, all_prs, title, result_p
     ax_plot.errorbar(x, means, yerr=stds, fmt='o', capsize=5, color='orange', label='Std Dev')
     ax_plot.plot(x, means, color='blue', linestyle='--', marker='x', label='Mean')
     ax_plot.set_title(title + ' (Std Dev)')
-    ax_plot.set_xlabel('Test Generation Rounds')
+    ax_plot.set_xlabel('PRs')
     ax_plot.set_ylabel('Coverage (%)')
     ax_plot.grid(True)
     ax_plot.legend()
@@ -44,19 +45,19 @@ def plot_coverages_violin_deviation(coverages_pr_level, all_prs, title, result_p
     min_vals = [f"{np.min(group):.2f}%" for group in cleaned_data]
 
     # Create table data
-    cell_text = [max_vals, min_vals]
-    row_labels = ['Max', 'Min']
-    # col_labels = [str(i+1) for i in range(len(groups))]
+    cell_text = [all_prs, max_vals, min_vals]
+    row_labels = ['PR', 'Max', 'Min']
+    col_labels = [str(i+1) for i in range(len(cleaned_data))]
 
     table = ax_table.table(
         cellText=cell_text,
         rowLabels=row_labels,
-        colLabels=all_prs,
+        colLabels=col_labels,
         loc='center',
         cellLoc='center'
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(10)  # Bigger font size
+    table.set_fontsize(10)
 
     plt.tight_layout()
     plt.savefig(result_pdf)
@@ -69,15 +70,14 @@ def main():
         # [1, 0, 1, False]
         [5, 8, 8, True]
     ]
-    
+    target_projects = ["marshmallow", "pandas", "scipy", "keras"]
+    results_folder = join("data", "results")
+
     for config in config_versions:
         version_id = '_'.join(map(str, config))
-        target_projects = ["marshmallow", "pandas", "scipy", "keras"]
-
         coverages_pr_level = [[] for _ in range(40)]  # 10 PRs, each will have 5 runs
         all_prs = []
 
-        results_folder = join("data", "results")
         pr_idx = 0
         for project in target_projects:
             pr_file = join("data", "meta", "pr_nums", f"{project}_PRs_subset10.txt")
@@ -117,8 +117,8 @@ def main():
 
         # Plot standard deviation for each PR
         title = "Coverage Standard Deviation Across 5 Repetitions per PR"
-        result_pdf = join(results_folder, "table_and_plots", f"Coverage_stddev_per_pr_all.pdf")
-        plot_coverages_violin_deviation(coverages_pr_level, all_prs, title, result_pdf)
+        result_pdf = join(results_folder, "table_and_plots", f"Coverage_stddev_per_pr.pdf")
+        plot_coverages_deviation(coverages_pr_level, all_prs, title, result_pdf)
 
 if __name__=="__main__":
     main()
