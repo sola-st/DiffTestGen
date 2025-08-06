@@ -3,7 +3,7 @@ import json
 import os
 
 
-class DifferentOutputsStatistics:
+class DifferentOutputsStatistics():
     def __init__(self):
         self.overall_diff_related_pr = 0
         self.overall_diff_nb = 0
@@ -16,6 +16,18 @@ class DifferentOutputsStatistics:
         self.overall_max_rounds = 0
         self.overall_from_rounds = [0]
 
+        # project level
+        self.project_diff_related_pr = 0
+        self.project_diff_nb = 0
+
+        self.project_from_full_diff = 0
+        self.project_from_filtered_diff = 0
+        self.project_from_uncertain_diff = 0
+
+        self.project_from_uncertain_round = 0
+        self.project_max_rounds = 0
+        self.project_from_rounds = [0]
+
     def clear_overall(self):
         self.overall_diff_related_pr = 0
         self.overall_diff_nb = 0
@@ -25,6 +37,16 @@ class DifferentOutputsStatistics:
         self.overall_from_uncertain_round = 0
         self.overall_max_rounds = 0
         self.overall_from_rounds = [0]
+
+    def clear_project_level(self):
+        self.project_diff_related_pr = 0
+        self.project_diff_nb = 0
+        self.project_from_full_diff = 0
+        self.project_from_filtered_diff = 0
+        self.project_from_uncertain_diff = 0
+        self.project_from_uncertain_round = 0
+        self.project_max_rounds = 0
+        self.project_from_rounds = [0]
 
     def analyze_single_pr(self, info):
         # current pr level
@@ -77,8 +99,8 @@ class DifferentOutputsStatistics:
         for idx, num in enumerate(from_rounds):
             single_pr_json["details"].update({f"from_round_{idx}": num})
 
-        # update overall 
         if diff_nb > 0:
+            # update overall 
             self.overall_diff_related_pr += 1
             self.overall_diff_nb += diff_nb
 
@@ -94,6 +116,23 @@ class DifferentOutputsStatistics:
 
             for j, num in enumerate(from_rounds):
                 self.overall_from_rounds[j] += num
+        
+            # update project level
+            self.project_diff_related_pr += 1
+            self.project_diff_nb += diff_nb
+
+            self.project_from_full_diff += from_full_diff
+            self.project_from_filtered_diff += from_filtered_diff
+            self.project_from_uncertain_diff += from_uncertain_diff
+
+            self.project_from_uncertain_round += from_uncertain_round
+            if self.project_max_rounds < max_rounds:
+                for _ in range(self.project_max_rounds, max_rounds):
+                    self.project_from_rounds.append(0)
+                self.project_max_rounds = max_rounds
+
+            for j, num in enumerate(from_rounds):
+                self.project_from_rounds[j] += num
 
         return single_pr_json
 
@@ -116,6 +155,7 @@ class DifferentOutputsStatistics:
             [5, 8, 8, True]
             ]
 
+        project_level = []
         single_iteration = []
         for config in config_versions:
             version_id = '_'.join(map(str, config))
@@ -135,7 +175,7 @@ class DifferentOutputsStatistics:
                             break
                     if log_file_path is None:
                         print(f"Iteration {iteration}: No log file found for PR {pr} in {log_folder}")
-                        single_iteration.append({"pr_num": pr})  # If missing, fill with zero
+                        single_iteration.append({"pr_num": pr}) 
                     else:
                         with open(log_file_path, "r") as f:
                             info = json.load(f) 
@@ -143,7 +183,27 @@ class DifferentOutputsStatistics:
                         single_pr_json["project"] = target_project
                         single_pr_json["pr_num"] = pr
                         single_iteration.append(single_pr_json)
+
+                # add project level summaries
+                project_str = {
+                    "project": target_project,
+                    "project_pr_num" : len(pr_list),
+                    "project_diff_related_pr_num": self.project_diff_related_pr,
+                    "project_different_outputs": self.project_diff_nb,
+                    "details": {
+                        "project_from_full_diff": self.project_from_full_diff,
+                        "project_from_filtered_diff": self.project_from_filtered_diff,
+                        "project_from_uncertain_diff": self.project_from_uncertain_diff,
+                    }
+                }
+
+                for idx, num in enumerate(self.project_from_rounds):
+                    project_str["details"].update({f"project_from_round_{idx}": num})
+
+                project_level.append(project_str)
+                self.clear_project_level()
             
+            # overall summary
             overall_str = {
                 "repetition_num" : iteration,
                 "overall_pr_num" : len(single_iteration),
@@ -159,11 +219,11 @@ class DifferentOutputsStatistics:
             for idx, num in enumerate(self.overall_from_rounds):
                 overall_str["details"].update({f"overall_from_round_{idx}": num})
 
-            single_iteration.insert(0, overall_str)
+            to_write = [overall_str] + project_level + single_iteration
 
             result_file = join(results_folder, "table_and_plots", f"Different_oputputs_statistics_{version_id}.json")
             with open(result_file, "w") as f:
-                json.dump(single_iteration, f, indent=4)
+                json.dump(to_write, f, indent=4)
 
             self.clear_overall()
 
