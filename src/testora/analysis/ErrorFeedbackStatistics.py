@@ -1,5 +1,6 @@
 '''check how many PRs need the error message feedback, and how many are fixed.'''
 
+from collections import Counter
 import json
 import os
 from os.path import join
@@ -44,6 +45,8 @@ class ErrorFeedbackStatistics():
         fix_attempts = 0
         passed_code_versions = 0
         need_fix_details = []
+        final_test_name = None
+        feedback_loop_ends = False
 
         for info_block in info:
             if "message" in info_block.keys():
@@ -55,35 +58,42 @@ class ErrorFeedbackStatistics():
                 elif msg.startswith("Fix runtime errors"):
                     fix_attempts += 1
                     test_name = info_block["content"].split(":", 1)[0]
-                    if pre_test_name and pre_test_name != test_name:
+                    if not test_name.startswith("# Round "):
+                        test_name = test_name.split("#")[0]
+                    # if pre_test_name and pre_test_name != test_name:
+                    if pre_test_name and feedback_loop_ends:
+                        fix_attempts_current = fix_attempts -1
                         # the first point that we get to an new example
                         need_fix_details.append({
-                            "test_name": test_name, 
-                            "fix_attempts": fix_attempts, 
+                            "test_name": pre_test_name, 
+                            "fix_attempts": fix_attempts_current, 
                             "passed_code_versions": passed_code_versions # the last fix attempt
                         })
 
                         if passed_code_versions > 0:
                             fixed_tests += 1
                         
-                        self.overall_fix_attempts.append(fix_attempts)
-                        self.project_fix_attempts.append(fix_attempts)
+                        self.overall_fix_attempts.append(fix_attempts_current)
+                        self.project_fix_attempts.append(fix_attempts_current)
 
                         # clear for current test, go for the next one
-                        fix_attempts = 0
+                        fix_attempts = 1
                         passed_code_versions = 0
+                        feedback_loop_ends = False
                     
                     pre_test_name = test_name
+                    final_test_name = test_name
                 elif "_error_fix" in msg:
-                    # test_name = info_block["code"].split("(", 1)[0]
                     error_exist = extract_error_type(info_block["output"])
-                    if not error_exist:
+                    if error_exist == None:
                         passed_code_versions += 1
+                elif "Error feedback loop ends after" in msg:
+                    feedback_loop_ends = True
 
         # add the last test
         if fix_attempts > 0:
             need_fix_details.append({
-                "test_name": test_name, 
+                "test_name": final_test_name, 
                 "fix_attempts": fix_attempts, 
                 "passed_code_versions": passed_code_versions # the last fix attempt
             })
@@ -180,6 +190,7 @@ class ErrorFeedbackStatistics():
                     "project_need_fix_tests": self.project_need_fix_tests,
                     "project_fixed_tests": self.project_fixed_tests,
                     "project_avg_fix_attempts" : f"{(sum(self.project_fix_attempts) / len(self.project_fix_attempts)):.2f}" if self.project_fix_attempts else 0,
+                    "project_fix_attempts_distribution" : f"{Counter(self.project_fix_attempts)}",
                     "project_fixed_related_prs": len(self.project_fixed_related_prs),
                     "details": f"{self.project_fixed_related_prs}",
                 }
@@ -192,7 +203,8 @@ class ErrorFeedbackStatistics():
                 "overall_tests": self.overall_tests,
                 "overall_need_fix_tests": self.overall_need_fix_tests,
                 "overall_fixed_tests": self.overall_fixed_tests,
-                "overall_avg_fix_attempts" : f"{(sum(self.overall_fix_attempts) / len(self.overall_fix_attempts)):.2f}" if self.overall_fix_attempts else 0,
+                "overall_fix_attempts_distribution" : f"{Counter(self.overall_fix_attempts)}",
+                "overall_fixed_related_prs": len(self.overall_fixed_related_prs),
                 "overall_fixed_related_prs": len(self.overall_fixed_related_prs),
             }
 
