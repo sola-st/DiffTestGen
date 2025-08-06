@@ -10,7 +10,7 @@ max_iteration = 5
 pr_split_num = 1 # could be 1, 2, or 3
 
 with open(".target_project", "r") as f:
-        target_project = f.read().strip()
+    target_project = f.read().strip()
     
 pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
 if pr_split_num:
@@ -25,7 +25,7 @@ config_versions = [
     [5, 5, 5, False],
     [5, 8, 8, False],
     [5, 8, 8, True]
-    ]
+]
 
 results_folder = join("data", "results")
 # if exists(results_folder):
