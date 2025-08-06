@@ -10,6 +10,7 @@ from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
 from testora.llms.LLMCache import LLMCache
+from testora.prompts.ParseErrorPrivateCallFixingPrompt import ParseErrorPrivateCallFixingPrompt
 from testora.prompts.RegressionTestGeneratorPromptV1 import RegressionTestGeneratorPromptV1
 from testora.prompts.RegressionTestGeneratorPromptV2 import RegressionTestGeneratorPromptV2
 from testora.prompts.RegressionTestGeneratorPromptV345 import RegressionTestGeneratorPromptV345
@@ -224,10 +225,16 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
 
 def remove_tests_with_private_call(tests):
     result = []
-    for test in tests:
-        if not has_private_accesses_or_fails_to_parse(test):
+    test_msg_pairs = [] # the msg could be parse error, could be private call issue
+    for i, test in enumerate(tests):
+        has, static_error_msg = has_private_accesses_or_fails_to_parse(test)
+        if has == False:
             result.append(test)
-    return result
+        else:
+            if static_error_msg:
+                test_msg_pairs.append([i, test, static_error_msg])
+
+    return result, test_msg_pairs
 
 
 def generate_tests(pr, github_repo, changed_functions):
@@ -262,13 +269,13 @@ def generate_tests(pr, github_repo, changed_functions):
     all_tests = list(dict.fromkeys(all_tests))
 
     # clean tests
-    all_tests = remove_tests_with_private_call(all_tests)
+    all_tests, test_msg_pairs = remove_tests_with_private_call(all_tests)
 
     append_event(Event(pr_nb=pr.number,
             message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
     
     # also return the bool values to not check multiple times in the feedback rounds
-    return all_tests, full_diff_len_fit, filtered_diff_len_nonequal_fit 
+    return all_tests, test_msg_pairs, full_diff_len_fit, filtered_diff_len_nonequal_fit 
 
 
 def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len_fit, filtered_diff_len_nonequal_fit,
@@ -349,11 +356,11 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
     all_tests = list(dict.fromkeys(all_tests))
 
     # clean tests
-    all_tests = remove_tests_with_private_call(all_tests)
+    all_tests, test_msg_pairs = remove_tests_with_private_call(all_tests)
 
     append_event(Event(pr_nb=pr.number,
             message=f"Generated {len(all_tests)} more tests. ({nb_tests_before_dedup_and_cleaning} tests before deduplication and cleaning)"))
-    return all_tests
+    return all_tests, test_msg_pairs
 
 def validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution):
     assert (old_execution.output is not None)
@@ -505,10 +512,10 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # TODO extract existing tests
 
     # generate tests via LLM
-    generated_tests, full_diff_len_fit, filtered_diff_len_nonequal_fit = generate_tests(pr, github_repo, changed_functions)
+    generated_tests, test_msg_pairs, full_diff_len_fit, filtered_diff_len_nonequal_fit = generate_tests(pr, github_repo, changed_functions)
     old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, \
-                    generated_tests, full_diff_len_fit, filtered_diff_len_nonequal_fit)
+                    generated_tests, test_msg_pairs, full_diff_len_fit, filtered_diff_len_nonequal_fit)
     if all_covered_modified_stmts_old == None:
         return
 
@@ -614,7 +621,7 @@ def check_union_coverage_full_cover_exist(missed_stmts:dict, covered_stmts:dict)
 
     return updated_missed_stmts, uncover_exist
 
-def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
+def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, test_msg_pairs,
             full_diff_len_fit, filtered_diff_len_nonequal_fit,
             old_executions:list=[], new_executions:list=[], all_covered_modified_stmts_old:list=[], all_covered_modified_stmts_new:list=[], 
             round=0, old_missed:dict={}, new_missed:dict={}):
@@ -627,10 +634,37 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     Initial generation is marked as round 0, and feedback loops marks start at round 1.
     '''
 
-    if not generated_tests:
-        append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
-        # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
-        return None, None, None, None
+    # if not generated_tests:
+    #     append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
+    #     # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
+    #     return None, None, None, None
+
+    # inner feedback about parse error and 'private' calls
+    if test_msg_pairs:
+        generated_tests_num = len(generated_tests)
+        # TODO only running no generated_tests, or if any test_msg_pairs exists
+        for pair in test_msg_pairs:
+            test_idx, test_code, static_error_msg = pair
+            attempt = 0
+            while static_error_msg:
+                if attempt >= Config.error_feedback_max:
+                    # max attempt to fix the test, but still fails on both versions of the code
+                    append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Max attempt ({Config.error_feedback_max}) reaches."))
+                    break
+
+                prompt = ParseErrorPrivateCallFixingPrompt(test_code, static_error_msg)
+                raw_answer = llm.query(prompt, no_cache=True)[0] # no_cache set to true, allow the model to get different answers with the same error message.
+                append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
+                refined_test = prompt.parse_answer(raw_answer)
+                attempt += 1
+                message = f"Refine code parsing and private call, attempt {attempt} (with {generated_tests_num} kept tests). Msg: {static_error_msg}"
+                append_event(LLMEvent(pr_nb=pr.number, message=message, content=refined_test)) # a mark to show which test
+                
+                # another round of static check
+                __, static_error_msg = has_private_accesses_or_fails_to_parse(refined_test)
+
+            append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Static errors fixed."))
+            generated_tests.insert(test_idx, refined_test)
 
     if cloned_repo_manager.repo_name == "pandas":
         # make sure the tests import pandas
@@ -815,9 +849,9 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     append_event(CoverageEvent(pr_nb=pr.number, 
                             message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
                     
-                    refined_tests = generate_replacement_tests(pr, github_repo, changed_functions, 
+                    refined_tests, test_msg_pairs = generate_replacement_tests(pr, github_repo, changed_functions, 
                             full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_for_further_needs)
-                    run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, 
+                    run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, test_msg_pairs,
                             full_diff_len_fit, filtered_diff_len_nonequal_fit,
                             old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
                 else:

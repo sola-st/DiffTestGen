@@ -192,24 +192,28 @@ def extract_tests_of_fut(all_test_code, fut_name):
 
 
 def has_private_accesses_or_fails_to_parse(code):
+    static_error_msg = None
     try:
         tree = cst.parse_module(code)
-    except cst.ParserSyntaxError:
-        return True
+    except cst.ParserSyntaxError as e:
+        static_error_msg = f"The code snippet could not be parsed. Error message: {e}"
+        return True, static_error_msg
 
     call_extractor = CallExtractor()
     tree.visit(call_extractor)
     for callee in call_extractor.callees:
         if callee.startswith("_"):
-            return True
+            static_error_msg = f"The code snippet calls the function '{callee}', which is not part of the public API."
+            return True, static_error_msg
 
     attribute_extractor = AttributeExtractor()
     tree.visit(attribute_extractor)
     for attribute in attribute_extractor.attributes:
         if attribute.startswith("_"):
-            return True
+            static_error_msg = f"The code snippet accesses the attribute '{attribute}', which is not part of the public API."
+            return True, static_error_msg
 
-    return False
+    return False, static_error_msg
 
 
 class FunctionRemover(cst.CSTTransformer):
