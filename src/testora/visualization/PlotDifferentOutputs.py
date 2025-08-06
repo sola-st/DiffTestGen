@@ -5,7 +5,6 @@ from matplotlib import gridspec, pyplot as plt
 import numpy as np
 
 
-
 def plot_nbs_of_different_outputs(diff_nbs_pr_level, all_prs, title, result_pdf):
     # Compute standard deviation for each group
     stds = [np.std(group) for group in diff_nbs_pr_level]

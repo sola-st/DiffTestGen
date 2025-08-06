@@ -22,7 +22,7 @@ def reorganize_coverages(all_data_approach_level, base=False):
         round_cov_pair_dict = pr_info["Initial"]["R-0"]
         if "--" in json.dumps(round_cov_pair_dict):
             union_old_new_cov_str = "0.00%"
-            print(f"IHUX_{pr_num}")
+            print(f"Init--{pr_num}")
         else:
             union_old_new_cov_str = get_overall_cov_rate(round_cov_pair_dict)
         initial_round_cov.append(union_old_new_cov_str)
@@ -34,7 +34,7 @@ def reorganize_coverages(all_data_approach_level, base=False):
             for round_name, round_rec in feedback_rounds.items():
                 if "--" in json.dumps(round_rec):
                     feedback_rounds_cov[i].append("0.00%")
-                    print(f"FHUX_{pr_num}")
+                    print(f"Feedback--{pr_num}")
                 else:
                     union_old_new_cov_str = get_overall_cov_rate(round_rec)
                     feedback_rounds_cov[i].append(union_old_new_cov_str)
