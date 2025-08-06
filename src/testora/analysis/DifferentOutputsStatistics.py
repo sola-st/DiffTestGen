@@ -9,7 +9,7 @@ class DifferentOutputsStatistics:
         self.overall_diff_nb = 0
 
         self.overall_from_full_diff = 0
-        self.overall_from_selected_diff = 0
+        self.overall_from_filtered_diff = 0
         self.overall_from_uncertain_diff = 0
 
         self.overall_from_uncertain_round = 0
@@ -20,7 +20,7 @@ class DifferentOutputsStatistics:
         self.overall_diff_related_pr = 0
         self.overall_diff_nb = 0
         self.overall_from_full_diff = 0
-        self.overall_from_selected_diff = 0
+        self.overall_from_filtered_diff = 0
         self.overall_from_uncertain_diff = 0
         self.overall_from_uncertain_round = 0
         self.overall_max_rounds = 0
@@ -31,7 +31,7 @@ class DifferentOutputsStatistics:
         diff_nb = 0
 
         from_full_diff = 0
-        from_selected_diff = 0
+        from_filtered_diff = 0
         from_uncertain_diff = 0
 
         from_uncertain_round = 0
@@ -52,8 +52,8 @@ class DifferentOutputsStatistics:
                     test_name, remaining = info_block["test_code"].split("(", 1)
                     if remaining.startswith("full_diff"):
                         from_full_diff += 1
-                    elif remaining.startswith("selected_diff"):
-                        from_selected_diff += 1
+                    elif remaining.startswith("filtered_diff"):
+                        from_filtered_diff += 1
                     else:
                         from_uncertain_diff += 1
 
@@ -69,7 +69,7 @@ class DifferentOutputsStatistics:
             "different_outputs": diff_nb,
             "details": {
                 "from_full_diff": from_full_diff,
-                "from_selected_diff": from_selected_diff,
+                "from_filtered_diff": from_filtered_diff,
                 "from_uncertain_diff": from_uncertain_diff,
             }
         }
@@ -83,7 +83,7 @@ class DifferentOutputsStatistics:
             self.overall_diff_nb += diff_nb
 
             self.overall_from_full_diff += from_full_diff
-            self.overall_from_selected_diff += from_selected_diff
+            self.overall_from_filtered_diff += from_filtered_diff
             self.overall_from_uncertain_diff += from_uncertain_diff
 
             self.overall_from_uncertain_round += from_uncertain_round
@@ -151,7 +151,7 @@ class DifferentOutputsStatistics:
                 "overall_different_outputs": self.overall_diff_nb,
                 "details": {
                     "overall_from_full_diff": self.overall_from_full_diff,
-                    "overall_from_selected_diff": self.overall_from_selected_diff,
+                    "overall_from_filtered_diff": self.overall_from_filtered_diff,
                     "overall_from_uncertain_diff": self.overall_from_uncertain_diff,
                 }
             }
