@@ -9,13 +9,13 @@ class ParseErrorPrivateCallFixingPrompt:
         template = """
 The following shows the Python code along with its static analysis results. Refine the code to ensure that:
 It is parsable, and
-It uses only the public API (i.e., avoid accessing or calling any functions or attributes that start with an underscore _).
+It uses only the public API (i.e., avoid accessing or calling any functions or attributes that start with an underscore '_').
 
 ```python
 {test_code}
 ```
 
-Runtime errors:
+Static analysis result:
 
 {error_messages}
 
