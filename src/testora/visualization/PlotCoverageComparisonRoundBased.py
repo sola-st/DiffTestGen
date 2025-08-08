@@ -8,10 +8,11 @@ from testora.visualization.CoverageComparison import CoverageComparison
 from testora.visualization.CoverageUtils import get_feedback_round_max_num, get_overall_cov_rate
 
 
-def reorganize_coverages(all_data_approach_level, base=False):
+def reorganize_coverages(all_data_approach_level, feedback_round_max=0, base=False):
     # Both 1 and 2 are for all PRs across all projects
     initial_round_cov = [] # 1
-    feedback_round_max = get_feedback_round_max_num(all_data_approach_level)
+    if (feedback_round_max == 0) and base == False:
+        feedback_round_max = get_feedback_round_max_num(all_data_approach_level)
     feedback_rounds_cov = [[] for _ in range(feedback_round_max)] # 2
 
     for pr_rec in all_data_approach_level:
@@ -53,7 +54,7 @@ def reorganize_coverages(all_data_approach_level, base=False):
         all_rounds_cov.extend(feedback_rounds_cov)
     return all_rounds_cov, feedback_round_max # max feedback round is 0 for Testora 
     
-def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_round_max, iterations, title, result_pdf):
+def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_round_max, title, result_pdf):
     cleaned_data = [
         [float(cov.strip('%')) for cov in pr_level_rates]
         for pr_level_rates in (cov_baseline + cov_our_approach)
@@ -131,8 +132,8 @@ def main():
         
         results_folder = join("data", "results")
         for version_id in prompt_versions:
+            all_data = [[] for _ in range(iterations)]
             for iter in range(iterations):
-                all_data = [] # approach level
                 for project in target_projects:
                     output_folder = join(results_folder, "table_and_plots", f"iter_{iter}", project)
                     log_folder = join(results_folder, f"iter_{iter}", f"log_{version_id}", project)
@@ -142,38 +143,40 @@ def main():
                         init = CoverageComparison(log_folder, version_id)
                     
                         all_from_cur_version = init.get_multiple_pr_coverage_info(project)
-                        # write a meta file for a version
-                        meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
-                        with open(meta_file, "w") as f:
-                            json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
-                        print(f"Collected coverage information is written to {meta_file}")
+                        
+                        # # write a meta file for a version
+                        # meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
+                        # with open(meta_file, "w") as f:
+                        #     json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
+                        # print(f"Collected coverage information is written to {meta_file}")
 
-                        all_data.extend(all_from_cur_version)
+                        all_data[iter].extend(all_from_cur_version)
+                
+                feedback_round_max_single_iter = get_feedback_round_max_num(all_data[iter])
+                if feedback_round_max_single_iter > feedback_round_max:
+                    feedback_round_max = feedback_round_max_single_iter
 
+            for all_data_single_round in all_data:
                 if version_id == "1_0_1_False":
-                    baseline_data_iter, __ = reorganize_coverages(all_data, base=True)
-                    # baseline_data.extend(baseline_data_iter)
+                    baseline_data_iter, __ = reorganize_coverages(all_data_single_round, base=True)
                     for k, round_cov in enumerate(baseline_data_iter):
                         try: 
                             baseline_data[k].extend(round_cov)
                         except:
                             baseline_data.append(round_cov)
                 else:
-                    our_approach_data_iter, feedback_round_max_single_iter = reorganize_coverages(all_data)
-                    # print(feedback_round_max_single_iter)
+                    our_approach_data_iter, __ = reorganize_coverages(all_data_single_round, feedback_round_max)
+                    
                     for k, round_cov in enumerate(our_approach_data_iter):
                         try: 
                             our_approach_data[k].extend(round_cov)
                         except:
                             our_approach_data.append(round_cov)
 
-                    if feedback_round_max_single_iter > feedback_round_max:
-                        feedback_round_max = feedback_round_max_single_iter
-
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"
         result_pdf = join(results_folder, "table_and_plots", f"Comparison_round_based_deviation_{prompt_versions[1]}_iter{iterations}.pdf") 
-        plot_coverages_violin_deviation([baseline_data[0]], our_approach_data, feedback_round_max, iterations, title, result_pdf)
+        plot_coverages_violin_deviation([baseline_data[0]], our_approach_data, feedback_round_max, title, result_pdf)
 
 
 if __name__=="__main__":

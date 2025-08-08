@@ -67,7 +67,7 @@ def plot_coverages_deviation(coverages_pr_level, all_prs, title, result_pdf):
 def main():
     iterations = 5
     config_versions = [
-        # [1, 0, 1, False]
+        # [1, 0, 1, False] # note: set 'base' in line 110 to True
         [5, 8, 8, True]
     ]
     target_projects = ["marshmallow", "pandas", "scipy", "keras"]
@@ -104,10 +104,9 @@ def main():
                         data_single_pr = init.all_from_cur_version
                         
                         if not data_single_pr:
-                            print(pr)
                             pr_runs.append("0.00%")
                         else:
-                            coverages_single_pr, _ = reorganize_coverages(data_single_pr, base=True)
+                            coverages_single_pr, _ = reorganize_coverages(data_single_pr, base=False)
                             # Take initial round coverage for this PR/run
                             if not coverages_single_pr:
                                 print(f"Iteration {iter}: PR {pr}")

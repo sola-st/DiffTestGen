@@ -39,7 +39,8 @@ def get_numerator_and_denominator_from_str(cov_str):
     numerator_str, denominator_str = tmp.split("/")
     return int(numerator_str), int(denominator_str)
 
-def get_overall_cov_rate(cov_pair_dict):
+def get_overall_cov_rate_op1(cov_pair_dict): 
+    # option 1: (old_ucovered + new_convered) / (old_all + new_all)
     old = cov_pair_dict["old"]
     new = cov_pair_dict["new"]
     numerator_old, denominator_old = get_numerator_and_denominator_from_str(old)
@@ -50,5 +51,18 @@ def get_overall_cov_rate(cov_pair_dict):
     denominator_all = denominator_old + denominator_new
     overall_cov = numerator_all / denominator_all if denominator_all > 0 else 1
     overall_cov_str = f"{overall_cov:.2%}"
+
+    return overall_cov_str
+
+def get_overall_cov_rate(cov_pair_dict): 
+    # option 2: (old percentage + new_percentage) / 2
+    old = cov_pair_dict["old"]
+    new = cov_pair_dict["new"]
+    percent_old = float(old.split("%")[0])
+    percent_new = float(new.split("%")[0])
+
+    # old + new
+    overall_cov = (percent_old + percent_new) / 2 
+    overall_cov_str = f"{overall_cov:.2f}"
 
     return overall_cov_str
