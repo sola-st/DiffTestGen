@@ -70,6 +70,7 @@ def main():
     # target_projects = ["scipy"]
 
     config_versions = [
+        # [1, 0, 1, False]
         [5, 8, 8, True]
         ]
 
@@ -118,7 +119,7 @@ def main():
 
         # Plot standard deviation for each PR
         title = "Different Outputs Across 5 Repetitions per PR"
-        result_pdf = join(results_folder, "table_and_plots", f"Outputs_stddev_per_pr.pdf")
+        result_pdf = join(results_folder, "table_and_plots", f"Outputs_stddev_per_pr_{version_id}.pdf")
         plot_nbs_of_different_outputs(diff_nbs_pr_level, all_prs, title, result_pdf)
 
 
