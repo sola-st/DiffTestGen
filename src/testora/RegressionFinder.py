@@ -38,6 +38,7 @@ from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorP
 from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
+from testora.util.ExtractExistingTests import ExtractExistingTests
 from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
 from testora.util.Logs import (CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
@@ -498,6 +499,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         append_event(Event(pr_nb=pr.number, message="Ignoring because labeled as 'DOC'"))
         return
 
+    
+
     # extract diff and names of changed functions. changed_function : qualified names
     # this function call wil also add the desired context to the pr.
     # old_changed_functions available if needed.
@@ -510,6 +513,14 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     #         github_repo, raw_info_changed_functions, output_dir)
 
     # TODO extract existing tests
+    if Config.use_existing_tests == True:
+        cloned_repo = cloned_repo_manager.get_cloned_repo(pr.post_commit)
+        container_name = cloned_repo.container_name
+        project_name = cloned_repo_manager.repo_name
+        
+        ExtractExistingTests(pr.modified_test_python_files, changed_functions, container_name, project_name).main()
+        # TODO
+        return
 
     # generate tests via LLM
     generated_tests, test_msg_pairs, full_diff_len_fit, filtered_diff_len_nonequal_fit = generate_tests(pr, github_repo, changed_functions)

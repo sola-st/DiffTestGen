@@ -1,6 +1,6 @@
 import requests
 from unidiff import PatchSet
-import urllib.request
+# import urllib.request
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
 from testora.util.PythonCodeUtil2 import (
@@ -40,6 +40,11 @@ class PullRequest:
         self.old_context_with_line_num = {}
         self.new_context_with_line_num = {}
 
+        # to help extract existing tests
+        if Config.use_existing_tests == True:
+            # to extract self.modified_test_python_files
+            self._compute_modified_test_python_files()
+
     def _pr_url_to_patch(self): 
         ''' 
         The target is to get the modified files from the patch.
@@ -74,8 +79,8 @@ class PullRequest:
         module_name = self.cloned_repo_manager.module_name
 
         # Python files only
-        modified_python_files = [f for f in self.patch.modified_files if f.path.endswith(".py") or f.path.endswith(".pyx")]
-        self.non_test_modified_python_files = [f.path for f in modified_python_files 
+        self.modified_python_files = [f for f in self.patch.modified_files if f.path.endswith(".py") or f.path.endswith(".pyx")]
+        self.non_test_modified_python_files = [f.path for f in self.modified_python_files 
                 if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
 
         # Python and other PLs
@@ -95,6 +100,10 @@ class PullRequest:
             return self.non_test_modified_python_files
         elif Config.code_change_pl == "all":
             return self.non_test_modified_code_files
+        
+    def _compute_modified_test_python_files(self):
+        self.modified_test_python_files = [f.path for f in self.modified_python_files 
+                if ("test_" in f.path or "_test" in f.path)]
 
     def has_non_comment_change(self):
         if Config.code_change_pl == "all":

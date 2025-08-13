@@ -57,6 +57,9 @@ phase_selection = "test_generation" # valid values: "test_generation", "all"
 use_error_feedabck = True
 error_feedback_max = 5
 
+# whether to detect existing tests
+use_existing_tests = True
+
 # # KEEP THIS AT THE END: log the current configuration
 # current_globals = set(globals().keys())
 # config_parameters = current_globals - initial_globals
