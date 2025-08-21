@@ -19,12 +19,13 @@ if pr_split_num:
 with open(pr_file, "r") as f:
     prs = f.readlines()
 pr_list = [int(pr) for pr in prs]
-    
+
+use_existing_tests = False # whether use developer-written tests   
 config_versions = [
-    [1, 0, 1, False],
-    [5, 5, 5, False],
-    [5, 8, 8, False],
-    [5, 8, 8, True]
+    [1, 0, 1, False, use_existing_tests],
+    [5, 5, 5, False, use_existing_tests],
+    [5, 8, 8, False, use_existing_tests],
+    [5, 8, 8, True, use_existing_tests]
 ]
 
 results_folder = join("data", "results")
