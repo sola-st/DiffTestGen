@@ -13,6 +13,20 @@ class FunctionCollector(cst.CSTVisitor):
         self.functions.append((node, pos.start.line, pos.end.line))
 
 
+class TestFunctionCollector(cst.CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
+    def __init__(self):
+        self.functions = []
+        self.imports = []
+
+    def visit_FunctionDef(self, node: cst.FunctionDef):
+        pos = self.get_metadata(PositionProvider, node)
+        self.functions.append((node, pos.start.line, pos.end.line))
+
+    def visit_Import(self, node: cst.Import | cst.ImportFrom):
+        self.imports.append((node.code))
+
 
 '''
 The following functions are some different versions of file analyis to return various information
@@ -71,6 +85,30 @@ def get_function_names_code(code: str, patch_ranges: list):
                 matched_functions_code.add(function_code)
 
     return list(matched_functions), list(matched_functions_code), None
+
+def get_test_function_names_code_refs(code: str, patch_ranges: list):
+    try:
+        tree = cst.parse_module(code)
+    except cst.ParserSyntaxError:
+        return None, None, None
+
+    wrapper = MetadataWrapper(tree)
+    collector = TestFunctionCollector()
+    wrapper.visit(collector)
+
+    matched_functions_code = set()
+    for patch_range in patch_ranges:
+        target_line = (patch_range[0] + patch_range[1]) / 2
+
+        for func in collector.functions:
+            func_node, start_line, end_line = func
+            # the start and end lines are both included, and start at 1.
+            if start_line <= target_line <= end_line:
+                module_with_node = cst.Module(body=[func_node])
+                function_code = module_with_node.code
+                matched_functions_code.add(function_code)
+
+    return list(matched_functions_code), collector.imports
 
 def get_function_names_code_with_line_num(code: str, patch_ranges: list):
     ''' Retrun modified function names, and the code of the functions (with marked line numbers).'''

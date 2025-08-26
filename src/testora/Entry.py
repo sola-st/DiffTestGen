@@ -20,7 +20,11 @@ with open(pr_file, "r") as f:
     prs = f.readlines()
 pr_list = [int(pr) for pr in prs]
 
-use_existing_tests = False # whether use developer-written tests   
+# existing developer-written tests
+# "none": do not make any extra effort about developer-written tests,
+# "pr-modified": use the PR-modified tests, 
+# "all": use PR-modified tests + local tests
+use_existing_tests = "pr-modified"   
 config_versions = [
     [1, 0, 1, False, use_existing_tests],
     [5, 5, 5, False, use_existing_tests],

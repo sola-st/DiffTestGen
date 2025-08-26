@@ -502,9 +502,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     
 
     # extract diff and names of changed functions. changed_function : qualified names
-    # this function call wil also add the desired context to the pr.
-    # old_changed_functions available if needed.
+    # * this function call wil also add the desired context to the pr.
+    # * old_changed_functions available if needed.
+    # * this function call wil also add the test function body to the pr.
     changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
+    # TODO also give test function codes
     # note: the initial round do not have converage info.
 
     # # extract call gragh and dependency gragh
@@ -513,7 +515,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     #         github_repo, raw_info_changed_functions, output_dir)
 
     # TODO extract existing tests
-    if Config.use_existing_tests == True:
+    # existing developer-written tests
+    # "none": do not make any extra effort about developer-written tests,
+    # "pr-modified": use the PR-modified tests, 
+    # "all": use PR-modified tests + local tests
+    if Config.use_existing_tests == "all":
         cloned_repo = cloned_repo_manager.get_cloned_repo(pr.post_commit)
         container_name = cloned_repo.container_name
         project_name = cloned_repo_manager.repo_name

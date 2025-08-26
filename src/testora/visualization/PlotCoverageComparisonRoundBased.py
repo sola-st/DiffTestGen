@@ -144,11 +144,11 @@ def main():
                     
                         all_from_cur_version = init.get_multiple_pr_coverage_info(project)
                         
-                        # # write a meta file for a version
-                        # meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
-                        # with open(meta_file, "w") as f:
-                        #     json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
-                        # print(f"Collected coverage information is written to {meta_file}")
+                        # write a meta file for a version
+                        meta_file = join(output_folder, f"coverage_comparison_meta_{version_id}.json")
+                        with open(meta_file, "w") as f:
+                            json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
+                        print(f"Collected coverage information is written to {meta_file}")
 
                         all_data[iter].extend(all_from_cur_version)
                 

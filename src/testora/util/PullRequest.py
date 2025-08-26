@@ -7,7 +7,8 @@ from testora.util.PythonCodeUtil2 import (
         get_function_names,
         get_function_names_code, 
         get_function_names_code_with_line_num,
-        get_function_names_code_to_with_mark
+        get_function_names_code_to_with_mark,
+        get_test_function_names_code_refs
 )
 
 
@@ -40,8 +41,10 @@ class PullRequest:
         self.old_context_with_line_num = {}
         self.new_context_with_line_num = {}
 
+        self.old_test_function_code = {}
+        self.new_test_function_code = {}
         # to help extract existing tests
-        if Config.use_existing_tests == True:
+        if Config.use_existing_tests != None:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
 
@@ -175,10 +178,17 @@ class PullRequest:
         return result
     
     def get_changed_function_names_and_context(self, prompt_base):
+        # get_changed_function_names_and_context
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
         changed_function_qualified_names_old = self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         changed_function_qualified_names_new = self.get_helper(post_commit_cloned_repo, "new", prompt_base)
+
+        # get test function code
+        if Config.use_existing_tests == "pr-modified":
+            self.get_test_function_code(pre_commit_cloned_repo, "old") # update self.xxx_test_function_code
+            self.get_test_function_code(post_commit_cloned_repo, "new") # TODO check whether repeated the repo build
+
         return changed_function_qualified_names_new
     
     def get_helper(self, cloned_repo, version, prompt_base):
@@ -244,6 +254,30 @@ class PullRequest:
                 self.new_context_with_line_num = code_context_with_line_num_str 
                 
         return changed_functions
+
+    def get_test_function_code(self, cloned_repo, version):
+        for modified_file in self.patch.modified_files:
+            if modified_file.path in self.modified_test_python_files:
+                with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
+                    file_content = f.read()
+                patch_ranges = []
+                for hunk in modified_file:
+                    start_line = hunk.target_start
+                    end_line = hunk.target_start + hunk.target_length
+                    patch_range = (start_line, end_line) # numbers start at 1 andend_line included
+                    patch_ranges.append(patch_range) 
+
+                test_functions_code, test_file_imports = get_test_function_names_code_refs(file_content, patch_ranges)
+                
+                if test_functions_code:
+                    code_context += f"The following are the modified test functions from file <{modified_file.path}>:\n"
+                    code_context += "\n\n".join(test_file_imports + test_functions_code)
+                    code_context += "\n"
+
+        if version == "old":
+            self.old_test_function_code = code_context
+        else:
+            self.new_test_function_code = code_context 
 
     def _compute_modified_lines(self):
         self.old_file_path_to_all_modified_lines = {}

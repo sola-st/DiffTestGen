@@ -60,7 +60,7 @@ def main():
 
     iterations = 5
     # option 1: for all projects
-    target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+    target_projects = ["marshmallow", "pandas", "scipy", "keras"] # the same order with covergae standard deviation plot
 
     # option 2: for a single project
     # with open(".target_project", "r") as f:
