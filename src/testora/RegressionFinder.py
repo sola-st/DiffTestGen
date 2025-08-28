@@ -10,7 +10,7 @@ from testora.execution.DockerExecutor import DockerExecutor
 from testora.execution.ProgramMerger import merge_programs, separate_outputs
 from testora.execution.TestExecution import TestExecution
 from testora.llms.LLMCache import LLMCache
-from testora.prompts.ParseErrorPrivateCallFixingPrompt import ParseErrorPrivateCallFixingPrompt
+from testora.prompts.ParseErrorPrivateCallFixingPromptV2 import ParseErrorPrivateCallFixingPrompt
 from testora.prompts.RegressionTestGeneratorPromptV1 import RegressionTestGeneratorPromptV1
 from testora.prompts.RegressionTestGeneratorPromptV2 import RegressionTestGeneratorPromptV2
 from testora.prompts.RegressionTestGeneratorPromptV345 import RegressionTestGeneratorPromptV345
@@ -185,7 +185,7 @@ def is_crash(output):
         "fail" in output.lower()
 
 
-def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, round=0):
+def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, round=0, do_name_reformatting=True):
     raw_answer = model.query(prompt, nb_samples)
     append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
 
@@ -193,35 +193,38 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     # Separate the examples if the model answers in a big python code block.
     if len(generated_tests) == 1:
         matches = re.findall(r'Example \d+', str(generated_tests))
-        if len(matches) > 1: # multiple usgae example in one python block
+        if len(matches) > 1: # multiple usage examples in one python block
             speparator_prompt = TestPythonBlockSeparatorPrompt(generated_tests[0])
             separate_raw_answer = llm.query(speparator_prompt)
             append_event(LLMEvent(pr_nb=pr.number, message="Separate raw answer", content="\n---(next sample)---".join(separate_raw_answer)))
             generated_tests = prompt.parse_answer(raw_answer)
         
     name_formatted_generated_tests = []
-    for idx, test in enumerate(generated_tests):
-        # for test:
-        #  * normal: # Example 1: <code>
-        #  * outliers: for projects that need further adjustments for import lines.
-        #       e.g., import pandas as pd\nimport numpy as np\nimport pyarrow as pa\n\n# Example 1: <code>
-        #       e.g., import pandas as pd\nimport numpy as np  # Fix: Importing numpy\n\n# Example 2: <code>
-        
-        # 1. modification to put all the example code (in the above formats) in the same format.
-        test_lines = test.splitlines()
-        for line in test_lines:
-            if "# Example" in line:
-                # get the newly formatted line
-                test = line + "\n" + test.replace(f"{line}\n", "")
-                break
-        
-        # 2. process to get the newly named tests
-        test_name, test_code = test.split(":", 1)
-        marked_name = test_name.replace("# Example", f"# Round {round} Example", 1) + f" ({diff_version}):"
-        formatted_test = f"{marked_name}{test_code}"
-        append_event(LLMEvent(pr_nb=pr.number, message=f"Generated test {idx+1}, round {round} ({diff_version})", content=formatted_test))
-        name_formatted_generated_tests.append(formatted_test)
-    return name_formatted_generated_tests
+    if do_name_reformatting == True:
+        for idx, test in enumerate(generated_tests):
+            # for test:
+            #  * normal: # Example 1: <code>
+            #  * outliers: for projects that need further adjustments for import lines.
+            #       e.g., import pandas as pd\nimport numpy as np\nimport pyarrow as pa\n\n# Example 1: <code>
+            #       e.g., import pandas as pd\nimport numpy as np  # Fix: Importing numpy\n\n# Example 2: <code>
+            
+            # 1. modification to put all the example code (in the above formats) in the same format.
+            test_lines = test.splitlines()
+            for line in test_lines:
+                if "# Example" in line:
+                    # get the newly formatted line
+                    test = line + "\n" + test.replace(f"{line}\n", "")
+                    break
+            
+            # 2. process to get the newly named tests
+            test_name, test_code = test.split(":", 1)
+            marked_name = test_name.replace("# Example", f"# Round {round} Example", 1) + f" ({diff_version}):"
+            formatted_test = f"{marked_name}{test_code}"
+            append_event(LLMEvent(pr_nb=pr.number, message=f"Generated test {idx+1}, round {round} ({diff_version})", content=formatted_test))
+            name_formatted_generated_tests.append(formatted_test)
+        return name_formatted_generated_tests
+    
+    return generated_tests
 
 
 def remove_tests_with_private_call(tests):
@@ -362,6 +365,30 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
     append_event(Event(pr_nb=pr.number,
             message=f"Generated {len(all_tests)} more tests. ({nb_tests_before_dedup_and_cleaning} tests before deduplication and cleaning)"))
     return all_tests, test_msg_pairs
+
+def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff):
+    static_err_fixed_tests = []
+
+    if code_and_err_msgs_full_diff:
+        # it will not change with the same PR. the initial round already checked the len. -> len(pr.full_diff.split("\n")) <= 200:
+        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
+        static_err_fixed_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", do_name_reformatting=False))
+
+    if code_and_err_msgs_filtered_diff:
+        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
+        static_err_fixed_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", do_name_reformatting=False))
+
+    # de-dup tests
+    nb_tests_before_dedup_and_cleaning = len(static_err_fixed_tests)
+    static_err_fixed_tests = list(dict.fromkeys(static_err_fixed_tests))
+
+    # clean tests, test_msg_pairs cna used to start another attmept if needed
+    static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(static_err_fixed_tests)
+
+    append_event(Event(pr_nb=pr.number,
+            message=f"Static error fixed {len(static_err_fixed_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+    
+    return static_err_fixed_tests
 
 def validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution):
     assert (old_execution.output is not None)
@@ -658,30 +685,56 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
     # inner feedback about parse error and 'private' calls
     if test_msg_pairs:
-        generated_tests_num = len(generated_tests)
+        code_and_err_msgs_full_diff = ""
+        code_and_err_msgs_filtered_diff = ""
+        test_idx_full_diff = []
+        test_idx_filtered_diff = []
+
+        # generated_tests_num = len(generated_tests) # ** Multiple -- PromptV1**
         # TODO only running no generated_tests, or if any test_msg_pairs exists
         for pair in test_msg_pairs:
             test_idx, test_code, static_error_msg = pair
-            attempt = 0
-            while static_error_msg:
-                if attempt >= Config.error_feedback_max:
-                    # max attempt to fix the test, but still fails on both versions of the code
-                    append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Max attempt ({Config.error_feedback_max}) reaches."))
-                    break
+            # TODO multiple attempts VS. only once (single)
+            # V1 and V2
+            # # ** Multiple -- PromptV1**
+            # attempt = 0
+            # while static_error_msg:
+            #     if attempt >= Config.error_feedback_max:
+            #         # max attempt to fix the test, but still fails on both versions of the code
+            #         append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Max attempt ({Config.error_feedback_max}) reaches."))
+            #         break
 
-                prompt = ParseErrorPrivateCallFixingPrompt(test_code, static_error_msg)
-                raw_answer = llm.query(prompt, no_cache=True)[0] # no_cache set to true, allow the model to get different answers with the same error message.
-                append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
-                refined_test = prompt.parse_answer(raw_answer)
-                attempt += 1
-                message = f"Refine code parsing and private call, attempt {attempt} (with {generated_tests_num} kept tests). Msg: {static_error_msg}"
-                append_event(LLMEvent(pr_nb=pr.number, message=message, content=refined_test)) # a mark to show which test
+            #     prompt = ParseErrorPrivateCallFixingPrompt(test_code, static_error_msg)
+            #     raw_answer = llm.query(prompt, no_cache=True)[0] # no_cache set to true, allow the model to get different answers with the same error message.
+            #     append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
+            #     refined_test = prompt.parse_answer(raw_answer)
+            #     attempt += 1
+            #     message = f"Refine code parsing and private call, attempt {attempt} (with {generated_tests_num} kept tests). Msg: {static_error_msg}"
+            #     append_event(LLMEvent(pr_nb=pr.number, message=message, content=refined_test)) # a mark to show which test
                 
-                # another round of static check
-                __, static_error_msg = has_private_accesses_or_fails_to_parse(refined_test)
+            #     # another round of static check
+            #     __, static_error_msg = has_private_accesses_or_fails_to_parse(refined_test)
 
-            append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Static errors fixed."))
-            generated_tests.insert(test_idx, refined_test)
+            # append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Static errors fixed."))
+            # generated_tests.insert(test_idx, refined_test)
+            # # ** Multiple -- PromptV1 Done**
+
+            # ** Single -- PromptV2** part 1
+            if "(full_diff)" in test_code:
+                code_and_err_msgs_full_diff += f"{test_code}\n{static_error_msg}\n"
+                test_idx_full_diff.append(test_idx)
+            elif "(filtered_diff)" in test_code:
+                code_and_err_msgs_filtered_diff += f"{test_code}\n{static_error_msg}\n"
+                test_idx_filtered_diff.append(test_idx)
+            # else: tests with name issue, ideally not exists.
+
+        # ** Single -- PromptV2** part 2
+        if test_idx_full_diff or test_idx_filtered_diff:
+            static_err_fixed_tests = refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
+            # go through to update the tests
+            append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends."))
+            for idx in (test_idx_full_diff + test_idx_filtered_diff):
+                generated_tests.insert(test_idx, static_err_fixed_tests)
 
     if cloned_repo_manager.repo_name == "pandas":
         # make sure the tests import pandas
