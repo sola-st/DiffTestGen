@@ -1,6 +1,6 @@
 class RegressionTestGeneratorPromptV7:
     '''Provides the old and new functions, and the line mapping infomation (the '@@ ' lines) from diff.'''
-    def __init__(self, project_name, fut_qualified_names, diff, old_context:set, new_context:set):
+    def __init__(self, project_name, fut_qualified_names, diff, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.old_context = old_context

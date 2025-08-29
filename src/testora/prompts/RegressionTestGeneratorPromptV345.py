@@ -1,10 +1,27 @@
 class RegressionTestGeneratorPromptV345:
-    def __init__(self, project_name, fut_qualified_names, diff, old_context:set, new_context:set):
+    def __init__(self, project_name, fut_qualified_names, diff, old_context, new_context, old_tests=None, new_tests=None):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.old_context = old_context
+        # 'X_context' and 'X_tests" r are "\n" separated strs
+        self.old_context = old_context 
         self.new_context = new_context
+
+        self.test_function_block = ""
+        if old_tests or new_tests:
+            self.test_function_block = """The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested.
+The following are the old and the new versions of these test functions:
+
+Old version: 
+
+{old_tests}
+
+New version:
+
+{new_tests}
+
+"""
+
         self.use_json_output = False
 
     def create_prompt(self):
@@ -24,6 +41,7 @@ New version:
 
 {new_context}
 
+{test_function_block}
 The usage examples you create should use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
 Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
@@ -46,7 +64,8 @@ etc.
                                fut_qualified_names=", ".join(self.fut_qualified_names),
                                diff=self.diff,
                                old_context=self.old_context,
-                               new_context=self.new_context)
+                               new_context=self.new_context,
+                               test_function_block = self.test_function_block)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")

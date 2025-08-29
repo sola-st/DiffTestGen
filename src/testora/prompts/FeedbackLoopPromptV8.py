@@ -3,7 +3,7 @@ class FeedbackTestGeneratorPromptV8:
     Given the covered lines and pre-round generated tests, let LLM generate some new tests that cover more changed lines.
     diff + test code + covered stmts (configuration 5_8_8).
     '''
-    def __init__(self, project_name, fut_qualified_names, diff, all_covered_modified_stmts_info, old_context, new_context):
+    def __init__(self, project_name, fut_qualified_names, diff, all_covered_modified_stmts_info, old_context, new_context): #, old_tests=None, new_tests=None):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
@@ -11,6 +11,20 @@ class FeedbackTestGeneratorPromptV8:
         self.all_covered_modified_stmts_info = all_covered_modified_stmts_info 
         self.old_context = old_context
         self.new_context = new_context
+
+#         self.test_function_block = ""
+#         if old_tests or new_tests:
+#             self.test_function_block = """The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested.
+# The following are the old and the new versions of these test functions:
+
+# Old version: 
+
+# {old_tests}
+
+# New version:
+
+# {new_tests}
+# """
         self.use_json_output = False
 
     def create_prompt(self):
@@ -58,6 +72,7 @@ etc.
                                old_context = self.old_context,
                                new_context = self.new_context,
                                fut_qualified_names=", ".join(self.fut_qualified_names))
+                            #    test_function_block = self.test_function_block)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")

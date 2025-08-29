@@ -8,7 +8,7 @@ from testora.util.PythonCodeUtil2 import (
         get_function_names_code, 
         get_function_names_code_with_line_num,
         get_function_names_code_to_with_mark,
-        get_test_function_names_code_refs
+        get_test_function_names_code_imports
 )
 
 
@@ -256,6 +256,7 @@ class PullRequest:
         return changed_functions
 
     def get_test_function_code(self, cloned_repo, version):
+        code_context = ""
         for modified_file in self.patch.modified_files:
             if modified_file.path in self.modified_test_python_files:
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
@@ -267,7 +268,7 @@ class PullRequest:
                     patch_range = (start_line, end_line) # numbers start at 1 andend_line included
                     patch_ranges.append(patch_range) 
 
-                test_functions_code, test_file_imports = get_test_function_names_code_refs(file_content, patch_ranges)
+                test_functions_code, test_file_imports = get_test_function_names_code_imports(file_content, patch_ranges)
                 
                 if test_functions_code:
                     code_context += f"The following are the modified test functions from file <{modified_file.path}>:\n"

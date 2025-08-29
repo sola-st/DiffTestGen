@@ -24,8 +24,11 @@ class TestFunctionCollector(cst.CSTVisitor):
         pos = self.get_metadata(PositionProvider, node)
         self.functions.append((node, pos.start.line, pos.end.line))
 
-    def visit_Import(self, node: cst.Import | cst.ImportFrom):
-        self.imports.append((node.code))
+    def visit_Import(self, node: cst.Import):
+        self.imports.append(cst.Module([]).code_for_node(node))
+
+    def visit_ImportFrom(self, node: cst.ImportFrom):
+        self.imports.append(cst.Module([]).code_for_node(node))
 
 
 '''
@@ -86,7 +89,7 @@ def get_function_names_code(code: str, patch_ranges: list):
 
     return list(matched_functions), list(matched_functions_code), None
 
-def get_test_function_names_code_refs(code: str, patch_ranges: list):
+def get_test_function_names_code_imports(code: str, patch_ranges: list):
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
@@ -108,7 +111,7 @@ def get_test_function_names_code_refs(code: str, patch_ranges: list):
                 function_code = module_with_node.code
                 matched_functions_code.add(function_code)
 
-    return list(matched_functions_code), collector.imports
+    return list(matched_functions_code), collector.imports # test functions
 
 def get_function_names_code_with_line_num(code: str, patch_ranges: list):
     ''' Retrun modified function names, and the code of the functions (with marked line numbers).'''

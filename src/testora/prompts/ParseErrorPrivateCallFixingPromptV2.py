@@ -1,10 +1,8 @@
 class ParseErrorPrivateCallFixingPrompt:
-    def __init__(self, project_name, fut_qualified_names, diff, all_uncovered_modified_stmts_info, \
-                old_context, new_context, code_and_err_msgs):
+    def __init__(self, project_name, fut_qualified_names, diff, old_context, new_context, code_and_err_msgs):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
-        self.all_uncovered_modified_stmts_info = all_uncovered_modified_stmts_info # uncovered statements of both versions
         self.old_context = old_context
         self.new_context = new_context
         self.code_and_err_msgs = code_and_err_msgs
@@ -32,7 +30,7 @@ New version:
 
 {new_context}
 
-The following gives several pieces of code and its converntion infomation that should be fixed.
+The following gives several pieces of code and its violation infomation that should be fixed.
 Generate one usage example for each piece of the information. 
 
 {code_and_err_msgs}
@@ -43,7 +41,6 @@ Wrap each refined individual example with Python code wrapped into ```python ...
 """
 
         return template.format(diff=self.diff, project_name=self.project_name, 
-                               all_uncovered_modified_stmts_info=self.all_uncovered_modified_stmts_info,
                                fut_qualified_names=", ".join(self.fut_qualified_names),
                                old_context = self.old_context,
                                new_context = self.new_context,

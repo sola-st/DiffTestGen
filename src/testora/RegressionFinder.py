@@ -252,8 +252,14 @@ def generate_tests(pr, github_repo, changed_functions):
 
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
+        prompt_full_diff = None
         # full diff with GPT4
-        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
+        if Config.initial_test_generation_prompt_version == 5: # TODO specific version of prompts
+            prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, \
+                pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code)
+        else: # e.g., other prompts, and testora
+            prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
+        
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
 
         # full diff with GPT3.5
@@ -261,8 +267,14 @@ def generate_tests(pr, github_repo, changed_functions):
 
     if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
         filtered_diff_len_nonequal_fit = True
+        prompt_filtered_diff = None
         # filtered diff with GPT4
-        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
+        if Config.initial_test_generation_prompt_version == 5:
+            prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, \
+                    pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code)
+        else:
+            prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
+        
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
 
         # filtered diff with GPT3.5
@@ -339,8 +351,14 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
 
     if full_diff_len_fit == True:
         # full diff with GPT4
-        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, 
+        prompt_full_diff = None
+        # if Config.initial_test_generation_prompt_version == 5: # TODO specific version of prompts
+        #     prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, 
+        #         all_uncovered_modified_stmts_info, old_context, new_context, pr.old_test_function_code, pr.new_test_function_code)
+        # else: # e.g., other prompts, and testora
+        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
                 all_uncovered_modified_stmts_info, old_context, new_context)
+        
         all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", round=round))
 
         # full diff with GPT3.5
@@ -348,8 +366,14 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
 
     if filtered_diff_len_nonequal_fit == True:
         # filtered diff with GPT4
-        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, 
+        prompt_filtered_diff = None
+        # if Config.initial_test_generation_prompt_version == 5:
+        #     prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
+        #             all_uncovered_modified_stmts_info, old_context, new_context, pr.old_test_function_code, pr.new_test_function_code)
+        # else:
+        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
                 all_uncovered_modified_stmts_info, old_context, new_context)
+        
         all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", round=round))
 
         # filtered diff with GPT3.5
@@ -367,22 +391,25 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
     return all_tests, test_msg_pairs
 
 def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff):
+    # TODO also to add test function bodies?
     static_err_fixed_tests = []
 
     if code_and_err_msgs_full_diff:
         # it will not change with the same PR. the initial round already checked the len. -> len(pr.full_diff.split("\n")) <= 200:
-        prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
+        prompt_full_diff = ParseErrorPrivateCallFixingPrompt(github_repo.name, changed_functions, pr.full_diff, 
+                pr.old_context, pr.new_context, code_and_err_msgs_full_diff)
         static_err_fixed_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", do_name_reformatting=False))
 
     if code_and_err_msgs_filtered_diff:
-        prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
+        prompt_filtered_diff = ParseErrorPrivateCallFixingPrompt(github_repo.name, changed_functions, pr.filtered_diff, 
+                pr.old_context, pr.new_context, code_and_err_msgs_filtered_diff)
         static_err_fixed_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", do_name_reformatting=False))
 
     # de-dup tests
     nb_tests_before_dedup_and_cleaning = len(static_err_fixed_tests)
     static_err_fixed_tests = list(dict.fromkeys(static_err_fixed_tests))
 
-    # clean tests, test_msg_pairs cna used to start another attmept if needed
+    # clean tests, test_msg_pairs can be used to start another attmept if needed
     static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(static_err_fixed_tests)
 
     append_event(Event(pr_nb=pr.number,
@@ -526,14 +553,15 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         append_event(Event(pr_nb=pr.number, message="Ignoring because labeled as 'DOC'"))
         return
 
-    
-
-    # extract diff and names of changed functions. changed_function : qualified names
-    # * this function call wil also add the desired context to the pr.
-    # * old_changed_functions available if needed.
-    # * this function call wil also add the test function body to the pr.
+    '''
+    Extract diff and names of changed functions. changed_function : qualified names
+     * this function call wil also add the desired context to the pr.
+     * old_changed_functions available if needed.
+     * if Config.use_existing_tests == "pr-modified":
+        this function call wil also add the test function body to the pr 
+        -> 'old_test_function_code' and 'new_test_function_code'
+    '''
     changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
-    # TODO also give test function codes
     # note: the initial round do not have converage info.
 
     # # extract call gragh and dependency gragh
@@ -541,7 +569,6 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # call_gragh, dependency_gragh = extract_graphs_from_specified_files(
     #         github_repo, raw_info_changed_functions, output_dir)
 
-    # TODO extract existing tests
     # existing developer-written tests
     # "none": do not make any extra effort about developer-written tests,
     # "pr-modified": use the PR-modified tests, 
@@ -721,10 +748,10 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
             # ** Single -- PromptV2** part 1
             if "(full_diff)" in test_code:
-                code_and_err_msgs_full_diff += f"{test_code}\n{static_error_msg}\n"
+                code_and_err_msgs_full_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
                 test_idx_full_diff.append(test_idx)
             elif "(filtered_diff)" in test_code:
-                code_and_err_msgs_filtered_diff += f"{test_code}\n{static_error_msg}\n"
+                code_and_err_msgs_filtered_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
                 test_idx_filtered_diff.append(test_idx)
             # else: tests with name issue, ideally not exists.
 
@@ -733,8 +760,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             static_err_fixed_tests = refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
             # go through to update the tests
             append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends."))
-            for idx in (test_idx_full_diff + test_idx_filtered_diff):
-                generated_tests.insert(test_idx, static_err_fixed_tests)
+            for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests):
+                generated_tests.insert(test_idx, test)
 
     if cloned_repo_manager.repo_name == "pandas":
         # make sure the tests import pandas

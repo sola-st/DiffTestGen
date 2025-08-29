@@ -7,13 +7,13 @@ import os
 
 iteration = 0
 
+use_existing_tests = "pr-modified"   
 config_versions = [
-    [1, 0, 1, False],
-    # [5, 5, 5, False],
-    # [5, 8, 8, False],
-    # [5, 8, 8, True]
-    ]
-
+    # [1, 0, 1, False, use_existing_tests],
+    # [5, 5, 5, False, use_existing_tests],
+    # [5, 8, 8, False, use_existing_tests],
+    [5, 8, 8, True, use_existing_tests]
+]
 results_folder = join("data", "results")
 if exists(results_folder):
     rename(results_folder, f"{results_folder}_backup")
@@ -29,7 +29,7 @@ with open(f"data/meta/pr_nums/{target_project}_PRs_subset10.txt", "r") as f:
 
 for config in config_versions:
     version_id = '_'.join(map(str, config))
-    config.append(iteration)
+    config = config + [iteration]
     # run RegressionFinder
     for pr_num in pr_list:
         subprocess.run(["python", "-m", "testora.RegressionFinder", 

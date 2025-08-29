@@ -1,6 +1,6 @@
 class RegressionTestGeneratorPromptV6:
     '''Provides nothing about diff, only the old and new functions'''
-    def __init__(self, project_name, fut_qualified_names, diff, old_context:set, new_context:set):
+    def __init__(self, project_name, fut_qualified_names, diff, old_context, new_context):
         self.project_name = project_name
         self.fut_qualified_names = fut_qualified_names
         # self.diff = diff
