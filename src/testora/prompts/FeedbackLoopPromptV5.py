@@ -16,7 +16,7 @@ and achieve the highest possible coverage of the specified lines in both the old
 {diff}
 
 The diff affects the following functions: {fut_qualified_names}. 
-The following are the old versions of these affected functions. Comment lines containing # TO_COVER indicate that the next line of code is expected to be covered by the generated usage example(s), here expected to generate {expected_test_num} usage example(s).
+The following are the old and the new versions of these affected functions. Comment lines containing # TO_COVER indicate that the next line of code is expected to be covered by the generated usage example(s), here expected to generate {expected_test_num} usage example(s).
 
 Old version: 
 

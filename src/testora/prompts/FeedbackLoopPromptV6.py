@@ -25,7 +25,7 @@ class FeedbackTestGeneratorPromptV6:
 Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the code changes.
 
 The code changes affect the following functions: {fut_qualified_names}.
-The following are the old versions of these affected functions, where each line of code starts with its line number in the format <line_number> :
+The following are the old and the new versions of these affected functions, where each line of code starts with its line number in the format <line_number> :
 
 Old version: 
 
