@@ -189,7 +189,8 @@ class PullRequest:
             self.get_test_function_code(pre_commit_cloned_repo, "old") # update self.xxx_test_function_code
             self.get_test_function_code(post_commit_cloned_repo, "new") # TODO check whether repeated the repo build
 
-        return changed_function_qualified_names_new
+        all_changed_func = list(set(changed_function_qualified_names_new).union(set(changed_function_qualified_names_old)))
+        return all_changed_func
     
     def get_helper(self, cloned_repo, version, prompt_base):
         changed_functions = []
@@ -204,9 +205,15 @@ class PullRequest:
                 module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
                 patch_ranges = []
                 for hunk in modified_file:
-                    start_line = hunk.target_start
-                    end_line = hunk.target_start + hunk.target_length
-                    patch_range = (start_line, end_line) # numbers start at 1 andend_line included
+                    patch_range = None
+                    if version == "new":
+                        start_line = hunk.target_start
+                        end_line = hunk.target_start + hunk.target_length
+                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
+                    else:
+                        start_line = hunk.source_start
+                        end_line = hunk.source_start + hunk.source_length
+                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
                     patch_ranges.append(patch_range) 
 
                 function_names = None
@@ -257,16 +264,22 @@ class PullRequest:
 
     def get_test_function_code(self, cloned_repo, version):
         code_context = ""
-        for modified_file in self.patch.modified_files:
+        for modified_file in self.patch.modified_files: # does not consider the removed test files.
             if modified_file.path in self.modified_test_python_files:
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     file_content = f.read()
                 patch_ranges = []
                 for hunk in modified_file:
-                    start_line = hunk.target_start
-                    end_line = hunk.target_start + hunk.target_length
-                    patch_range = (start_line, end_line) # numbers start at 1 andend_line included
-                    patch_ranges.append(patch_range) 
+                    patch_range = None
+                    if version == "new":
+                        start_line = hunk.target_start
+                        end_line = hunk.target_start + hunk.target_length
+                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
+                    else:
+                        start_line = hunk.source_start
+                        end_line = hunk.source_start + hunk.source_length
+                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
+                    patch_ranges.append(patch_range)
 
                 test_functions_code, test_file_imports = get_test_function_names_code_imports(file_content, patch_ranges)
                 
