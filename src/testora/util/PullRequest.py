@@ -10,6 +10,7 @@ from testora.util.PythonCodeUtil2 import (
         get_function_names_code_to_with_mark,
         get_test_function_names_code_imports
 )
+from testora.util.ExtractCallerCallee import PythonLanguageServer
 
 
 class PullRequest:
@@ -47,6 +48,9 @@ class PullRequest:
         if Config.use_existing_tests != None:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
+
+        self.function_callers = {} # each dict element is a changed function maps to its callers
+        self.function_callees = {}
 
     def _pr_url_to_patch(self): 
         ''' 
@@ -236,8 +240,28 @@ class PullRequest:
                         code_context_with_line_num_str += "\n\n".join(functions_code_with_line_num)
                         code_context_with_line_num_str += "\n"
 
-                for func_name in function_names:
-                    changed_functions.append(f"{module_name}.{func_name}")
+                if function_names:
+                    if type(function_names[0]) == tuple: 
+                        if Config.call_gragh == True:
+                            server = PythonLanguageServer(cloned_repo.repo.working_dir)
+                            for func_info in function_names:
+                                func_name, start_line, start_col = func_info
+                        
+                                # TODO maybe repetition here, check to visit less as possible as it can
+                                callers = server.get_function_callers(modified_file.path, start_line-1, start_col)
+                                self.function_callers.update({func_name: callers})
+                                # print(f"*** Callers of {func_name}@{start_line}: {callers}")
+
+                                callees = server.get_function_callees(modified_file.path, start_line-1)
+                                self.function_callers.update({func_name: callees})
+                                # print(f"--- Callees of {func_name}@{start_line}: {callees}")
+                        else:
+                            for func_name in function_names:
+                                function_name, start_line, start_col = func_name
+                                changed_functions.append(f"{module_name}.{function_name}")
+                    else:
+                        for func_name in function_names:
+                            changed_functions.append(f"{module_name}.{func_name}") # func_name also includes class_name if the setting goes like that
 
                 if functions_code:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"

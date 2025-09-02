@@ -7,11 +7,19 @@ class FunctionCollector(cst.CSTVisitor):
 
     def __init__(self):
         self.functions = []
+        self.class_stack = []
+
+    def visit_ClassDef(self, node: cst.ClassDef):
+        self.class_stack.append(node.name.value)
+
+    def leave_ClassDef(self, node: cst.ClassDef):
+        # TODO remove class name when decided
+        self.class_stack.pop()
 
     def visit_FunctionDef(self, node: cst.FunctionDef):
         pos = self.get_metadata(PositionProvider, node)
-        self.functions.append((node, pos.start.line, pos.end.line))
-
+        parent_class = self.class_stack[-1] if self.class_stack else None
+        self.functions.append((node, pos.start.line, pos.start.column, pos.end.line, parent_class))
 
 class TestFunctionCollector(cst.CSTVisitor):
     METADATA_DEPENDENCIES = (PositionProvider,)
@@ -35,7 +43,7 @@ class TestFunctionCollector(cst.CSTVisitor):
 The following functions are some different versions of file analyis to return various information
 All functions return 3 values.
 '''
-# TODO get a union of these functions
+
 def get_function_names(code: str, patch_ranges: list):
     '''Return modified function names.'''
     try:
@@ -55,7 +63,7 @@ def get_function_names(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line = func
+            func_node, start_line, start_col, end_line, class_name = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value) # Consider multiple functions involved in a single range
@@ -79,7 +87,7 @@ def get_function_names_code(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line = func
+            func_node, start_line, start_col, end_line, class_name = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value) 
@@ -88,6 +96,33 @@ def get_function_names_code(code: str, patch_ranges: list):
                 matched_functions_code.add(function_code)
 
     return list(matched_functions), list(matched_functions_code), None
+
+# def get_caller_callees(code: str, patch_ranges: list):
+#     try:
+#         tree = cst.parse_module(code)
+#     except cst.ParserSyntaxError:
+#         return None, None, None
+
+#     wrapper = MetadataWrapper(tree)
+#     collector = FunctionCollector()
+#     wrapper.visit(collector)
+
+#     # TODO
+#     matched_functions = set() # function names
+#     matched_functions_code = set()
+#     for patch_range in patch_ranges:
+#         target_line = (patch_range[0] + patch_range[1]) / 2
+
+#         for func in collector.functions:
+#             func_node, start_line, start_col, end_line, class_name = func
+#             # the start and end lines are both included, and start at 1.
+#             if start_line <= target_line <= end_line:
+#                 matched_functions.add(func_node.name.value) 
+#                 module_with_node = cst.Module(body=[func_node])
+#                 function_code = module_with_node.code
+#                 matched_functions_code.add(function_code)
+
+#     return list(matched_functions), list(matched_functions_code), None
 
 def get_test_function_names_code_imports(code: str, patch_ranges: list):
     try:
@@ -104,7 +139,7 @@ def get_test_function_names_code_imports(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line = func
+            func_node, start_line, start_col, end_line, class_name = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 module_with_node = cst.Module(body=[func_node])
@@ -130,7 +165,7 @@ def get_function_names_code_with_line_num(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line = func
+            func_node, start_line, start_col, end_line, class_name = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value)
@@ -167,10 +202,18 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line = func
+            func_node, start_line, start_col, end_line, class_name = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
-                matched_functions.add(func_node.name.value)
+                # # option 1: origianl testora
+                # matched_functions.add(func_node.name.value)
+
+                # # option 2: matching with call gragh tools
+                # matched_functions.add(f"{class_name}.{func_node.name.value}")
+
+                # option 3: language server
+                matched_functions.add((func_node.name.value, start_line-1, start_col)) # languge server is 0-based
+
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
                 matched_functions_code.add(function_code)

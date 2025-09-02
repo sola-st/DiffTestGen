@@ -562,6 +562,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         -> 'old_test_function_code' and 'new_test_function_code'
     '''
     changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
+    return
     # note: the initial round do not have converage info.
 
     # # extract call gragh and dependency gragh

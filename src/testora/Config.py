@@ -63,6 +63,8 @@ error_feedback_max = 5
 # "all": use PR-modified tests + local tests
 use_existing_tests = "pr-modified"
 
+call_gragh = True
+
 # # KEEP THIS AT THE END: log the current configuration
 # current_globals = set(globals().keys())
 # config_parameters = current_globals - initial_globals
