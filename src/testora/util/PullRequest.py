@@ -1,3 +1,4 @@
+import json
 import requests
 from unidiff import PatchSet
 # import urllib.request
@@ -10,7 +11,7 @@ from testora.util.PythonCodeUtil2 import (
         get_function_names_code_to_with_mark,
         get_test_function_names_code_imports
 )
-from testora.util.ExtractCallerCallee import PythonLanguageServer
+from testora.util.ExtractCallerCallee import ExtractCallerCallee
 
 
 class PullRequest:
@@ -243,21 +244,31 @@ class PullRequest:
                 if function_names:
                     if type(function_names[0]) == tuple: 
                         if Config.call_gragh == True:
-                            server = PythonLanguageServer(cloned_repo.repo.working_dir)
+                            server = ExtractCallerCallee(cloned_repo.repo.working_dir)
                             for func_info in function_names:
-                                func_name, start_line, start_col = func_info
+                                func_name, start_line_0_based, start_col_0_based = func_info
                         
                                 # TODO maybe repetition here, check to visit less as possible as it can
-                                callers = server.get_function_callers(modified_file.path, start_line-1, start_col)
-                                self.function_callers.update({func_name: callers})
-                                # print(f"*** Callers of {func_name}@{start_line}: {callers}")
+                                try:
+                                    callers = server.get_function_callers(modified_file.path, start_line_0_based, start_col_0_based)
+                                    self.function_callers.update({func_name: callers})
+                                    # print(f"*** Callers of {func_name}@{start_line}: {callers}")
+                                    with open("callers_utils_2699_dev.json", "w") as f:
+                                        json.dump(callers, f, indent=2)
+                                except:
+                                    print(f"* [{version}-ER] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
 
-                                callees = server.get_function_callees(modified_file.path, start_line-1)
-                                self.function_callers.update({func_name: callees})
-                                # print(f"--- Callees of {func_name}@{start_line}: {callees}")
+                                try:
+                                    callees = server.get_function_callees(modified_file.path, start_line_0_based)
+                                    self.function_callers.update({func_name: callees})
+                                    # print(f"--- Callees of {func_name}@{start_line}: {callees}")
+                                    with open("callees_utils_2699_dev.json", "w") as f:
+                                        json.dump(callees, f, indent=2)
+                                except:
+                                    print(f"* [{version}-EE] Get callee failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
                         else:
                             for func_name in function_names:
-                                function_name, start_line, start_col = func_name
+                                function_name, start_line_0_based, start_col_0_based = func_name
                                 changed_functions.append(f"{module_name}.{function_name}")
                     else:
                         for func_name in function_names:

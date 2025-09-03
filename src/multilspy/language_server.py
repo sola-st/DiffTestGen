@@ -468,7 +468,11 @@ class LanguageServer:
             )
 
         ret: List[multilspy_types.Location] = []
+        # TODO the 'self.server.send.references' allows to return None, why here can not?
         assert isinstance(response, list)
+        # if response == None:
+        #     return ret
+        
         for item in response:
             assert isinstance(item, dict)
             assert LSPConstants.URI in item

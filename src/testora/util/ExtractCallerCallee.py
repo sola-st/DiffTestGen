@@ -1,11 +1,11 @@
+import json
+import os
 import libcst as cst
 from libcst.metadata import MetadataWrapper, PositionProvider
-import json
+from pathlib import Path
 from multilspy import SyncLanguageServer
 from multilspy.multilspy_config import MultilspyConfig
 from multilspy.multilspy_logger import MultilspyLogger
-from pathlib import Path
-from os.path import join
 
 
 class CalleeFinder(cst.CSTVisitor):
@@ -52,61 +52,101 @@ def get_callees_in_function(file_path, def_line):
     return finder.callees
 
 
-class PythonLanguageServer:
+class ExtractCallerCallee:
     def __init__(self, repo_path):
-        self.repo_path = repo_path
+        self.repo_path = str(Path(repo_path).resolve())
         config = MultilspyConfig.from_dict({"code_language": "python"})
         logger = MultilspyLogger()
-        absolute_repo_path = str(Path(repo_path).resolve())
-        self.lsp = SyncLanguageServer.create(config, logger, absolute_repo_path)
+        self.lsp = SyncLanguageServer.create(config, logger, self.repo_path)
 
-    def get_function_callers(self, file_path, def_line, def_col):
+    def _normalize_paths(self, file_path: str):
+        """Return (full_path: Path, rel_path: str (posix style relative to repo root))."""
+        p = Path(file_path)
+        if not p.is_absolute():
+            full = Path(self.repo_path) / p
+        else:
+            full = p
+        full = full.resolve()
+        rel = os.path.relpath(full, self.repo_path)
+        return full, Path(rel).as_posix()
+
+    def get_function_callers(self, file_path, def_line: int, def_col: int):
         """
-        Get all call sites for the function defined at (file_path, def_line).
-        func_name is for clarity, but disambiguation is by line number.
+        Return list of references (callers) for symbol at (file_path, def_line, def_col).
+        file_path may be absolute or repo-relative; def_line/def_col are 0-based.
         """
+        full_path, rel_path = self._normalize_paths(file_path)
+        refs = []
         with self.lsp.start_server():
-            refs = self.lsp.request_references(file_path, def_line, def_col)
-            callers = []
-            for r in refs:
-                # TODO check here whether necessary
-                # Filter out the definition itself
-                if r["uri"] == file_path and r["range"]["start"]["line"] == def_line:
-                    continue
-                callers.append(r)
-            return callers
-    
-    def get_function_callees(self, file_path, def_line):
-        # Step 1: Use CST to get callees in the function
-        callees = get_callees_in_function(join(self.repo_path, file_path), def_line)
+            try:
+                refs = self.lsp.request_references(rel_path, def_line, def_col) or []
+            except:
+                pass # no references
+
+        callers = []
+        for r in refs:
+            # TODO check here whether necessary
+            # Filter out the definition itself
+            if r["uri"] == file_path and r["range"]["start"]["line"] == def_line:
+                continue
+            callers.append(r)
+        return callers
+
+    def get_function_callees(self, file_path, def_line: int):
+        """
+        Use CST to find calls inside the function (def_line 0-based), then resolve each
+        call with the LSP. Returns list of dicts with callee+definition info.
+        """
+        full_path, rel_path = self._normalize_paths(file_path)
+        callees = get_callees_in_function(str(full_path), def_line)
+
         callees_with_defs = []
-        for callee_name, call_start_line, call_start_col in callees:
-            # Step 2: Use LSP to resolve the definition of each callee
-            with self.lsp.start_server():
-                # LSP expects 0-based line numbers
-                defs = self.lsp.request_definition(file_path, call_start_line, call_start_col)
+        with self.lsp.start_server():
+            for callee_name, call_start_line, call_start_col in callees:
+                defs = []
+                try:
+                    defs = self.lsp.request_definition(rel_path, call_start_line, call_start_col) or []
+                except:
+                    pass
                 for d in defs:
-                    # callee_info = {
-                    #     "callee_name": callee_name,
-                    #     "call_lineno": call_start_line,
-                    #     "definition_file": d.get("relativePath", d.get("uri")),
-                    #     "definition_line": d["range"]["start"]["line"] + 1  # convert to 1-based
-                    # }
-                    callees_with_defs.append(d)
+                    # if self.repo_path in d["absolutePath"]: # to filter out the built-in functions
+                    #     callees_with_defs.append(d)
+
+                    absolute = d.get("absolutePath")
+                    relative = d.get("relativePath")
+                    rng = d.get("range", {})
+                    start = rng.get("start", {})
+                    def_line = start.get("line")
+                    def_col = start.get("character") or start.get("column") or start.get("col")
+                    info = {
+                        "callee_name": callee_name,
+                        "call_location": {"file": str(full_path), "line": call_start_line, "col": call_start_col},
+                        "definition": {
+                            "absolute": absolute,
+                            "relative": relative,
+                            "line": def_line,
+                            "col": def_col,
+                            "raw": d,
+                        },
+                    }
+                    if self.repo_path in str(absolute):
+                        callees_with_defs.append(info)
+
         return callees_with_defs
 
 
 if __name__ == "__main__":
     # test_path = "hhh_server_test.py" # 9, 4
-    test_path = "src/marshmallow/error_store.py"
+    # test_path = "src/marshmallow/error_store.py" # 16, 9
+    test_path = "src/marshmallow/utils.py"
     repo_path = "data/repos/marshmallow/"
-    repo = PythonLanguageServer(repo_path)
+    repo = ExtractCallerCallee(repo_path)
 
-    callers = repo.get_function_callers(test_path, 16, 9)
-    with open("callers_error_store2.json", "w") as f:
+    callers = repo.get_function_callers(test_path, 135, 0) 
+    with open("callers_utils_2699.json", "w") as f:
         json.dump(callers, f, indent=2)
 
-    callees = repo.get_function_callees(test_path, 16)
-    with open("callees_error_store231.json", "w") as f:
+    callees = repo.get_function_callees(test_path, 135)
+    with open("callees_utils_2699.json", "w") as f:
         json.dump(callees, f, indent=2)
 
