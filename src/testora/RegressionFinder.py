@@ -708,13 +708,14 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     Initial generation is marked as round 0, and feedback loops marks start at round 1.
     '''
 
-    # if not generated_tests:
-    #     append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
-    #     # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
-    #     return None, None, None, None
+    if not generated_tests:
+        if Config.fix_static_error == False:
+            append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
+            # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
+            return None, None, None, None
 
     # inner feedback about parse error and 'private' calls
-    if test_msg_pairs:
+    if test_msg_pairs and Config.fix_static_error == True:
         code_and_err_msgs_full_diff = ""
         code_and_err_msgs_filtered_diff = ""
         test_idx_full_diff = []

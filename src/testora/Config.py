@@ -57,13 +57,15 @@ phase_selection = "test_generation" # valid values: "test_generation", "all"
 use_error_feedabck = True
 error_feedback_max = 5
 
+fix_static_error = False
+
 # existing developer-written tests
 # None: do not make any extra effort about developer-written tests,
 # "pr-modified": use the PR-modified tests, 
 # "all": use PR-modified tests + local tests
 use_existing_tests = "pr-modified"
 
-call_gragh = True
+call_gragh = False
 
 # # KEEP THIS AT THE END: log the current configuration
 # current_globals = set(globals().keys())
