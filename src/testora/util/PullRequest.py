@@ -253,18 +253,16 @@ class PullRequest:
                                     callers = server.get_function_callers(modified_file.path, start_line_0_based, start_col_0_based)
                                     self.function_callers.update({func_name: callers})
                                     # print(f"*** Callers of {func_name}@{start_line}: {callers}")
-                                    with open("callers_utils_2699_dev.json", "w") as f:
-                                        json.dump(callers, f, indent=2)
                                 except:
+                                    self.function_callers.update({func_name: "failed"})
                                     print(f"* [{version}-ER] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
 
                                 try:
                                     callees = server.get_function_callees(modified_file.path, start_line_0_based)
-                                    self.function_callers.update({func_name: callees})
+                                    self.function_callees.update({func_name: callees})
                                     # print(f"--- Callees of {func_name}@{start_line}: {callees}")
-                                    with open("callees_utils_2699_dev.json", "w") as f:
-                                        json.dump(callees, f, indent=2)
                                 except:
+                                    self.function_callees.update({func_name: "failed"})
                                     print(f"* [{version}-EE] Get callee failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
                         else:
                             for func_name in function_names:

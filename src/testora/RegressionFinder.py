@@ -560,9 +560,10 @@ def check_pr(github_repo, cloned_repo_manager, pr):
      * if Config.use_existing_tests == "pr-modified":
         this function call wil also add the test function body to the pr 
         -> 'old_test_function_code' and 'new_test_function_code'
+     * if Config.call_gragh == True:
+        this function will also return the callers and callees of the changed functions 
     '''
     changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
-    return
     # note: the initial round do not have converage info.
 
     # # extract call gragh and dependency gragh
