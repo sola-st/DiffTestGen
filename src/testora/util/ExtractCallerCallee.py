@@ -77,17 +77,17 @@ class ExtractCallerCallee:
         """
         full_path, rel_path = self._normalize_paths(file_path)
         refs = []
-        with self.lsp.start_server():
-            try:
-                refs = self.lsp.request_references(rel_path, def_line, def_col) or []
-            except:
-                pass # no references
+        
+        try:
+            refs = self.lsp.request_references(rel_path, def_line, def_col) or []
+        except:
+            pass # no references
 
         callers = []
         for r in refs:
             # TODO check here whether necessary
             # Filter out the definition itself
-            if r["uri"] == file_path and r["range"]["start"]["line"] == def_line:
+            if r["relativePath"] == rel_path and r["range"]["start"]["line"] == def_line:
                 continue
             callers.append(r)
         return callers
@@ -101,36 +101,35 @@ class ExtractCallerCallee:
         callees = get_callees_in_function(str(full_path), def_line)
 
         callees_with_defs = []
-        with self.lsp.start_server():
-            for callee_name, call_start_line, call_start_col in callees:
-                defs = []
-                try:
-                    defs = self.lsp.request_definition(rel_path, call_start_line, call_start_col) or []
-                except:
-                    pass
-                for d in defs:
-                    # if self.repo_path in d["absolutePath"]: # to filter out the built-in functions
-                    #     callees_with_defs.append(d)
+        for callee_name, call_start_line, call_start_col in callees:
+            defs = []
+            try:
+                defs = self.lsp.request_definition(rel_path, call_start_line, call_start_col) or []
+            except:
+                pass
+            for d in defs:
+                # if self.repo_path in d["absolutePath"]: # to filter out the built-in functions
+                #     callees_with_defs.append(d)
 
-                    absolute = d.get("absolutePath")
-                    relative = d.get("relativePath")
-                    rng = d.get("range", {})
-                    start = rng.get("start", {})
-                    def_line = start.get("line")
-                    def_col = start.get("character") or start.get("column") or start.get("col")
-                    info = {
-                        "callee_name": callee_name,
-                        "call_location": {"file": str(full_path), "line": call_start_line, "col": call_start_col},
-                        "definition": {
-                            "absolute": absolute,
-                            "relative": relative,
-                            "line": def_line,
-                            "col": def_col,
-                            "raw": d,
-                        },
-                    }
-                    if self.repo_path in str(absolute):
-                        callees_with_defs.append(info)
+                absolute = d.get("absolutePath")
+                relative = d.get("relativePath")
+                rng = d.get("range", {})
+                start = rng.get("start", {})
+                def_line = start.get("line")
+                def_col = start.get("character") or start.get("column") or start.get("col")
+                info = {
+                    "callee_name": callee_name,
+                    "call_location": {"file": str(full_path), "line": call_start_line, "col": call_start_col},
+                    "definition": {
+                        "absolute": absolute,
+                        "relative": relative,
+                        "line": def_line,
+                        "col": def_col,
+                        "raw": d,
+                    },
+                }
+                if self.repo_path in str(absolute):
+                    callees_with_defs.append(info)
 
         return callees_with_defs
 
@@ -141,6 +140,7 @@ if __name__ == "__main__":
     test_path = "src/marshmallow/utils.py"
     repo_path = "data/repos/marshmallow/"
     repo = ExtractCallerCallee(repo_path)
+    repo.lsp.start_server()
 
     callers = repo.get_function_callers(test_path, 135, 0) 
     with open("callers_utils_2699.json", "w") as f:

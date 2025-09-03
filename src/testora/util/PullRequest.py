@@ -198,6 +198,18 @@ class PullRequest:
         return all_changed_func
     
     def get_helper(self, cloned_repo, version, prompt_base):
+        changed_functions = None
+        if Config.call_gragh == True:
+            # the server stays alive for the entire workspace
+            server = ExtractCallerCallee(cloned_repo.repo.working_dir)
+            with server.lsp.start_server(): # start only once, automatic stop
+                changed_functions = self.helper_inner(cloned_repo, version, prompt_base, server)
+        else:
+            changed_functions = self.helper_inner(cloned_repo, version, prompt_base)
+
+        return changed_functions  
+
+    def helper_inner(self, cloned_repo, version, prompt_base, server=None):
         changed_functions = []
         code_context = ""
         code_context_with_line_num_str = ""
@@ -244,7 +256,6 @@ class PullRequest:
                 if function_names:
                     if type(function_names[0]) == tuple: 
                         if Config.call_gragh == True:
-                            server = ExtractCallerCallee(cloned_repo.repo.working_dir)
                             for func_info in function_names:
                                 func_name, start_line_0_based, start_col_0_based = func_info
                         
@@ -253,6 +264,8 @@ class PullRequest:
                                     callers = server.get_function_callers(modified_file.path, start_line_0_based, start_col_0_based)
                                     self.function_callers.update({func_name: callers})
                                     # print(f"*** Callers of {func_name}@{start_line}: {callers}")
+                                    # with open(f"er_{self.number}_{func_name}_{start_col_0_based}.json", "w") as f:
+                                    #     json.dump(callers, f, indent=2)
                                 except:
                                     self.function_callers.update({func_name: "failed"})
                                     print(f"* [{version}-ER] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
@@ -261,6 +274,8 @@ class PullRequest:
                                     callees = server.get_function_callees(modified_file.path, start_line_0_based)
                                     self.function_callees.update({func_name: callees})
                                     # print(f"--- Callees of {func_name}@{start_line}: {callees}")
+                                    # with open(f"ee_{self.number}_{func_name}_{start_col_0_based}.json", "w") as f:
+                                    #     json.dump(callees, f, indent=2)
                                 except:
                                     self.function_callees.update({func_name: "failed"})
                                     print(f"* [{version}-EE] Get callee failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
@@ -276,7 +291,7 @@ class PullRequest:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
                     code_context += "\n\n".join(functions_code)
                     code_context += "\n"
-        
+
         if version == "old":
             self.old_context = code_context
         else:
