@@ -9,18 +9,9 @@ class RegressionTestGeneratorPromptV345:
 
         self.test_function_block = ""
         if old_tests or new_tests:
-            self.test_function_block = """The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested.
-The following are the old and the new versions of these test functions:
-
-Old version: 
-
-{old_tests}
-
-New version:
-
-{new_tests}
-
-"""
+            test_function_block_prefix = """The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested.
+The following are the old and the new versions of these test functions:"""
+            self.test_function_block = f"{test_function_block_prefix}\n\nOld version:\n\n{old_tests}\n\nNew version:\n\n{new_tests}\n\n"
 
         self.use_json_output = False
 

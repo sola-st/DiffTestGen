@@ -332,8 +332,10 @@ class PullRequest:
                 test_functions_code, test_file_imports = get_test_function_names_code_imports(file_content, patch_ranges)
                 
                 if test_functions_code:
-                    code_context += f"The following are the modified test functions from file <{modified_file.path}>:\n"
-                    code_context += "\n\n".join(test_file_imports + test_functions_code)
+                    code_context += f"The following are and the modified test functions from file <{modified_file.path}>:\n"
+                    code_context += "Here starts with the import statements of this test file, refer to them if needed.\n"
+                    code_context += "\n".join(test_file_imports)
+                    code_context += "\n\n".join(test_functions_code)
                     code_context += "\n"
 
         if version == "old":

@@ -7,12 +7,11 @@ import os
 
 iteration = 0
 
-use_existing_tests = "pr-modified"   
 config_versions = [
-    # [1, 0, 1, False, use_existing_tests],
-    # [5, 5, 5, False, use_existing_tests],
-    # [5, 8, 8, False, use_existing_tests],
-    [5, 8, 8, True, use_existing_tests]
+    [1, 0, 1, False, False, None],
+    # [5, 5, 5, False, False, None],
+    # [5, 8, 8, False, False, None],
+    [5, 8, 8, True, True, "pr-modified"]
 ]
 results_folder = join("data", "results")
 if exists(results_folder):
