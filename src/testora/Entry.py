@@ -7,7 +7,7 @@ from os import makedirs, rename
 import os
 
 max_iteration = 5
-pr_split_num = 1 # could be 1, 2, or 3
+pr_split_num = 1 # could be None, 1, 2, or 3
 
 with open(".target_project", "r") as f:
     target_project = f.read().strip()
@@ -20,16 +20,18 @@ with open(pr_file, "r") as f:
     prs = f.readlines()
 pr_list = [int(pr) for pr in prs]
 
-# existing developer-written tests
-# "none": do not make any extra effort about developer-written tests,
-# "pr-modified": use the PR-modified tests, 
-# "all": use PR-modified tests + local tests
-use_existing_tests = "pr-modified"   
+'''For a single congif: 
+[initial_prompt_version, feedback_prompt_version, context_version, use_error_feedabck, fix_static_error, use_existing_tests]
+* existing developer-written tests
+    "none": do not make any extra effort about developer-written tests,
+    "pr-modified": use the PR-modified tests, 
+    "all": use PR-modified tests + local tests
+'''
 config_versions = [
-    [1, 0, 1, False, use_existing_tests],
-    [5, 5, 5, False, use_existing_tests],
-    [5, 8, 8, False, use_existing_tests],
-    [5, 8, 8, True, use_existing_tests]
+    [1, 0, 1, False, False, None],
+    # [5, 5, 5, False, False, None],
+    # [5, 8, 8, False, False, None],
+    [5, 8, 8, True, True, "pr-modified"]
 ]
 
 results_folder = join("data", "results")
