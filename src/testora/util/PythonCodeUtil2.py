@@ -105,7 +105,6 @@ def get_function_names_code(code: str, patch_ranges: list):
 
         for func in collector.functions:
             func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, class_name = func
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, class_name = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value) 
@@ -157,7 +156,7 @@ def get_test_function_names_code_imports(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, class_name = func
+            func_node, start_line, end_line = func
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 module_with_node = cst.Module(body=[func_node])
