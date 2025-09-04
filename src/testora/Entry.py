@@ -42,7 +42,8 @@ for iteration in range(max_iteration):
     breakpoints_data_folder = join(results_folder, "breakpoint", f"iter_{iteration}")
 
     # the default cache file setting form LLMCache
-    cache_dir = join("data", "llm_cache", "gpt-4o-mini-2024-07-18", "cache.json") 
+    # gpt-5-mini-2025-08-07, gpt-4o-mini-2024-07-18
+    cache_dir = join("data", "llm_cache", "gpt-5-mini-2025-08-07", "cache.json")
     # to resuse the cache
     iter_marked_cache_dir = cache_dir.replace(".json", f"_{iteration}.json")
     if exists(iter_marked_cache_dir):
