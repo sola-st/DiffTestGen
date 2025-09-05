@@ -7,6 +7,8 @@ from os import makedirs, rename
 import os
 
 max_iteration = 5
+# model_version = "gpt-4o-mini-2024-07-18"
+model_version = "gpt-5-mini-2025-08-07"
 pr_split_num = 1 # could be None, 1, 2, or 3
 
 with open(".target_project", "r") as f:
@@ -39,11 +41,11 @@ results_folder = join("data", "results")
 #     rename(results_folder, f"{results_folder}_backup")
 
 for iteration in range(max_iteration):
-    breakpoints_data_folder = join(results_folder, "breakpoint", f"iter_{iteration}")
+    breakpoints_data_folder = join(results_folder, "breakpoint", model_version, f"iter_{iteration}")
 
     # the default cache file setting form LLMCache
     # gpt-5-mini-2025-08-07, gpt-4o-mini-2024-07-18
-    cache_dir = join("data", "llm_cache", "gpt-5-mini-2025-08-07", "cache.json")
+    cache_dir = join("data", "llm_cache", model_version, "cache.json")
     # to resuse the cache
     iter_marked_cache_dir = cache_dir.replace(".json", f"_{iteration}.json")
     if exists(iter_marked_cache_dir):
@@ -52,16 +54,10 @@ for iteration in range(max_iteration):
     for config in config_versions:
         version_id = '_'.join(map(str, config))
         # add tasks about current target project to database
-        
-        # result = subprocess.run(
-        #         ["python", "-m", "testora.evaluation.PreparePRChunks", f"--prsplit={pr_split_num}"],
-        #         capture_output=True, text=True)
-        # pr_list = ast.literal_eval(result.stdout.rsplit("\n", 3)[-3].strip())
-
         subprocess.run(["python", "-m", "testora.evaluation.PreparePRChunks", f"--prs={pr_list}"])
 
         # run RegressionFinder
-        config_with_iter = config + [iteration]
+        config_with_iter = config + [iteration, model_version]
         subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config_with_iter}", f"--prs={pr_list}"])
         
         # store the breakpoint data seperately

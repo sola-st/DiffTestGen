@@ -66,6 +66,8 @@ def plot_coverages_deviation(coverages_pr_level, all_prs, title, result_pdf):
     
 def main():
     iterations = 5
+    # model_version = "gpt-4o-mini-2024-07-18"
+    model_version = "gpt-5-mini-2025-08-07"
     config_versions = [
         # [1, 0, 1, False] # note: set 'base' in line 110 to True
         [5, 8, 8, True]
@@ -89,7 +91,7 @@ def main():
             for pr in pr_list:
                 pr_runs = []
                 for iter in range(iterations):
-                    log_folder = join(results_folder, f"iter_{iter}", f"log_{version_id}", project)
+                    log_folder = join(results_folder, model_version, f"iter_{iter}", f"log_{version_id}", project)
                     log_file = None
                     for fname in os.listdir(log_folder):
                         if str(pr) in fname:
@@ -116,7 +118,7 @@ def main():
 
         # Plot standard deviation for each PR
         title = "Coverage Standard Deviation Across 5 Repetitions per PR"
-        result_pdf = join(results_folder, "table_and_plots", f"Coverage_stddev_per_pr.pdf")
+        result_pdf = join(results_folder, "table_and_plots", model_version, f"Coverage_stddev_per_pr.pdf")
         plot_coverages_deviation(coverages_pr_level, all_prs, title, result_pdf)
 
 if __name__=="__main__":

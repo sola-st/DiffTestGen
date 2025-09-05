@@ -43,6 +43,7 @@ for target_project in target_projects:
                 
                 config_message_tmp = info[0]["message"].replace("Configuration: ", "", 1)
                 config_message = ast.literal_eval(config_message_tmp)
+                model_version = config_message["model_version"] # to support each version with a separate folder
                 initial_prompt = config_message["initial_test_generation_prompt_version"]
                 feedback_prompt = config_message["feedback_test_generation_prompt_version"]
                 context = config_message["context_version"]
@@ -51,7 +52,7 @@ for target_project in target_projects:
                     version_id = f"{initial_prompt}_{feedback_prompt}_{context}_{whether_feedback}"
                     iteration = config_message["iteration"]
                     if f"{version_id}_{iteration}" in version_ids_with_iter:
-                        separated_results_folder = join(base_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
+                        separated_results_folder = join(base_folder, model_version, f"iter_{iteration}", f"log_{version_id}", target_project)
                         makedirs(separated_results_folder, exist_ok=True)
                         if not exists(join(separated_results_folder, file)):
                             shutil.copy2(log_file_path, separated_results_folder)

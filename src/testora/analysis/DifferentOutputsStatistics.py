@@ -141,6 +141,8 @@ class DifferentOutputsStatistics():
         results_folder = join("data", "results")
 
         iteration = 4
+        # model_version = "gpt-4o-mini-2024-07-18"
+        model_version = "gpt-5-mini-2025-08-07"
         # option 1: for all projects
         target_projects = ["scipy", "marshmallow", "pandas", "keras"]
 
@@ -167,7 +169,7 @@ class DifferentOutputsStatistics():
                 pr_list = [int(pr) for pr in prs]
                 
                 for pr in pr_list:
-                    log_folder = join(results_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_id}", target_project)
                     log_file_path = None
                     for fname in os.listdir(log_folder):
                         if str(pr) in fname:
@@ -221,7 +223,7 @@ class DifferentOutputsStatistics():
 
             to_write = [overall_str] + project_level + single_iteration
 
-            result_file = join(results_folder, "table_and_plots", f"Different_oputputs_statistics_{version_id}.json")
+            result_file = join(results_folder, "table_and_plots", model_version, f"Different_oputputs_statistics_{version_id}.json")
             with open(result_file, "w") as f:
                 json.dump(to_write, f, indent=4)
 

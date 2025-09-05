@@ -115,6 +115,8 @@ def plot_coverages_violin_deviation(cov_baseline, cov_our_approach, feedback_rou
 
 def main():
     iterations = 5
+    # model_version = "gpt-4o-mini-2024-07-18"
+    model_version = "gpt-5-mini-2025-08-07"
     config_versions = [
         # [5, 5, 5, False],
         # [5, 8, 8, False],
@@ -135,8 +137,8 @@ def main():
             all_data = [[] for _ in range(iterations)]
             for iter in range(iterations):
                 for project in target_projects:
-                    output_folder = join(results_folder, "table_and_plots", f"iter_{iter}", project)
-                    log_folder = join(results_folder, f"iter_{iter}", f"log_{version_id}", project)
+                    output_folder = join(results_folder, "table_and_plots", model_version, f"iter_{iter}", project)
+                    log_folder = join(results_folder, model_version, f"iter_{iter}", f"log_{version_id}", project)
                     makedirs(output_folder, exist_ok=True)
                     
                     if listdir(log_folder):
@@ -175,7 +177,7 @@ def main():
 
         # for the plot
         title = "Coverage Comparison between Testora and Our Approach"
-        result_pdf = join(results_folder, "table_and_plots", f"Comparison_round_based_deviation_{prompt_versions[1]}_iter{iterations}.pdf") 
+        result_pdf = join(results_folder, "table_and_plots", model_version, f"Comparison_round_based_deviation_{prompt_versions[1]}_iter{iterations}.pdf") 
         plot_coverages_violin_deviation([baseline_data[0]], our_approach_data, feedback_round_max, title, result_pdf)
 
 
