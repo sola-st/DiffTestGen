@@ -412,8 +412,16 @@ def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_a
     # clean tests, test_msg_pairs can be used to start another attmept if needed
     static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(static_err_fixed_tests)
 
+    fixed = len(static_err_fixed_tests) - len(test_msg_pairs)
     append_event(Event(pr_nb=pr.number,
-            message=f"Static error fixed {len(static_err_fixed_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+            message=f"Static error fixed {fixed}/{len(static_err_fixed_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+    
+    if test_msg_pairs:
+        for detail in test_msg_pairs:
+            test_idx, test_code, static_info = detail
+            append_event(LLMEvent(pr_nb=pr.number, 
+                    message=f"Failed to fix test #{test_idx}. Static error: {static_info}", 
+                    content=test_code))
     
     return static_err_fixed_tests
 

@@ -2,12 +2,12 @@
 
 from collections import Counter
 import json
-import os
+from os import listdir, makedirs
 from os.path import join
 from testora.prompts.RuntimeErrorsFixingPrompt import extract_error_type
 
 
-class ErrorFeedbackStatistics():
+class RuntimeErrorFeedbackStatistics():
     def __init__(self):
         self.overall_tests = 0
         self.overall_need_fix_tests = 0
@@ -53,7 +53,7 @@ class ErrorFeedbackStatistics():
                 msg = info_block["message"]
                 test_name = None
                 # e.g., "Generated 4 more tests. (4 tests before deduplication and cleaning)"
-                if 'before deduplication and cleaning' in msg:
+                if 'before deduplication and cleaning' in msg and msg.startswith("Generated"):
                     tests += int(msg.split(" ", 2)[1])
                 elif msg.startswith("Fix runtime errors"):
                     fix_attempts += 1
@@ -136,7 +136,9 @@ class ErrorFeedbackStatistics():
     def main(self):
         results_folder = join("data", "results")
 
-        iteration = 4
+        iteration = 0
+        # model_version = "gpt-4o-mini-2024-07-18"
+        model_version = "gpt-5-mini-2025-08-07"
         # option 1: for all projects
         target_projects = ["scipy", "marshmallow", "pandas", "keras"]
 
@@ -167,9 +169,9 @@ class ErrorFeedbackStatistics():
                 
                 for pr in pr_list:
                     # use a fixed order of the prs, could help when check across repetitions (iterations).
-                    log_folder = join(results_folder, f"iter_{iteration}", f"log_{version_id}", target_project)
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_id}", target_project)
                     log_file_path = None
-                    for fname in os.listdir(log_folder):
+                    for fname in listdir(log_folder):
                         if str(pr) in fname:
                             log_file_path = join(log_folder, fname)
                             break
@@ -209,8 +211,9 @@ class ErrorFeedbackStatistics():
             }
 
             to_write = [overall_str] + project_level + single_iteration
-
-            result_file = join(results_folder, "table_and_plots", f"Error_feedback_statistics_{version_id}.json")
+            parent_folder = join(results_folder, "table_and_plots", model_version)
+            makedirs(parent_folder, exist_ok=True)
+            result_file = join(parent_folder, f"runtime_error_feedback_statistics_{version_id}.json")
             with open(result_file, "w") as f:
                 json.dump(to_write, f, indent=4)
 
@@ -219,4 +222,4 @@ class ErrorFeedbackStatistics():
 
 
 if __name__ == "__main__":
-    ErrorFeedbackStatistics().main()
+    RuntimeErrorFeedbackStatistics().main()
