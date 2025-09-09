@@ -184,6 +184,15 @@ def is_crash(output):
         "error" in output.lower() or \
         "fail" in output.lower()
 
+def de_dup_tests_with_name(tests):
+    pure_test_code_list = []
+    tests_dedup = []
+    for test_code in tests:
+        pure_test_code = test_code.split("\n", 1)[1]
+        if pure_test_code not in pure_test_code_list:
+            pure_test_code_list.append(pure_test_code)
+            tests_dedup.append(test_code)
+    return tests_dedup
 
 def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, round=0, do_name_reformatting=True):
     raw_answer = model.query(prompt, nb_samples)
@@ -198,33 +207,59 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
             separate_raw_answer = llm.query(speparator_prompt)
             append_event(LLMEvent(pr_nb=pr.number, message="Separate raw answer", content="\n---(next sample)---".join(separate_raw_answer)))
             generated_tests = prompt.parse_answer(raw_answer)
+
+    nb_tests_before_dedup_and_cleaning = len(generated_tests)
+    if do_name_reformatting == False: # for the static error fixed tests
+        # # de-dup tests, 
+        # # not using static_err_fixed_tests_dedup here to avoid mismatching, 
+        # # e.g., need 5 fixed but 3 after dedup, will have 2 tests left in the overall generated tests
+        # # de-dup later when insert this tests back to the overall generated tests.
+        static_err_fixed_tests_dedup = de_dup_tests_with_name(generated_tests)
+
+        # clean tests, test_msg_pairs can be used to start another attmept if needed
+        static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
+
+        fixed = len(static_err_fixed_tests) - len(test_msg_pairs)
+        append_event(Event(pr_nb=pr.number,
+                message=f"Static error fixed {fixed}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+
+        return static_err_fixed_tests, test_msg_pairs # static_err_fixed_tests may duplicate
         
-    name_formatted_generated_tests = []
-    if do_name_reformatting == True:
-        for idx, test in enumerate(generated_tests):
-            # for test:
-            #  * normal: # Example 1: <code>
-            #  * outliers: for projects that need further adjustments for import lines.
-            #       e.g., import pandas as pd\nimport numpy as np\nimport pyarrow as pa\n\n# Example 1: <code>
-            #       e.g., import pandas as pd\nimport numpy as np  # Fix: Importing numpy\n\n# Example 2: <code>
-            
-            # 1. modification to put all the example code (in the above formats) in the same format.
-            test_lines = test.splitlines()
-            for line in test_lines:
-                if "# Example" in line:
-                    # get the newly formatted line
-                    test = line + "\n" + test.replace(f"{line}\n", "")
-                    break
-            
-            # 2. process to get the newly named tests
-            test_name, test_code = test.split(":", 1)
-            marked_name = test_name.replace("# Example", f"# Round {round} Example", 1) + f" ({diff_version}):"
-            formatted_test = f"{marked_name}{test_code}"
-            append_event(LLMEvent(pr_nb=pr.number, message=f"Generated test {idx+1}, round {round} ({diff_version})", content=formatted_test))
-            name_formatted_generated_tests.append(formatted_test)
-        return name_formatted_generated_tests
+    # here works for generated_tests with pure generated code (e.g., generate_tests, generate_refinment_tests), 
+    # also solve the example name non-consective issue.
+    # deduplication and static error check first (above), then go to the test name formatting (below).
+    # de-dup tests
+    generated_tests = list(dict.fromkeys(generated_tests))
+
+    # clean tests
+    generated_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
+
+    append_event(Event(pr_nb=pr.number,
+            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
     
-    return generated_tests
+    name_formatted_generated_tests = []
+    for idx, test in enumerate(generated_tests):
+        # for test:
+        #  * normal: # Example 1: <code>
+        #  * outliers: for projects that need further adjustments for import lines.
+        #       e.g., import pandas as pd\nimport numpy as np\nimport pyarrow as pa\n\n# Example 1: <code>
+        #       e.g., import pandas as pd\nimport numpy as np  # Fix: Importing numpy\n\n# Example 2: <code>
+        
+        # 1. modification to put all the example code (in the above formats) in the same format.
+        test_lines = test.splitlines()
+        for line in test_lines:
+            if "# Example" in line:
+                # get the newly formatted line
+                test = line + "\n" + test.replace(f"{line}\n", "")
+                break
+        
+        # 2. process to get the newly named tests
+        test_name, test_code = test.split(":", 1)
+        marked_name = test_name.replace("# Example", f"# Round {round} Example", 1) + f" ({diff_version}):"
+        formatted_test = f"{marked_name}{test_code}"
+        append_event(LLMEvent(pr_nb=pr.number, message=f"Generated test {idx+1}, round {round} ({diff_version})", content=formatted_test))
+        name_formatted_generated_tests.append(formatted_test)
+    return name_formatted_generated_tests, test_msg_pairs
 
 
 def remove_tests_with_private_call(tests):
@@ -247,6 +282,9 @@ def generate_tests(pr, github_repo, changed_functions):
     pr.get_filtered_diff() # this adds filtered_diff info to pr.filtered_diff 
 
     all_tests = []
+    test_msg_pairs_full_diff = []
+    test_msg_pairs_filtered_diff = []
+
     full_diff_len_fit = False
     filtered_diff_len_nonequal_fit = False
 
@@ -260,10 +298,8 @@ def generate_tests(pr, github_repo, changed_functions):
         else: # e.g., other prompts, and testora
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
         
-        all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff"))
-
-        # full diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, "full_diff", nb_samples=10))
+        generated_tests, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff")
+        all_tests.extend(generated_tests)
 
     if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
         filtered_diff_len_nonequal_fit = True
@@ -275,23 +311,11 @@ def generate_tests(pr, github_repo, changed_functions):
         else:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         
-        all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff"))
-
-        # filtered diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, gpt35, "filtered_diff", nb_samples=10))
-
-    # de-dup tests
-    nb_tests_before_dedup_and_cleaning = len(all_tests)
-    all_tests = list(dict.fromkeys(all_tests))
-
-    # clean tests
-    all_tests, test_msg_pairs = remove_tests_with_private_call(all_tests)
-
-    append_event(Event(pr_nb=pr.number,
-            message=f"Generated {len(all_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+        generated_tests, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff")
+        all_tests.extend(generated_tests)
     
     # also return the bool values to not check multiple times in the feedback rounds
-    return all_tests, test_msg_pairs, full_diff_len_fit, filtered_diff_len_nonequal_fit 
+    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit 
 
 
 def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len_fit, filtered_diff_len_nonequal_fit,
@@ -359,10 +383,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
         prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
                 all_uncovered_modified_stmts_info, old_context, new_context)
         
-        all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", round=round))
-
-        # full diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, gpt35, "full_diff", nb_samples=10, round=round))
+        generated_test, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", round=round)
+        all_tests.extend(generated_test)
 
     if filtered_diff_len_nonequal_fit == True:
         # filtered diff with GPT4
@@ -374,21 +396,10 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
         prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
                 all_uncovered_modified_stmts_info, old_context, new_context)
         
-        all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", round=round))
+        generated_test, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", round=round)
+        all_tests.extend(generated_test)
 
-        # filtered diff with GPT3.5
-        # all_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, gpt35, "filtered_diff", nb_samples=10, round=round))
-
-    # de-dup tests
-    nb_tests_before_dedup_and_cleaning = len(all_tests)
-    all_tests = list(dict.fromkeys(all_tests))
-
-    # clean tests
-    all_tests, test_msg_pairs = remove_tests_with_private_call(all_tests)
-
-    append_event(Event(pr_nb=pr.number,
-            message=f"Generated {len(all_tests)} more tests. ({nb_tests_before_dedup_and_cleaning} tests before deduplication and cleaning)"))
-    return all_tests, test_msg_pairs
+    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff
 
 def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff):
     # TODO also to add test function bodies?
@@ -398,30 +409,24 @@ def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_a
         # it will not change with the same PR. the initial round already checked the len. -> len(pr.full_diff.split("\n")) <= 200:
         prompt_full_diff = ParseErrorPrivateCallFixingPrompt(github_repo.name, changed_functions, pr.full_diff, 
                 pr.old_context, pr.new_context, code_and_err_msgs_full_diff)
-        static_err_fixed_tests.extend(generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", do_name_reformatting=False))
+        generated_test, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", do_name_reformatting=False)
+        static_err_fixed_tests.extend(generated_test)
+
+        for detail in test_msg_pairs_full_diff:
+            test_idx, test_code, static_info = detail
+            append_event(LLMEvent(pr_nb=pr.number, 
+                    message=f"Failed to fix test #{test_idx} (full_diff). Static error: {static_info}", content=test_code))
 
     if code_and_err_msgs_filtered_diff:
         prompt_filtered_diff = ParseErrorPrivateCallFixingPrompt(github_repo.name, changed_functions, pr.filtered_diff, 
                 pr.old_context, pr.new_context, code_and_err_msgs_filtered_diff)
-        static_err_fixed_tests.extend(generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", do_name_reformatting=False))
+        generated_test, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", do_name_reformatting=False)
+        static_err_fixed_tests.extend(generated_test)
 
-    # de-dup tests
-    nb_tests_before_dedup_and_cleaning = len(static_err_fixed_tests)
-    static_err_fixed_tests = list(dict.fromkeys(static_err_fixed_tests))
-
-    # clean tests, test_msg_pairs can be used to start another attmept if needed
-    static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(static_err_fixed_tests)
-
-    fixed = len(static_err_fixed_tests) - len(test_msg_pairs)
-    append_event(Event(pr_nb=pr.number,
-            message=f"Static error fixed {fixed}/{len(static_err_fixed_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
-    
-    if test_msg_pairs:
-        for detail in test_msg_pairs:
+        for detail in test_msg_pairs_filtered_diff:
             test_idx, test_code, static_info = detail
             append_event(LLMEvent(pr_nb=pr.number, 
-                    message=f"Failed to fix test #{test_idx}. Static error: {static_info}", 
-                    content=test_code))
+                    message=f"Failed to fix test #{test_idx} (filtered_diff). Static error: {static_info}", content=test_code))
     
     return static_err_fixed_tests
 
@@ -594,10 +599,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         return
 
     # generate tests via LLM
-    generated_tests, test_msg_pairs, full_diff_len_fit, filtered_diff_len_nonequal_fit = generate_tests(pr, github_repo, changed_functions)
+    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, \
+            full_diff_len_fit, filtered_diff_len_nonequal_fit = generate_tests(pr, github_repo, changed_functions)
     old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, \
-                    generated_tests, test_msg_pairs, full_diff_len_fit, filtered_diff_len_nonequal_fit)
+                    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit)
     if all_covered_modified_stmts_old == None:
         return
 
@@ -703,8 +709,8 @@ def check_union_coverage_full_cover_exist(missed_stmts:dict, covered_stmts:dict)
 
     return updated_missed_stmts, uncover_exist
 
-def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, test_msg_pairs,
-            full_diff_len_fit, filtered_diff_len_nonequal_fit,
+def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
+            test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit,
             old_executions:list=[], new_executions:list=[], all_covered_modified_stmts_old:list=[], all_covered_modified_stmts_new:list=[], 
             round=0, old_missed:dict={}, new_missed:dict={}):
     ''' 
@@ -723,57 +729,31 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             return None, None, None, None
 
     # inner feedback about parse error and 'private' calls
-    if test_msg_pairs and Config.fix_static_error == True:
+    if Config.fix_static_error == True and round == 0: # TODO let it work for only R0
         code_and_err_msgs_full_diff = ""
         code_and_err_msgs_filtered_diff = ""
         test_idx_full_diff = []
         test_idx_filtered_diff = []
 
-        # generated_tests_num = len(generated_tests) # ** Multiple -- PromptV1**
-        # TODO only running no generated_tests, or if any test_msg_pairs exists
-        for pair in test_msg_pairs:
+        for pair in test_msg_pairs_full_diff:
             test_idx, test_code, static_error_msg = pair
-            # TODO multiple attempts VS. only once (single)
-            # V1 and V2
-            # # ** Multiple -- PromptV1**
-            # attempt = 0
-            # while static_error_msg:
-            #     if attempt >= Config.error_feedback_max:
-            #         # max attempt to fix the test, but still fails on both versions of the code
-            #         append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Max attempt ({Config.error_feedback_max}) reaches."))
-            #         break
+            code_and_err_msgs_full_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
+            test_idx_full_diff.append(test_idx)
 
-            #     prompt = ParseErrorPrivateCallFixingPrompt(test_code, static_error_msg)
-            #     raw_answer = llm.query(prompt, no_cache=True)[0] # no_cache set to true, allow the model to get different answers with the same error message.
-            #     append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
-            #     refined_test = prompt.parse_answer(raw_answer)
-            #     attempt += 1
-            #     message = f"Refine code parsing and private call, attempt {attempt} (with {generated_tests_num} kept tests). Msg: {static_error_msg}"
-            #     append_event(LLMEvent(pr_nb=pr.number, message=message, content=refined_test)) # a mark to show which test
-                
-            #     # another round of static check
-            #     __, static_error_msg = has_private_accesses_or_fails_to_parse(refined_test)
+        for pair in test_msg_pairs_filtered_diff:
+            code_and_err_msgs_filtered_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
+            test_idx_filtered_diff.append(test_idx)
 
-            # append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after attempt {attempt}. Static errors fixed."))
-            # generated_tests.insert(test_idx, refined_test)
-            # # ** Multiple -- PromptV1 Done**
-
-            # ** Single -- PromptV2** part 1
-            if "(full_diff)" in test_code:
-                code_and_err_msgs_full_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
-                test_idx_full_diff.append(test_idx)
-            elif "(filtered_diff)" in test_code:
-                code_and_err_msgs_filtered_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
-                test_idx_filtered_diff.append(test_idx)
-            # else: tests with name issue, ideally not exists.
-
-        # ** Single -- PromptV2** part 2
+        # ** Single -- PromptV2**
         if test_idx_full_diff or test_idx_filtered_diff:
-            static_err_fixed_tests = refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
+            static_err_fixed_tests_may_dup = refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
             # go through to update the tests
             append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends."))
-            for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests):
+            for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests_may_dup):
                 generated_tests.insert(test_idx, test)
+
+            # overall dedup, to remove the duplicates in remianing generated tests and static_err_fixed_tests_may_dup
+            generated_tests = de_dup_tests_with_name(generated_tests)
 
     if cloned_repo_manager.repo_name == "pandas":
         # make sure the tests import pandas
@@ -951,17 +931,17 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             
             # feedback loop to get new tests that are expected to cover more modified lines.
             if is_coverage_changed == True: # and round < Config.max_round:
-                round+=1
                 deduplicated_len = len(all_uncovered_modified_stmts_info["old"])
                 if deduplicated_len > 0:
+                    round+=1
                     details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"
                     append_event(CoverageEvent(pr_nb=pr.number, 
                             message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
                     
                     refined_tests, test_msg_pairs = generate_replacement_tests(pr, github_repo, changed_functions, 
                             full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_for_further_needs)
-                    run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, test_msg_pairs,
-                            full_diff_len_fit, filtered_diff_len_nonequal_fit,
+                    run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, test_msg_pairs_full_diff,
+                            test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit,
                             old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
                 else:
                     append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, union coverage reaches 100%."))
