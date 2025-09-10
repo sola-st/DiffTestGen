@@ -372,6 +372,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
             all_uncovered_modified_stmts_info += f"Information {i+1}:\nOld:\n{old_uncovered_str}New:\n{new_uncovered_str}"
 
     all_tests = []
+    test_msg_pairs_full_diff = []
+    test_msg_pairs_filtered_diff = []
 
     if full_diff_len_fit == True:
         # full diff with GPT4
