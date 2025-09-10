@@ -743,6 +743,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             test_idx_full_diff.append(test_idx)
 
         for pair in test_msg_pairs_filtered_diff:
+            test_idx, test_code, static_error_msg = pair
             code_and_err_msgs_filtered_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
             test_idx_filtered_diff.append(test_idx)
 
