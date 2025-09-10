@@ -941,7 +941,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     append_event(CoverageEvent(pr_nb=pr.number, 
                             message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
                     
-                    refined_tests, test_msg_pairs = generate_replacement_tests(pr, github_repo, changed_functions, 
+                    # here test_msg_pairs_full_diff, test_msg_pairs_filtered_diff only used for round 0
+                    refined_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff = generate_replacement_tests(pr, github_repo, changed_functions, 
                             full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_for_further_needs)
                     run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, test_msg_pairs_full_diff,
                             test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit,
