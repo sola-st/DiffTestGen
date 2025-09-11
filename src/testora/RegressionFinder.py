@@ -791,6 +791,12 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     execute_tests_on_commit(cloned_repo_manager, pr, old_executions_cur_round, pr.pre_commit, "old")
     execute_tests_on_commit(cloned_repo_manager, pr, new_executions_cur_round, pr.post_commit, "new")
 
+    # early stop for PRs with no executable modified lines
+    if ("(0/0)" in old_executions_cur_round[0].coverage_percentage) and ("(0/0)" in new_executions_cur_round[0].coverage_percentage):
+        append_event(Event(pr_nb=pr.number, message="Ignoring because no executable modified code lines/statements."))
+        # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
+        return None, None, None, None
+
     if Config.use_error_feedabck == True:
         '''
         Two options for giving the feedback:
