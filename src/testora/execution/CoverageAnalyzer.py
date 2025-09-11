@@ -29,8 +29,10 @@ def analyze_coverage(coverage_report_file, coverage_files, version, \
     all_covered_exec_modified_stmts = {}
     all_uncovered_exec_modified_stmts = {}
     
+    # now the coverage_files should has no .pyx files
     for file in coverage_files:
         relative_file_path = file.split("/", 3)[-1]
+        # [Cython issue] file should be .pyx file and not parsable via python chekcing
         analysis = cov.analysis2(file)
         # excluded_stmts means the statements that were specified to be excluded. 
         # uncovered_stmts: [30, 31], uncovered_stmts_str: 30-31

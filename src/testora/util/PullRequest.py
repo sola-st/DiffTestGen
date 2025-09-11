@@ -87,7 +87,7 @@ class PullRequest:
         module_name = self.cloned_repo_manager.module_name
 
         # Python files only
-        self.modified_python_files = [f for f in self.patch.modified_files if f.path.endswith(".py") or f.path.endswith(".pyx")]
+        self.modified_python_files = [f for f in self.patch.modified_files if f.path.endswith(".py")] # [cython issue Sept.11] or f.path.endswith(".pyx")]
         self.non_test_modified_python_files = [f.path for f in self.modified_python_files 
                 if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
 

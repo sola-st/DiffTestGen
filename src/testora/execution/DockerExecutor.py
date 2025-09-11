@@ -14,6 +14,7 @@ class DockerExecutor:
         self.pr = pr
         self.container = client.containers.get(container_name)
         self.container.start()
+        self.project_name = project_name
 
         # adapt paths of coverage files to the container's file system
         self.coverage_files = [f"/home/{project_name}/{f}" for f in coverage_files]
@@ -55,7 +56,7 @@ class DockerExecutor:
         self.container.exec_run("rm -rf /tmp/Testora")
         self.container.exec_run("mkdir /tmp/Testora")
 
-        if len(code.splitlines()) == 1:
+        if len(code.splitlines()) == 1 and self.project_name == "keras":
             self.container.exec_run('/bin/sh -c "cd /home/keras && pip install -e ./"')
 
         self.copy_code_to_container(code, "/tmp/Testora/Testora_test_code.py")
