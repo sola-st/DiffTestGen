@@ -209,6 +209,9 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
             generated_tests = prompt.parse_answer(raw_answer)
 
     nb_tests_before_dedup_and_cleaning = len(generated_tests)
+    if nb_tests_before_dedup_and_cleaning == 0: # model gives nothing
+        return None, None
+    
     if do_name_reformatting == False: # for the static error fixed tests
         # # de-dup tests, 
         # # not using static_err_fixed_tests_dedup here to avoid mismatching, 
@@ -235,7 +238,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     generated_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
 
     append_event(Event(pr_nb=pr.number,
-            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
     
     name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
@@ -724,14 +727,19 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     Initial generation is marked as round 0, and feedback loops marks start at round 1.
     '''
 
-    if not generated_tests:
-        if Config.fix_static_error == False or (round != 0):
+    if generate_tests == None:
+        append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round {round}"))
+        # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
+        return None, None, None, None
+    
+    elif generated_tests == []:
+        if Config.fix_static_error == False:
             append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests were generated. #Round {round}"))
             # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
             return None, None, None, None
 
     # inner feedback about parse error and 'private' calls
-    if Config.fix_static_error == True and round == 0: # TODO let it work for only R0
+    if Config.fix_static_error == True and round == 0:
         code_and_err_msgs_full_diff = ""
         code_and_err_msgs_filtered_diff = ""
         test_idx_full_diff = []
