@@ -725,8 +725,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     '''
 
     if not generated_tests:
-        if Config.fix_static_error == False:
-            append_event(Event(pr_nb=pr.number, message="Ignoring because no tests were generated"))
+        if Config.fix_static_error == False or (round != 0):
+            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests were generated. #Round {round}"))
             # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
             return None, None, None, None
 
