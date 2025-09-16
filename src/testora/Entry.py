@@ -25,7 +25,7 @@ with open(pr_file, "r") as f:
     prs = f.readlines()
 pr_list = [int(pr) for pr in prs]
 
-'''For a single congif: 
+'''For a single config: 
 [initial_prompt_version, feedback_prompt_version, context_version, use_error_feedabck, fix_static_error, use_existing_tests]
 * existing developer-written tests
     "none": do not make any extra effort about developer-written tests,

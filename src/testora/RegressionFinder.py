@@ -210,7 +210,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
 
     nb_tests_before_dedup_and_cleaning = len(generated_tests)
     if nb_tests_before_dedup_and_cleaning == 0: # model gives nothing
-        return None, None
+        return {}, []
     
     if do_name_reformatting == False: # for the static error fixed tests
         # # de-dup tests, 
@@ -287,6 +287,8 @@ def generate_tests(pr, github_repo, changed_functions):
     all_tests = []
     test_msg_pairs_full_diff = []
     test_msg_pairs_filtered_diff = []
+    empty_answer_full_diff = False
+    empty_answer_filtered_diff = False
 
     full_diff_len_fit = False
     filtered_diff_len_nonequal_fit = False
@@ -302,7 +304,10 @@ def generate_tests(pr, github_repo, changed_functions):
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
         
         generated_tests, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff")
-        all_tests.extend(generated_tests)
+        if type(generate_tests) == dict:
+            empty_answer_full_diff = True
+        else:
+            all_tests.extend(generated_tests)
 
     if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
         filtered_diff_len_nonequal_fit = True
@@ -315,10 +320,14 @@ def generate_tests(pr, github_repo, changed_functions):
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         
         generated_tests, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff")
-        all_tests.extend(generated_tests)
+        if type(generate_tests) == dict:
+            empty_answer_filtered_diff = True
+        else:
+            all_tests.extend(generated_tests)
     
     # also return the bool values to not check multiple times in the feedback rounds
-    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit 
+    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
+        empty_answer_full_diff, empty_answer_filtered_diff
 
 
 def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len_fit, filtered_diff_len_nonequal_fit,
@@ -604,8 +613,14 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         return
 
     # generate tests via LLM
-    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, \
-            full_diff_len_fit, filtered_diff_len_nonequal_fit = generate_tests(pr, github_repo, changed_functions)
+    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
+            empty_answer_full_diff, empty_answer_filtered_diff = generate_tests(pr, github_repo, changed_functions)
+    
+    if generated_tests:
+        if empty_answer_full_diff == True or empty_answer_filtered_diff == True:
+            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round {round}"))
+            return 
+    
     old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, \
                     generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit)
@@ -727,14 +742,9 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     Initial generation is marked as round 0, and feedback loops marks start at round 1.
     '''
 
-    if generate_tests == None:
-        append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round {round}"))
-        # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
-        return None, None, None, None
-    
-    elif generated_tests == []:
+    if not generated_tests:
         if Config.fix_static_error == False:
-            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests were generated. #Round {round}"))
+            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (after deduplication and clean) were generated. #Round {round}"))
             # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
             return None, None, None, None
 
@@ -765,7 +775,13 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
             # overall dedup, to remove the duplicates in remianing generated tests and static_err_fixed_tests_may_dup
             generated_tests = de_dup_tests_with_name(generated_tests)
-
+    
+    if not generated_tests:
+        # if after the static error fix, there is still no generated tests, do not need to run the following
+        append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (still no after static fix) were generated. #Round {round}"))
+        # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
+        return None, None, None, None
+    
     if cloned_repo_manager.repo_name == "pandas":
         # make sure the tests import pandas
         updated_tests = []
@@ -791,7 +807,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             else:
                 fixed_tests.append(test)
         generated_tests = fixed_tests
-
+    
     # execute tests
     old_executions_cur_round = [TestExecution(t) for t in generated_tests]
     new_executions_cur_round = [TestExecution(t) for t in generated_tests]
@@ -876,7 +892,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         for idx, old_execution, new_execution in zip(error_fixed_tests_indices, fixed_executions_old, fixed_executions_new):
             old_executions_cur_round[idx] = old_execution
             new_executions_cur_round[idx] = new_execution
-            
+
     old_executions.extend(old_executions_cur_round) # get the executions for all the rounds
     new_executions.extend(new_executions_cur_round)
     assert None not in [e.output for e in old_executions_cur_round]
