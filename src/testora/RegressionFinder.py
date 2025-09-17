@@ -222,7 +222,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         # clean tests, test_msg_pairs can be used to start another attmept if needed
         static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
 
-        fixed = len(static_err_fixed_tests) - len(test_msg_pairs)
+        fixed = max(len(static_err_fixed_tests) - len(test_msg_pairs), 0)
         append_event(Event(pr_nb=pr.number,
                 message=f"Static error fixed {fixed}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
 
@@ -416,7 +416,6 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
     return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff
 
 def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff):
-    # TODO also to add test function bodies?
     static_err_fixed_tests = []
 
     if code_and_err_msgs_full_diff:
@@ -428,6 +427,7 @@ def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_a
 
         for detail in test_msg_pairs_full_diff:
             test_idx, test_code, static_info = detail
+            # based on the given check list, (refined list-based)
             append_event(LLMEvent(pr_nb=pr.number, 
                     message=f"Failed to fix test #{test_idx} (full_diff). Static error: {static_info}", content=test_code))
 
@@ -756,26 +756,29 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     if Config.fix_static_error == True and round == 0:
         code_and_err_msgs_full_diff = ""
         code_and_err_msgs_filtered_diff = ""
-        test_idx_full_diff = []
-        test_idx_filtered_diff = []
+        # TODO to totally clear?
+        # test_idx_full_diff = []
+        # test_idx_filtered_diff = []
 
         for pair in test_msg_pairs_full_diff:
             test_idx, test_code, static_error_msg = pair
             code_and_err_msgs_full_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
-            test_idx_full_diff.append(test_idx)
+            # test_idx_full_diff.append(test_idx)
 
         for pair in test_msg_pairs_filtered_diff:
             test_idx, test_code, static_error_msg = pair
             code_and_err_msgs_filtered_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
-            test_idx_filtered_diff.append(test_idx)
+            # test_idx_filtered_diff.append(test_idx)
 
         # ** Single -- PromptV2**
-        if test_idx_full_diff or test_idx_filtered_diff:
+        if test_msg_pairs_full_diff or test_msg_pairs_filtered_diff:
             static_err_fixed_tests_may_dup = refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
             # go through to update the tests
             append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends."))
-            for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests_may_dup):
-                generated_tests.insert(test_idx, test)
+            # # the indices does not match
+            # for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests_may_dup):
+            #     generated_tests.insert(test_idx, test)
+            generated_tests.extend(static_err_fixed_tests_may_dup)
 
             # overall dedup, to remove the duplicates in remianing generated tests and static_err_fixed_tests_may_dup
             generated_tests = de_dup_tests_with_name(generated_tests)

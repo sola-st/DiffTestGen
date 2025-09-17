@@ -26,9 +26,12 @@ def compute_line_distance(test_executions: list, files_to_union_uncovers: dict):
                 if file in files_with_uncovered:
                     uncovered_nums = files_to_union_uncovers[file]
                     missing_in_cur_test = uncovered_nums - covered_nums
-                    for b in missing_in_cur_test:
-                        nearest_distance = min(abs(b - a) for a in covered_nums)
-                        mad_execution_level.append(nearest_distance)
+                    if missing_in_cur_test:
+                        for b in missing_in_cur_test:
+                            nearest_distance = min(abs(b - a) for a in covered_nums)
+                            mad_execution_level.append(nearest_distance)
+                    else:
+                        mad_execution_level.append(0)
                 # else: # all lines in this file are covered by this test
 
         mad_distances.append(mad_execution_level)
@@ -105,7 +108,7 @@ def filter_tests_by_line_distance(old_and_new_executions: dict, prompt_base: int
 
         if is_unique == False:
             # pick the test with shortest dist list    
-            # the shortor the dist list, the less lines the test missed
+            # the shorter the dist list, the less lines the test missed
             pre_remains = [overall_dist_lists[test_idx] for test_idx in unique_check]
             shortest = min([len(dists) for dists in pre_remains])
             unique_check = [test_idx for test_idx, dists in enumerate(overall_dist_lists) if len(dists) == shortest]
