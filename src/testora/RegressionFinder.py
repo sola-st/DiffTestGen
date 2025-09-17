@@ -557,6 +557,10 @@ def select_expected_behavior(project_name, pr, old_execution, new_execution, doc
 def check_pr(github_repo, cloned_repo_manager, pr):
     # ignore if too few or too many files changed
     # nb_modified_code_files = len(pr.non_test_modified_python_files)
+    if len(pr.non_test_modified_python_files) == 0: # related to 'code_change_pl = "all"' in Config file
+        append_event(Event(pr_nb=pr.github_pr.number, message="Ignoring because no non-test python files were modified"))
+        return
+    
     nb_modified_code_files = len(pr.non_test_modified_code_files)
     if nb_modified_code_files == 0:
         append_event(Event(pr_nb=pr.github_pr.number, message="Ignoring because no non-test code files were modified"))
