@@ -444,22 +444,25 @@ def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_a
     
     return static_err_fixed_tests
 
-def validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution):
-    assert (old_execution.output is not None)
-    assert (new_execution.output is not None)
+def validate_output_difference(cloned_repo_manager, pr, old_executions, new_executions):
+    difference_found_list = []
+    old_execution_repeated = [TestExecution(old_exec.code) for old_exec in old_executions]
+    new_execution_repeated = [TestExecution(new_exec.code) for new_exec in new_executions]
 
     # re-execute test on old and new version and ignore flaky differences
-    # for _ in range(len(new_execution)): # H: default to 1?
-    old_execution_repeated = TestExecution(old_execution.code)
-    execute_tests_on_commit(cloned_repo_manager, pr, [old_execution_repeated], pr.pre_commit, "old_flaky")
-    new_execution_repeated = TestExecution(new_execution.code)
-    execute_tests_on_commit(cloned_repo_manager, pr, [new_execution_repeated], pr.post_commit, "new_flaky")
-    if old_execution.output != old_execution_repeated.output:
-        return False
-    if new_execution.output != new_execution_repeated.output:
-        return False
-    return True
+    execute_tests_on_commit(cloned_repo_manager, pr, old_execution_repeated, pr.pre_commit, "old_flaky")
+    execute_tests_on_commit(cloned_repo_manager, pr, new_execution_repeated, pr.post_commit, "new_flaky")
 
+    for old_execution, new_execution, new_execution, new_execution_repeated in zip(old_executions, new_executions, old_execution_repeated, new_execution_repeated):
+        if old_execution.output != new_execution.output:
+            difference_found_list.append(False)
+            continue
+        if new_execution.output != new_execution_repeated.output:
+            difference_found_list.append(False)
+            continue
+        difference_found_list.append(True)
+
+    return difference_found_list
 
 def reduce_test(cloned_repo_manager, pr, old_execution, new_execution):
     assert (old_execution.code == new_execution.code)
@@ -633,18 +636,19 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
     # analyze behavior of executions
     # TODO add covered lines to show which lines introduce the behavioral differences.
+    
+    append_event(Event(pr_nb=pr.number, message=f"Check differences for {len(old_executions)} pairs of executions."))
 
-    # to separate the test genration and classification phase, here we store the breakpoint data.
-    old_executions_differ_relevant = []
-    new_executions_differ_relevant = []
+    # to compile the dev only once for all flaky tests
+    old_executions_to_flaky = []
+    new_executions_to_flaky = []
 
-    for (old_execution, new_execution, old_covered, new_covered) in zip(
-            old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new):
+    # step 1: iter-through to get "both failed" and the xxx_to_flaky executions
+    for (old_execution, new_execution, old_covered, new_covered) in zip(old_executions, new_executions):
+            #, all_covered_modified_stmts_old, all_covered_modified_stmts_new):
         assert old_execution.output is not None
         assert new_execution.output is not None
 
-        # check for behavioral differences
-        difference_found = old_execution.output != new_execution.output
         # if is_crash(old_execution.output) and is_crash(new_execution.output):
         if check_whether_error_exist(old_execution.code, old_execution.output) and check_whether_error_exist(new_execution.code, new_execution.output):
             # ignore differences if both tests crash
@@ -653,13 +657,22 @@ def check_pr(github_repo, cloned_repo_manager, pr):
                     test_code=old_execution.code, old_output=old_execution.output,
                     new_output=new_execution.output))
             continue
-        if difference_found:
-            # double-check differences by re-executing the tests
-            difference_found_again = validate_output_difference(cloned_repo_manager, pr, old_execution, new_execution)
-            if not difference_found_again:
-                difference_found = False
 
-        if not difference_found:
+        # check for behavioral differences
+        difference_found = old_execution.output != new_execution.output
+        if difference_found:
+            old_executions_to_flaky.append(old_execution)
+            new_executions_to_flaky.append(new_execution)
+
+    # to separate the test genration and classification phase, here we store the breakpoint data.
+    old_executions_differ_relevant = []
+    new_executions_differ_relevant = []
+    
+    # step 2: to handle the xxx_to_flaky executions
+    # double-check differences by re-executing the tests
+    difference_found_again_list = validate_output_difference(cloned_repo_manager, pr, old_executions_to_flaky, new_executions_to_flaky)
+    for difference_found_again in difference_found_again_list:
+        if difference_found_again == False:
             append_event(ComparisonEvent(pr_nb=pr.number, message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
                     test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
             continue
