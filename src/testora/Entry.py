@@ -15,9 +15,9 @@ with open(".target_project", "r") as f:
     target_project = f.read().strip()
     
 # pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
-# 10 + marshmallow 55, keras 150, 
-# 0 + pandas 140, scipy 142
-pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset55.txt")
+# marshmallow 53, keras 149, 
+# pandas 132, scipy 136
+pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset53.txt")
 if pr_split_num:
     pr_file = pr_file.replace(".txt", f"_{pr_split_num}.txt")
 
