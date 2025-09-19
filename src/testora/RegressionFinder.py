@@ -446,15 +446,15 @@ def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_a
 
 def validate_output_difference(cloned_repo_manager, pr, old_executions, new_executions):
     difference_found_list = []
-    old_execution_repeated = [TestExecution(old_exec.code) for old_exec in old_executions]
-    new_execution_repeated = [TestExecution(new_exec.code) for new_exec in new_executions]
+    old_executions_repeated = [TestExecution(old_exec.code) for old_exec in old_executions]
+    new_executions_repeated = [TestExecution(new_exec.code) for new_exec in new_executions]
 
     # re-execute test on old and new version and ignore flaky differences
-    execute_tests_on_commit(cloned_repo_manager, pr, old_execution_repeated, pr.pre_commit, "old_flaky")
-    execute_tests_on_commit(cloned_repo_manager, pr, new_execution_repeated, pr.post_commit, "new_flaky")
+    execute_tests_on_commit(cloned_repo_manager, pr, old_executions_repeated, pr.pre_commit, "old_flaky")
+    execute_tests_on_commit(cloned_repo_manager, pr, new_executions_repeated, pr.post_commit, "new_flaky")
 
-    for old_execution, new_execution, new_execution, new_execution_repeated in zip(old_executions, new_executions, old_execution_repeated, new_execution_repeated):
-        if old_execution.output != new_execution.output:
+    for old_execution, new_execution, old_execution_repeated, new_execution_repeated in zip(old_executions, new_executions, old_executions_repeated, new_executions_repeated):
+        if old_execution.output != old_execution_repeated.output:
             difference_found_list.append(False)
             continue
         if new_execution.output != new_execution_repeated.output:
@@ -645,7 +645,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     flaky_indices = []
 
     # step 1: iter-through to get "both failed" and the xxx_to_flaky executions
-    for i, old_execution, new_execution, old_covered, new_covered in enumerate(
+    for i, (old_execution, new_execution, old_covered, new_covered) in enumerate(
             zip(old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new)):
         assert old_execution.output is not None
         assert new_execution.output is not None
@@ -665,6 +665,10 @@ def check_pr(github_repo, cloned_repo_manager, pr):
             old_executions_to_flaky.append(old_execution)
             new_executions_to_flaky.append(new_execution)
             flaky_indices.append(i)
+        else:
+            append_event(ComparisonEvent(pr_nb=pr.number, 
+                    message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+                    test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
 
     # to separate the test genration and classification phase, here we store the breakpoint data.
     old_executions_differ_relevant = []
