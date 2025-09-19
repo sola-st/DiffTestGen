@@ -4,7 +4,7 @@ import os
 import re
 
 def analyze_single_pr(info):
-    nb_test_generated_patterns = [r"^Generated (\d+) tests", r"^Generated (\d+) more tests"]
+    nb_test_generated_patterns = [r"^Generated (\d+) tests", r"^Generated (\d+) more tests", r"Static error fixed (\d+)/"]
     tests_num = 0
     both_failed = 0
     old_flaky = 0
