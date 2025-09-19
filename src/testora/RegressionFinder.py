@@ -642,10 +642,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # to compile the dev only once for all flaky tests
     old_executions_to_flaky = []
     new_executions_to_flaky = []
+    flaky_indices = []
 
     # step 1: iter-through to get "both failed" and the xxx_to_flaky executions
-    for (old_execution, new_execution, old_covered, new_covered) in zip(old_executions, new_executions):
-            #, all_covered_modified_stmts_old, all_covered_modified_stmts_new):
+    for i, old_execution, new_execution, old_covered, new_covered in enumerate(
+            zip(old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new)):
         assert old_execution.output is not None
         assert new_execution.output is not None
 
@@ -663,6 +664,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         if difference_found:
             old_executions_to_flaky.append(old_execution)
             new_executions_to_flaky.append(new_execution)
+            flaky_indices.append(i)
 
     # to separate the test genration and classification phase, here we store the breakpoint data.
     old_executions_differ_relevant = []
@@ -671,14 +673,15 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # step 2: to handle the xxx_to_flaky executions
     # double-check differences by re-executing the tests
     difference_found_again_list = validate_output_difference(cloned_repo_manager, pr, old_executions_to_flaky, new_executions_to_flaky)
-    for difference_found_again in difference_found_again_list:
+    for difference_found_again, idx in zip(difference_found_again_list, flaky_indices):
         if difference_found_again == False:
-            append_event(ComparisonEvent(pr_nb=pr.number, message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+            append_event(ComparisonEvent(pr_nb=pr.number, 
+                    message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                     test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
             continue
 
         append_event(ComparisonEvent(pr_nb=pr.number,
-                message=f"Different outputs\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+                message=f"Different outputs\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                 test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
 
         if Config.phase_selection == "all": # run the entire workflow, including test genration and classification. 
@@ -748,8 +751,8 @@ def check_union_coverage_full_cover_exist(missed_stmts:dict, covered_stmts:dict)
 
 def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
             test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit,
-            old_executions:list=[], new_executions:list=[], all_covered_modified_stmts_old:list=[], all_covered_modified_stmts_new:list=[], 
-            round=0, old_missed:dict={}, new_missed:dict={}):
+            old_executions=None, new_executions=None, all_covered_modified_stmts_old=None, all_covered_modified_stmts_new=None, 
+            round=0, old_missed=None, new_missed=None):
     ''' 
     A recursive function to run the generated tests and use the feedback for the next round test generation.
     Loop ends when:
@@ -913,6 +916,15 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             old_executions_cur_round[idx] = old_execution
             new_executions_cur_round[idx] = new_execution
 
+    # to make sure the info does not mess-up across PRs
+    if old_executions is None:
+        old_executions = []
+        new_executions = []
+        all_covered_modified_stmts_old = []
+        all_covered_modified_stmts_new = []
+        old_missed = {}
+        new_missed = {}
+        
     old_executions.extend(old_executions_cur_round) # get the executions for all the rounds
     new_executions.extend(new_executions_cur_round)
     assert None not in [e.output for e in old_executions_cur_round]
