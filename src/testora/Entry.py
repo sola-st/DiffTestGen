@@ -70,6 +70,7 @@ for iteration in range(max_iteration):
             if isfile(f) and f.endswith("_breakpoint_data.json"):
                 shutil.move(f, bp_data_cur_version)
 
-    # rename the llm cache, to check the Non-determinism of models
-    # Finally, we get a cache file for each iteration, and the cache file can be reuse if needed
-    os.rename(cache_dir, iter_marked_cache_dir)
+        # rename the llm cache, to check the Non-determinism of models
+        # Finally, we get a cache file for each iteration, and the cache file can be reuse if needed
+        os.rename(cache_dir, iter_marked_cache_dir.replace(".json", f"_{version_id}.json"))
+    # os.rename(cache_dir, iter_marked_cache_dir)
