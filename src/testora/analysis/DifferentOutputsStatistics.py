@@ -140,21 +140,21 @@ class DifferentOutputsStatistics():
     def main(self):
         results_folder = join("data", "results")
 
-        iteration = 4
+        iteration = 0
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
         # option 1: for all projects
         target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+        target_nums = [136, 53, 132, 149]
 
         # option 2: for a single project
         # with open(".target_project", "r") as f:
         #     target_project = f.read().strip()
         # target_projects = [target_project]
 
-        # target_projects = ["scipy"]
-
         config_versions = [
-            [5, 8, 8, True]
+            [1, 0, 1, False],
+            # [5, 8, 8, True]
             ]
 
         project_level = []
@@ -162,8 +162,8 @@ class DifferentOutputsStatistics():
         for config in config_versions:
             version_id = '_'.join(map(str, config))
 
-            for target_project in target_projects:
-                pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
+            for target_project, num in zip(target_projects, target_nums):
+                pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
                 with open(pr_file, "r") as f:
                     prs = f.readlines()
                 pr_list = [int(pr) for pr in prs]

@@ -144,10 +144,37 @@ class CoverageComparison():
             new_info_str = f"{new_percentage:.2%} ({union_covered['new_len_cross_file']}/{self.all_executable_modified_lines_new_len})"
         return old_info_str, new_info_str
 
+    # # option 1: listdir in a random order
+    # def get_multiple_pr_coverage_info(self, project=""):
+    #     log_files = listdir(self.log_folder)
+    #     for file in log_files:
+    #         log_file = join(self.log_folder, file)
+    #         if isfile(log_file) and "breakpoint" not in file:
+    #             # exclude archive folder and breakpoint_data files
+    #             self.get_single_log_file_coverage_dtg(log_file, project)
+
+    #     self.all_from_cur_version = sorted(self.all_from_cur_version, key=lambda d: list(d.keys())[3])
+    #     return self.all_from_cur_version
+    
+    # # option 2: run on the specified PRs (in order)
     def get_multiple_pr_coverage_info(self, project=""):
-        # listdir in a random order
+        pr_file = join("data", "meta", "pr_nums", f"{project}_checked.txt")
+        # # marshmallow 53, keras 149, 
+        # # pandas 132, scipy 136
+        # pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset43.txt")
+
+        with open(pr_file, "r") as f:
+            prs = f.readlines()
+        pr_list = [int(pr) for pr in prs]
+
         log_files = listdir(self.log_folder)
-        for file in log_files:
+        ordered_log_files = []
+        for pr in pr_list:
+            for file in log_files:
+                if str(pr) in file:
+                    ordered_log_files.append(file)
+
+        for file in ordered_log_files:
             log_file = join(self.log_folder, file)
             if isfile(log_file) and "breakpoint" not in file:
                 # exclude archive folder and breakpoint_data files

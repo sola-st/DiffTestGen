@@ -55,12 +55,12 @@ def main():
     target_projects = ["marshmallow"] # ["scipy", "marshmallow", "pandas", "keras"]
 
     config_versions = [
-        [1, 0, 1, False]
-        # [5, 8, 8, True]
+        [1, 0, 1, False],
+        [5, 8, 8, True]
         ]
 
-    all_data = []
     for config in config_versions:
+        all_data = []
         version_id = '_'.join(map(str, config))
 
         for target_project in target_projects:

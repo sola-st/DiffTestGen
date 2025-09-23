@@ -19,8 +19,6 @@ target_projects = ["scipy", "marshmallow", "pandas", "keras"]
 for target_project in target_projects:
     config_versions = [
         [1, 0, 1, False],
-        [5, 5, 5, False],
-        [5, 8, 8, False],
         [5, 8, 8, True]
     ]
 
@@ -38,6 +36,14 @@ for target_project in target_projects:
         for file in log_files:
             log_file_path = join(log_folder, file)
             if isfile(log_file_path):
+                # just for convenience, time-based filter
+                if "09-" in file:
+                    date = int(file.split(" ")[0].split("09-")[1])
+                    if date < 18: 
+                        continue
+                else:
+                    continue
+
                 with open(log_file_path, "r") as f:
                     info = json.load(f) 
                 
@@ -56,14 +62,5 @@ for target_project in target_projects:
                         makedirs(separated_results_folder, exist_ok=True)
                         if not exists(join(separated_results_folder, file)):
                             shutil.copy2(log_file_path, separated_results_folder)
-                    # try:
-                    #     iteration = config_message["iteration"]
-                    # except:
-                    #     if "07-28" in log_file_path:
-                    #         if f"{version_id}" in version_ids_with_iter:
-                    #             separated_results_folder = join(base_folder, f"iter_1", f"log_{version_id}", target_project)
-                    #             makedirs(separated_results_folder, exist_ok=True)
-                    #             if not exists(join(separated_results_folder, file)):
-                    #                 shutil.copy2(log_file_path, separated_results_folder)
                 except:
                     pass # old executions with no the newly added configs
