@@ -3,7 +3,7 @@ from os.path import join
 
 
 iteration = 0
-target_projects = ["scipy", "keras"] # ["scipy", "marshmallow", "pandas", "keras"]
+target_projects = ["scipy", "marshmallow", "pandas", "keras"]
 base_folder = "data/results/table_and_plots/gpt-5-mini-2025-08-07"
 for project in target_projects:
     coverage_file = join(base_folder, f"iter_{iteration}", project, "coverage_comparison_meta_1_0_1_False.json")
