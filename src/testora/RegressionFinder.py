@@ -223,7 +223,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
 
         append_event(Event(pr_nb=pr.number,
-                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning({diff_version}). #Round {round})"))
 
         return static_err_fixed_tests, test_msg_pairs # static_err_fixed_tests may duplicate
         
@@ -237,7 +237,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     generated_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
 
     append_event(Event(pr_nb=pr.number,
-            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
+            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning ({diff_version}). #Round {round})"))
     
     name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
@@ -982,7 +982,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # a dict, and each value is a list of ranges
         all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
 
-        if Config.feedback_test_generation_prompt_version != 0:
+        if Config.feedback_test_generation_prompt_version != 0: # TODO 
             if not old_missed and not new_missed:
                 # union coverage reaches 100%
                 full_coverage_exists = True
