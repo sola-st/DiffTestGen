@@ -854,7 +854,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
         return None, None, None, None
 
-    if Config.use_error_feedabck == True:
+    if Config.use_error_feedback == True: # runtime error, inner loop
         '''
         Two options for giving the feedback:
         1. max attempts
@@ -888,12 +888,11 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 #     break
 
                 # refine the test by fixing the error
+                # TODO optimize the prompt
                 prompt = RuntimeErrorsFixingPrompt(old_execution.code, old_execution.output) #, new_execution.output)
                 raw_answer = llm.query(prompt, no_cache=True)[0] # no_cache set to true, allow the model to get different answers with the same error message.
                 append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
                 fixed_test = prompt.parse_answer(raw_answer)
-                # if "# Round" not in fixed_test:
-                #     print(test_i)
                 message = f"Fix runtime errors. Error types: old: {error_type_in_old}, new: {error_type_in_new}"
                 append_event(LLMEvent(pr_nb=pr.number, message=message, content=fixed_test)) # a mark to show which test
                 inner_round += 1
@@ -1211,7 +1210,7 @@ def main():
     if args.paras:
         # auto-updates the prompt versions, available for both db mode and single-pr mode
         Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
-                Config.use_error_feedabck, Config.fix_static_error, Config.use_existing_tests, Config.iteration, Config.model_version = args.paras
+                Config.use_error_feedback, Config.fix_static_error, Config.use_existing_tests, Config.iteration, Config.model_version = args.paras
         
     if args.db:
         if args.project or args.pr:

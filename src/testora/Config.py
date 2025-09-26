@@ -55,7 +55,7 @@ context_version = 2 # available from 1 to 5 (with 2 and 3 direct to the same inp
 # full_coverage_level = "union" # valid values: "union", "single"
 phase_selection = "test_generation" # valid values: "test_generation", "all"
 
-use_error_feedabck = True
+use_error_feedback = True # runtime rror
 error_feedback_max = 5
 
 fix_static_error = False
