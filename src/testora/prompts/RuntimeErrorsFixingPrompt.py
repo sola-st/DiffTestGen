@@ -50,8 +50,13 @@ Respond only with Python code wrapped into ```python ... ```. Give no explanatio
                 in_code = True
         return code
 
+def check_whether_error_exist(execution_output):
+    error_exist = False
+    if "Traceback (most recent call last)" in execution_output:
+        error_exist = True
+    return error_exist
 
-def check_whether_error_exist(test_code, execution_output):
+def check_whether_error_exist_2_kinds(test_code, execution_output):
     error_exist = False
     # if error exists, extract the error message
     if "Traceback (most recent call last)" in execution_output:

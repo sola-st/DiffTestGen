@@ -24,7 +24,7 @@ from testora.prompts.FeedbackLoopPromptV5 import FeedbackTestGeneratorPromptV5
 from testora.prompts.FeedbackLoopPromptV6 import FeedbackTestGeneratorPromptV6
 from testora.prompts.FeedbackLoopPromptV7 import FeedbackTestGeneratorPromptV7
 from testora.prompts.FeedbackLoopPromptV8 import FeedbackTestGeneratorPromptV8
-from testora.prompts.RuntimeErrorsFixingPrompt import RuntimeErrorsFixingPrompt, check_whether_error_exist, extract_error_type
+from testora.prompts.RuntimeErrorsFixingPrompt import RuntimeErrorsFixingPrompt, extract_error_type
 from testora.prompts.TestPythonBlockSeparatorPrompt import TestPythonBlockSeparatorPrompt
 from testora.prompts.UndefinedRefsFixingPrompt import UndefinedRefsFixingPrompt
 from testora.prompts.PRRegressionBugRanking import PRRegressionBugRanking
@@ -223,7 +223,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
 
         append_event(Event(pr_nb=pr.number,
-                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning({diff_version}). #Round {round})"))
+                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
 
         return static_err_fixed_tests, test_msg_pairs # static_err_fixed_tests may duplicate
         
@@ -237,7 +237,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     generated_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests)
 
     append_event(Event(pr_nb=pr.number,
-            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning ({diff_version}). #Round {round})"))
+            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
     
     name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
@@ -649,24 +649,31 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         assert old_execution.output is not None
         assert new_execution.output is not None
 
-        # if is_crash(old_execution.output) and is_crash(new_execution.output):
-        if check_whether_error_exist(old_execution.code, old_execution.output) and check_whether_error_exist(new_execution.code, new_execution.output):
-            # ignore differences if both tests crash
-            append_event(ComparisonEvent(pr_nb=pr.number,
-                    message=f"Both tests failed, considering them the same\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
-                    test_code=old_execution.code, old_output=old_execution.output,
-                    new_output=new_execution.output))
-            continue
-
         # check for behavioral differences
         difference_found = old_execution.output != new_execution.output
-        if difference_found:
-            old_executions_to_flaky.append(old_execution)
-            new_executions_to_flaky.append(new_execution)
-            flaky_indices.append(i)
+        old_error_type = extract_error_type(old_execution.output)
+        new_error_type = extract_error_type(new_execution.output)
+
+        if old_error_type == new_error_type:
+            if old_error_type != None: # same error type exists in both version
+                append_event(ComparisonEvent(pr_nb=pr.number,
+                    message=f"Both tests failed with error {old_error_type}\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+                    test_code=old_execution.code, old_output=old_execution.output,
+                    new_output=new_execution.output))
+            else: # no errors, go for flaky tests
+                if difference_found:
+                    old_executions_to_flaky.append(old_execution)
+                    new_executions_to_flaky.append(new_execution)
+                    flaky_indices.append(i)
+                else:
+                    append_event(ComparisonEvent(pr_nb=pr.number, 
+                            message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+                            test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
         else:
-            append_event(ComparisonEvent(pr_nb=pr.number, 
-                    message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+            # 1. error exists in one version,
+            # 2. two different error types
+            append_event(ComparisonEvent(pr_nb=pr.number,
+                    message=f"Different outputs\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
                     test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
 
     # to separate the test genration and classification phase, here we store the breakpoint data.
@@ -675,9 +682,9 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     
     # step 2: to handle the xxx_to_flaky executions
     # double-check differences by re-executing the tests
-    difference_found_again_list = validate_output_difference(cloned_repo_manager, pr, old_executions_to_flaky, new_executions_to_flaky)
-    for difference_found_again, idx in zip(difference_found_again_list, flaky_indices):
-        if difference_found_again == False:
+    flaky_change_found_list = validate_output_difference(cloned_repo_manager, pr, old_executions_to_flaky, new_executions_to_flaky)
+    for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
+        if flaky_change_found == False: # flaky test gets the same output as before
             append_event(ComparisonEvent(pr_nb=pr.number, 
                     message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                     test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
