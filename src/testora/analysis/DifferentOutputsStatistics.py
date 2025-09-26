@@ -144,8 +144,12 @@ class DifferentOutputsStatistics():
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
         # option 1: for all projects
-        target_projects = ["scipy", "marshmallow", "pandas", "keras"]
-        target_nums = [136, 53, 132, 149]
+        project_info = {
+            "scipy": 129,
+            "marshmallow": 53,
+            "pandas": 128,
+            "keras": 133
+        }
 
         # option 2: for a single project
         # with open(".target_project", "r") as f:
@@ -154,15 +158,15 @@ class DifferentOutputsStatistics():
 
         config_versions = [
             [1, 0, 1, False],
-            # [5, 8, 8, True]
+            [5, 8, 8, True]
             ]
-
-        project_level = []
-        single_iteration = []
+        
         for config in config_versions:
+            project_level = []
+            single_iteration = []
             version_id = '_'.join(map(str, config))
 
-            for target_project, num in zip(target_projects, target_nums):
+            for target_project, num in project_info.items():
                 pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
                 with open(pr_file, "r") as f:
                     prs = f.readlines()
@@ -223,7 +227,7 @@ class DifferentOutputsStatistics():
 
             to_write = [overall_str] + project_level + single_iteration
 
-            result_file = join(results_folder, "table_and_plots", model_version, f"Different_oputputs_statistics_{version_id}.json")
+            result_file = join(results_folder, "table_and_plots", model_version, f"Different_outputs_statistics_{version_id}.json")
             with open(result_file, "w") as f:
                 json.dump(to_write, f, indent=4)
 

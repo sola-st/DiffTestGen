@@ -657,7 +657,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         if old_error_type == new_error_type:
             if old_error_type != None: # same error type exists in both version
                 append_event(ComparisonEvent(pr_nb=pr.number,
-                    message=f"Both tests failed with error {old_error_type}\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+                    message=f"Both tests failed with error {old_error_type}, considering them the same\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
                     test_code=old_execution.code, old_output=old_execution.output,
                     new_output=new_execution.output))
             else: # no errors, go for flaky tests

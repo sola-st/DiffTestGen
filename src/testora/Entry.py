@@ -14,10 +14,16 @@ pr_split_num = 1 # could be None, 1, 2, or 3
 with open(".target_project", "r") as f:
     target_project = f.read().strip()
     
-# pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
-# marshmallow 53, keras 149, 
-# pandas 132, scipy 136
-pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset53.txt")
+# marshmallow 53, keras 133, pandas 128, scipy 129
+num = 53
+if target_project == "keras":
+    num = 133
+elif target_project == "pandas":
+    num = 128
+elif target_project == "scipy":
+    num = 129
+
+pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
 if pr_split_num:
     pr_file = pr_file.replace(".txt", f"_{pr_split_num}.txt")
 
