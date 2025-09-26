@@ -7,7 +7,7 @@ import argparse
 from testora.util.Logs import Event
 
 
-nb_test_generated_patterns = [r"^Generated (\d+) tests", r"^Generated (\d+) more tests"]
+nb_test_generated_patterns = [r"^Generated (\d+) tests", r"^Generated (\d+) more tests", r"Static error fixed (\d+)/"]
 
 
 class Classification(Enum):

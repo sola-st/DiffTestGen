@@ -687,12 +687,12 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         if flaky_change_found == False: # flaky test gets the same output as before
             append_event(ComparisonEvent(pr_nb=pr.number, 
                     message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
-                    test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
+                    test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
             continue
 
         append_event(ComparisonEvent(pr_nb=pr.number,
                 message=f"Different outputs\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
-                test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
+                test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
 
         if Config.phase_selection == "all": # run the entire workflow, including test genration and classification. 
             # if difference found, reduce the test while still observing a difference

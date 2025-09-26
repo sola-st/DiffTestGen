@@ -9,22 +9,17 @@ class FeedbackTestGeneratorPromptV8:
         self.diff = diff
         # prompt 5-based: test code
         self.all_covered_modified_stmts_info = all_covered_modified_stmts_info 
-        self.old_context = old_context
-        self.new_context = new_context
 
-#         self.test_function_block = ""
-#         if old_tests or new_tests:
-#             self.test_function_block = """The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested.
-# The following are the old and the new versions of these test functions:
+        # the following only provide the info when it is available
+        self.changed_function_block = ""
+        if fut_qualified_names:
+            fut_qualified_names_str = ", ".join(fut_qualified_names)
+            self.changed_function_block = (
+                f"The diff affects the following functions: {fut_qualified_names_str}.\n"
+                f"The following are the old and the new versions of these affected functions:\n"
+                f"Old version:\n\n{old_context}\n\nNew version:\n\n{new_context}\n"
+            )
 
-# Old version: 
-
-# {old_tests}
-
-# New version:
-
-# {new_tests}
-# """
         self.use_json_output = False
 
     def create_prompt(self):
@@ -34,17 +29,7 @@ and achieve the highest possible coverage of the specified lines in both the old
 
 {diff}
 
-The diff affects the following functions: {fut_qualified_names}.
-The following are the old and the new versions of these affected functions:
-
-Old version: 
-
-{old_context}
-
-New version:
-
-{new_context}
-
+{changed_function_block}
 The following is an existing usage example, provided to show how the affected functions or code under test can be accessed and used. 
 Below the example are the old and the new versions of these affected functions. Some lines in these functions end with a comment: '# COVERED' indicates the line is covered by the existing example, '#TO_COVER' marks lines that should be covered by the newly generated usgae examples.
 Since some # COVERED lines are near the # TO_COVER lines, you can use the existing example as a reference to understand how to invoke the relevant functionality. 
@@ -69,11 +54,8 @@ etc.
 """
 
         return template.format(diff=self.diff, project_name=self.project_name, 
-                               all_covered_modified_stmts_info=self.all_covered_modified_stmts_info,
-                               old_context = self.old_context,
-                               new_context = self.new_context,
-                               fut_qualified_names=", ".join(self.fut_qualified_names))
-                            #    test_function_block = self.test_function_block)
+                               changed_function_block = self.changed_function_block,
+                               all_covered_modified_stmts_info=self.all_covered_modified_stmts_info)
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")

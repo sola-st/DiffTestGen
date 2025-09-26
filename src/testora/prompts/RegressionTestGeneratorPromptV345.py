@@ -4,14 +4,24 @@ class RegressionTestGeneratorPromptV345:
         self.fut_qualified_names = fut_qualified_names
         self.diff = diff
         # 'X_context' and 'X_tests" r are "\n" separated strs
-        self.old_context = old_context 
-        self.new_context = new_context
+
+        # the following only provide the info when it is available
+        self.changed_function_block = ""
+        if fut_qualified_names:
+            fut_qualified_names_str = ", ".join(fut_qualified_names)
+            self.changed_function_block = (
+                f"The diff affects the following functions: {fut_qualified_names_str}.\n"
+                f"The following are the old and the new versions of these affected functions:\n"
+                f"Old version:\n\n{old_context}\n\nNew version:\n\n{new_context}\n"
+            )
 
         self.test_function_block = ""
         if old_tests or new_tests:
-            test_function_block_prefix = """The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested.
-The following are the old and the new versions of these test functions:"""
-            self.test_function_block = f"{test_function_block_prefix}\n\nOld version:\n\n{old_tests}\n\nNew version:\n\n{new_tests}\n\n"
+            self.test_function_block = (
+                f"The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested."
+                f"The following are the old and the new versions of these test functions:\n"
+                f"Old version:\n\n{old_tests}\n\nNew version:\n\n{new_tests}\n"
+            )
 
         self.use_json_output = False
 
@@ -21,21 +31,12 @@ Your task is to generate usage examples of the {project_name} project that expos
 
 {diff}
 
-The diff affects the following functions: {fut_qualified_names}.
-The following are the old and the new versions of these affected functions:
-
-Old version: 
-
-{old_context}
-
-New version:
-
-{new_context}
+{changed_function_block}
 
 {test_function_block}
 The usage examples you create should use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
-Answer by giving ten usage examples that cover normal usage scenarios and ten usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
+Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
@@ -52,10 +53,8 @@ etc.
 """
 
         return template.format(project_name=self.project_name,
-                               fut_qualified_names=", ".join(self.fut_qualified_names),
                                diff=self.diff,
-                               old_context=self.old_context,
-                               new_context=self.new_context,
+                               changed_function_block = self.changed_function_block,
                                test_function_block = self.test_function_block)
 
     def remove_unnecessary_indentation(self, code):
