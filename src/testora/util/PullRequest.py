@@ -279,6 +279,20 @@ class PullRequest:
                                         visited.add((curr_func, curr_line, curr_col))
 
                                         callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
+                                        if callers and len(path) == 1:
+                                            # If at the start function and there are callers, expand at least once
+                                            for caller in callers:
+                                                with open(caller["absolutePath"], "r") as f:
+                                                    caller_file_content = f.read()
+                                                call_function, caller_func_info = get_caller_function_names(
+                                                    caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
+                                                )
+                                                next_func, next_line, next_col = call_function
+                                                new_path = [next_func] + path
+                                                new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
+                                                queue.append((next_func, next_line, next_col, new_path, new_signature))
+                                            continue
+
                                         if not callers or not curr_func.startswith("_"):
                                             # Found a public function or no more callers
                                             if shortest_path is None or len(path) < len(shortest_path):
@@ -297,7 +311,8 @@ class PullRequest:
                                             new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
                                             queue.append((next_func, next_line, next_col, new_path, new_signature))
 
-                                    if shortest_path:
+                                    # Only accept shortest_path if it has at least 2 function names
+                                    if shortest_path and len(shortest_path) >= 2:
                                         func_level_call_gragh_paths.append(shortest_path)
                                         func_level_signatures.append(
                                             "The following are the signatures and docstrings (if available) of the functions (exclude the changed functions) in the above call gragh path:\n"
