@@ -5,6 +5,7 @@ from unidiff import PatchSet
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
 from testora.util.PythonCodeUtil2 import (
+        get_caller_function_names,
         get_function_names,
         get_function_names_code, 
         get_function_names_code_with_line_num,
@@ -49,9 +50,6 @@ class PullRequest:
         if Config.use_existing_tests != None:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
-
-        self.function_callers = {} # each dict element is a changed function maps to its callers
-        self.function_callees = {}
 
     def _pr_url_to_patch(self): 
         ''' 
@@ -255,30 +253,53 @@ class PullRequest:
 
                 if function_names:
                     if type(function_names[0]) == tuple: 
-                        if Config.call_gragh == True:
+                        if Config.call_gragh == True and version == "new":
+                            self.call_gragh_paths = []
+                            self.signatures = []
                             for func_info in function_names:
                                 func_name, start_line_0_based, start_col_0_based = func_info
-                        
-                                # TODO maybe repetition here, check to visit less as possible as it can
                                 try:
+                                    # the elements of call_gragh_paths and signatures are mapped
+                                    func_level_call_gragh_paths = []
+                                    func_level_signatures = []
                                     callers = server.get_function_callers(modified_file.path, start_line_0_based, start_col_0_based)
-                                    self.function_callers.update({func_name: callers})
-                                    # print(f"*** Callers of {func_name}@{start_line}: {callers}")
-                                    # with open(f"er_{self.number}_{func_name}_{start_col_0_based}.json", "w") as f:
-                                    #     json.dump(callers, f, indent=2)
-                                except:
-                                    self.function_callers.update({func_name: "failed"})
-                                    print(f"* [{version}-ER] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
+                                    for caller in callers:
+                                        single_call_gragh_path = [func_name]
+                                        signature_of_current_path = f"The following are the signatures and docstrings (if available) of the functions (exclude the changed functions) in the above call gragh path:\n"
+        
+                                        caller_func_info = None
+                                        while func_name.startswith("_") or caller_func_info == None: # call gragh chain stops when it first get a public function
+                                            # from the call location to get the caller function name and other info
+                                            with open(caller["absolutePath"], "r") as f:
+                                                caller_file_content = f.read()
+                                            call_function, caller_func_info = get_caller_function_names(caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]])
+                                            func_name, start_line_0_based, start_col_0_based = call_function
+                                            # order: from the found public to the changed function
+                                            single_call_gragh_path.insert(0, func_name) 
+                                            signature_of_current_path += f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
+                                            
+                                        func_level_call_gragh_paths.append(single_call_gragh_path)
+                                        func_level_signatures.append(signature_of_current_path)
+                                    
+                                    # for later use
+                                    self.call_gragh_paths.append(func_level_call_gragh_paths)
+                                    self.signatures.append(func_level_signatures)
 
-                                try:
-                                    callees = server.get_function_callees(modified_file.path, start_line_0_based)
-                                    self.function_callees.update({func_name: callees})
-                                    # print(f"--- Callees of {func_name}@{start_line}: {callees}")
-                                    # with open(f"ee_{self.number}_{func_name}_{start_col_0_based}.json", "w") as f:
-                                    #     json.dump(callees, f, indent=2)
+                                    # # for quick check
+                                    # # print(f"*** Callers of {func_name}@{start_line}: {callers}")
+                                    # paths = ""
+                                    # for e in func_level_call_gragh_paths:
+                                    #     paths += "-->".join(e)
+                                    # sigs = ""
+                                    # for e in func_level_signatures:
+                                    #     sigs += "\n\n".join(func_level_signatures)
+
+                                    # with open(f"eeer_{self.number}_{func_name}_{start_col_0_based}_{version}.txt", "w") as f:
+                                    #     f.writelines(f"{paths}\n\n{sigs}")
                                 except:
-                                    self.function_callees.update({func_name: "failed"})
-                                    print(f"* [{version}-EE] Get callee failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
+                                    self.call_gragh_paths.append([])
+                                    self.signatures.append([])
+                                    print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
                         else:
                             for func_name in function_names:
                                 function_name, start_line_0_based, start_col_0_based = func_name

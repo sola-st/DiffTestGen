@@ -292,13 +292,25 @@ def generate_tests(pr, github_repo, changed_functions):
     full_diff_len_fit = False
     filtered_diff_len_nonequal_fit = False
 
+    call_graph_info_str = ""
+    if Config.call_gragh == True:
+        # form the info about call gragh
+        # each of them are a triple list: pr_level[function_level[path level]]
+        for func_name, cg_path_func_level, sig_func_level in zip(changed_functions, pr.call_gragh_paths, pr.signatures): 
+            if cg_path_func_level:
+                call_graph_info_str += f"Call graph (multiple paths may exist) about the changed function {func_name}:\n"
+                for idx, (cg_path_path_level, sig_path_level) in enumerate(zip(cg_path_func_level, sig_func_level)):
+                    path = "-->".join(cg_path_path_level)
+                    call_graph_info_str += f"Path #{idx}: {path}\n"
+                    call_graph_info_str += sig_path_level
+
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
         prompt_full_diff = None
-        # full diff with GPT4
+        # full diff with GPT4, 5
         if Config.initial_test_generation_prompt_version == 5: # TODO specific version of prompts
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, \
-                pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code)
+                pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=call_graph_info_str)
         else: # e.g., other prompts, and testora
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
         
@@ -314,7 +326,7 @@ def generate_tests(pr, github_repo, changed_functions):
         # filtered diff with GPT4
         if Config.initial_test_generation_prompt_version == 5:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, \
-                    pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code)
+                    pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info_str = "")
         else:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         
