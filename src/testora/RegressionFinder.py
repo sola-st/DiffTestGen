@@ -179,7 +179,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
 
 
 def is_crash(output):
-    # TODO Reduce mis-matching.
+    # TODO this now only related to classification task
     return "Traceback (most recent call last)" in output or \
         "error" in output.lower() or \
         "fail" in output.lower()

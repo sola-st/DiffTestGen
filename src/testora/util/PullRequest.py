@@ -314,8 +314,9 @@ class PullRequest:
                                     # Only accept shortest_path if it has at least 2 function names
                                     if shortest_path and len(shortest_path) >= 2:
                                         func_level_call_gragh_paths.append(shortest_path)
-                                        func_level_signatures.append(
-                                            "The following are the signatures and docstrings (if available) of the functions (exclude the changed functions) in the above call gragh path:\n"
+                                        # TODO change the imports to about the public API
+                                        func_level_signatures.append( 
+                                            "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
                                             + shortest_signature
                                         )
 

@@ -34,6 +34,34 @@ class FunctionCollector(cst.CSTVisitor):
             # parent_class
         ))
 
+
+class CallerFunctionCollector(cst.CSTVisitor):
+    # get function nodes and import lines
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
+    def __init__(self):
+        self.functions = []
+        self.imports = []
+
+    def visit_FunctionDef(self, node: cst.FunctionDef):
+        # the same with FunctionCollector
+        full_pos = self.get_metadata(PositionProvider, node)
+
+        name_pos = self.get_metadata(PositionProvider, node.name)
+        self.functions.append((
+            node,
+            full_pos.start.line,
+            full_pos.end.line,
+            name_pos.start.line-1,      # <-- use this for LSP refs/defs
+            name_pos.start.column,    # <-- use this for LSP refs/defs
+        ))
+
+    def visit_Import(self, node: cst.Import):
+        self.imports.append(cst.Module([]).code_for_node(node))
+
+    def visit_ImportFrom(self, node: cst.ImportFrom):
+        self.imports.append(cst.Module([]).code_for_node(node))
+
 class TestFunctionCollector(cst.CSTVisitor):
     METADATA_DEPENDENCIES = (PositionProvider,)
 
@@ -123,7 +151,7 @@ def get_caller_function_names(code: str, check_range):
     wrapper = MetadataWrapper(tree)
 
     # Collect all functions
-    collector = FunctionCollector()
+    collector = CallerFunctionCollector()
     wrapper.visit(collector)
 
     # Match the function by patch range
@@ -140,7 +168,7 @@ def get_caller_function_names(code: str, check_range):
 
             # # option 1: return entire function code
             # module_with_node = cst.Module(body=[func_node])
-            # caller_func_info = module_with_node.code
+            # caller_func_info = "\n".join(collector.imports) + "\n" + module_with_node.code
 
             # # option 2: return the signature
             signature = get_function_signature(func_node)
@@ -156,7 +184,10 @@ def get_caller_function_names(code: str, check_range):
                 ):
                     docstring = first_stmt.body[0].value  # This includes the quotes
             
-            caller_func_info = f"{signature}\n"
+            # TODO collector.imports should be about how to access the public API
+            # TODO maybe get some hint from the API documentation
+            caller_func_info = "\n".join(collector.imports)
+            caller_func_info += f"\n{signature}\n"
             if docstring:
                 caller_func_info += f"{docstring}\n"
 
