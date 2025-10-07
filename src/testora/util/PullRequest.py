@@ -257,75 +257,9 @@ class PullRequest:
                         if Config.call_gragh == True and version == "new":
                             self.call_gragh_paths = []
                             self.signatures = []
-                            # callers = server.get_function_callers(modified_file.path, start_line_0_based, start_col_0_based)
                             
-                            for func_info in function_names:
-                                func_name, start_line_0_based, start_col_0_based = func_info
-                                try:
-                                    func_level_call_gragh_paths = []
-                                    func_level_signatures = []
-                                    visited = set()
-                                    queue = deque()
-                                    # Each item: (current_func_name, start_line, start_col, path_so_far, signature_so_far)
-                                    queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], ""))
-
-                                    shortest_path = None
-                                    shortest_signature = None
-
-                                    while queue:
-                                        curr_func, curr_line, curr_col, path, signature = queue.popleft()
-                                        if (curr_func, curr_line, curr_col) in visited:
-                                            continue
-                                        visited.add((curr_func, curr_line, curr_col))
-
-                                        callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
-                                        if callers and len(path) == 1:
-                                            # If at the start function and there are callers, expand at least once
-                                            for caller in callers:
-                                                with open(caller["absolutePath"], "r") as f:
-                                                    caller_file_content = f.read()
-                                                call_function, caller_func_info = get_caller_function_names(
-                                                    caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
-                                                )
-                                                next_func, next_line, next_col = call_function
-                                                new_path = [next_func] + path
-                                                new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
-                                                queue.append((next_func, next_line, next_col, new_path, new_signature))
-                                            continue
-
-                                        if not callers or not curr_func.startswith("_"):
-                                            # Found a public function or no more callers
-                                            if shortest_path is None or len(path) < len(shortest_path):
-                                                shortest_path = list(path)
-                                                shortest_signature = signature
-                                            continue
-
-                                        for caller in callers:
-                                            with open(caller["absolutePath"], "r") as f:
-                                                caller_file_content = f.read()
-                                            call_function, caller_func_info = get_caller_function_names(
-                                                caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
-                                            )
-                                            next_func, next_line, next_col = call_function
-                                            new_path = [next_func] + path
-                                            new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
-                                            queue.append((next_func, next_line, next_col, new_path, new_signature))
-
-                                    # Only accept shortest_path if it has at least 2 function names
-                                    if shortest_path and len(shortest_path) >= 2:
-                                        func_level_call_gragh_paths.append(shortest_path)
-                                        # TODO change the imports to about the public API
-                                        func_level_signatures.append( 
-                                            "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
-                                            + shortest_signature
-                                        )
-
-                                    self.call_gragh_paths.append(func_level_call_gragh_paths)
-                                    self.signatures.append(func_level_signatures)
-                                except Exception as e:
-                                    self.call_gragh_paths.append([])
-                                    self.signatures.append([])
-                                    print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
+                            # update "self.call_gragh_paths" and "self.signatures"
+                            self.get_call_gragh_info(server, modified_file, function_names, version)
                             
                             for func_name in function_names:
                                 function_name, start_line_0_based, start_col_0_based = func_name
@@ -356,6 +290,75 @@ class PullRequest:
                 self.new_context_with_line_num = code_context_with_line_num_str 
                 
         return changed_functions
+
+    def get_call_gragh_info(self, server, modified_file, function_names, version):
+        for func_info in function_names:
+            func_name, start_line_0_based, start_col_0_based = func_info
+            try:
+                func_level_call_gragh_paths = []
+                func_level_signatures = []
+                visited = set()
+                queue = deque()
+                # Each item: (current_func_name, start_line, start_col, path_so_far, signature_so_far)
+                queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], ""))
+
+                shortest_path = None
+                shortest_signature = None
+
+                while queue:
+                    curr_func, curr_line, curr_col, path, signature = queue.popleft()
+                    if (curr_func, curr_line, curr_col) in visited:
+                        continue
+                    visited.add((curr_func, curr_line, curr_col))
+
+                    callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
+                    if callers and len(path) == 1:
+                        # If at the start function and there are callers, expand at least once
+                        for caller in callers:
+                            with open(caller["absolutePath"], "r") as f:
+                                caller_file_content = f.read()
+                            call_function, caller_func_info = get_caller_function_names(
+                                caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
+                            )
+                            next_func, next_line, next_col = call_function
+                            new_path = [next_func] + path
+                            new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
+                            queue.append((next_func, next_line, next_col, new_path, new_signature))
+                        continue
+
+                    if not callers or not curr_func.startswith("_"):
+                        # Found a public function or no more callers
+                        if shortest_path is None or len(path) < len(shortest_path):
+                            shortest_path = list(path)
+                            shortest_signature = signature
+                        continue
+
+                    for caller in callers:
+                        with open(caller["absolutePath"], "r") as f:
+                            caller_file_content = f.read()
+                        call_function, caller_func_info = get_caller_function_names(
+                            caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
+                        )
+                        next_func, next_line, next_col = call_function
+                        new_path = [next_func] + path
+                        new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
+                        queue.append((next_func, next_line, next_col, new_path, new_signature))
+
+                # Only accept shortest_path if it has at least 2 function names
+                if shortest_path and len(shortest_path) >= 2:
+                    func_level_call_gragh_paths.append(shortest_path)
+                    # TODO change the imports to about the public API
+                    func_level_signatures.append( 
+                        "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
+                        + shortest_signature
+                    )
+
+                self.call_gragh_paths.append(func_level_call_gragh_paths)
+                self.signatures.append(func_level_signatures)
+            except Exception as e:
+                self.call_gragh_paths.append([])
+                self.signatures.append([])
+                print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
 
     def get_test_function_code(self, cloned_repo, version):
         code_context = ""
