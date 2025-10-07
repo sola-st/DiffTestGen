@@ -326,7 +326,7 @@ def generate_tests(pr, github_repo, changed_functions):
         # filtered diff with GPT4
         if Config.initial_test_generation_prompt_version == 5:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, \
-                    pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info_str = "")
+                    pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=call_graph_info_str)
         else:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         
