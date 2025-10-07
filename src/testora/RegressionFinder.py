@@ -298,12 +298,18 @@ def generate_tests(pr, github_repo, changed_functions):
         # each of them are a triple list: pr_level[function_level[path level]]
         for func_name, cg_path_func_level, sig_func_level in zip(changed_functions, pr.call_gragh_paths, pr.signatures): 
             if cg_path_func_level:
-                call_graph_info_str += f"Call graph (multiple paths may exist) about the changed function {func_name}:\n"
+                call_graph_info_str += (f"Call graph (multiple paths may exist) about the changed function {func_name}:\n\n"
+                    f"Each call graph path shows the sequence of function calls from one function to another (for example, Path #0: a → b → c)."
+                    f"Along with each path, the related import statements used in that part of the code are listed."
+                    f"Additionally, for the first function in the path (in this case, a), its function signature and docstring (if available) are displayed."
+                )
+                call_graph_info_str += "Every call graph path with its related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
                 for idx, (cg_path_path_level, sig_path_level) in enumerate(zip(cg_path_func_level, sig_func_level)):
-                    path = "-->".join(cg_path_path_level)
-                    call_graph_info_str += f"Path #{idx}: {path}\n"
+                    path = " --> ".join(cg_path_path_level)
+                    call_graph_info_str += f"Path #{idx}: {path}\n\n"
                     call_graph_info_str += sig_path_level
 
+        # print(call_graph_info_str)
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
         prompt_full_diff = None

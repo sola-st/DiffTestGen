@@ -326,12 +326,21 @@ class PullRequest:
                             queue.append((next_func, next_line, next_col, new_path, new_signature))
                         continue
 
-                    if not callers or not curr_func.startswith("_"):
-                        # Found a public function or no more callers
-                        public_func = curr_func
-                        # Only keep the shortest path for each public function
-                        if public_func not in public_func_paths or len(path) < len(public_func_paths[public_func][0]):
-                            public_func_paths[public_func] = (list(path), signature)
+                    # If the 2nd (1-based) function in the path is public or the target
+                    # record the full path from caller to target (min length 2)
+                    if len(path) >= 2:
+                        second_func = path[1]
+                        # If the 2nd function is public or is the target function
+                        if not second_func.startswith("_") or second_func == path[-1]: # may helps when use public API criteria
+                            func_level_call_gragh_paths.append(path)
+                            func_level_signatures.append(
+                                "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
+                                + signature
+                            )
+                            break
+
+                    if not callers:
+                        # No more callers, but no public function found in the path
                         continue
 
                     for caller in callers:
@@ -350,10 +359,7 @@ class PullRequest:
                     if shortest_path and len(shortest_path) >= 2:
                         # TODO change the imports to about the public API
                         func_level_call_gragh_paths.append(shortest_path)
-                        func_level_signatures.append(
-                            "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
-                            + shortest_signature
-                        )
+                        func_level_signatures.append(shortest_signature)
 
                 self.call_gragh_paths.append(func_level_call_gragh_paths)
                 self.signatures.append(func_level_signatures)

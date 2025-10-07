@@ -187,7 +187,7 @@ def get_caller_function_names(code: str, check_range):
             # TODO collector.imports should be about how to access the public API
             # TODO maybe get some hint from the API documentation
             caller_func_info = "\n".join(collector.imports)
-            caller_func_info += f"\n{signature}\n"
+            caller_func_info += f"\n\n{signature}\n"
             if docstring:
                 caller_func_info += f"{docstring}\n"
 
