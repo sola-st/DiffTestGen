@@ -302,14 +302,14 @@ class PullRequest:
                 # Each item: (current_func_name, start_line, start_col, path_so_far, signature_so_far)
                 queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], ""))
 
-                shortest_path = None
-                shortest_signature = None
+                # Map: public_func_name -> (shortest_path, signature)
+                public_func_paths = {}
 
                 while queue:
                     curr_func, curr_line, curr_col, path, signature = queue.popleft()
-                    if (curr_func, curr_line, curr_col) in visited:
+                    if (curr_func, curr_line, curr_col, tuple(path)) in visited:
                         continue
-                    visited.add((curr_func, curr_line, curr_col))
+                    visited.add((curr_func, curr_line, curr_col, tuple(path)))
 
                     callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
                     if callers and len(path) == 1:
@@ -328,9 +328,10 @@ class PullRequest:
 
                     if not callers or not curr_func.startswith("_"):
                         # Found a public function or no more callers
-                        if shortest_path is None or len(path) < len(shortest_path):
-                            shortest_path = list(path)
-                            shortest_signature = signature
+                        public_func = curr_func
+                        # Only keep the shortest path for each public function
+                        if public_func not in public_func_paths or len(path) < len(public_func_paths[public_func][0]):
+                            public_func_paths[public_func] = (list(path), signature)
                         continue
 
                     for caller in callers:
@@ -344,14 +345,15 @@ class PullRequest:
                         new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
                         queue.append((next_func, next_line, next_col, new_path, new_signature))
 
-                # Only accept shortest_path if it has at least 2 function names
-                if shortest_path and len(shortest_path) >= 2:
-                    func_level_call_gragh_paths.append(shortest_path)
-                    # TODO change the imports to about the public API
-                    func_level_signatures.append( 
-                        "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
-                        + shortest_signature
-                    )
+                # Only accept shortest paths with at least 2 function names
+                for pub_func, (shortest_path, shortest_signature) in public_func_paths.items():
+                    if shortest_path and len(shortest_path) >= 2:
+                        # TODO change the imports to about the public API
+                        func_level_call_gragh_paths.append(shortest_path)
+                        func_level_signatures.append(
+                            "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
+                            + shortest_signature
+                        )
 
                 self.call_gragh_paths.append(func_level_call_gragh_paths)
                 self.signatures.append(func_level_signatures)
