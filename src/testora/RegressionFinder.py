@@ -304,9 +304,9 @@ def generate_tests(pr, github_repo, changed_functions):
     if Config.call_gragh == True:
         # form the info about call gragh
         # each of them are a triple list: pr_level[function_level[path level]]
+        call_graph_info_str_sub = ""
         for func_name, cg_path_func_level, imports_func_level, sig_func_level in zip(changed_functions, pr.call_gragh_paths, pr.imports, pr.signatures_docstrings): 
             if cg_path_func_level:
-                call_graph_info_str_sub = ""
                 for idx, (cg_path_path_level, import_path_level, sig_path_level) in enumerate(zip(cg_path_func_level, imports_func_level, sig_func_level)):
                     if import_path_level or sig_path_level:
                         path = " -> ".join(cg_path_path_level)
