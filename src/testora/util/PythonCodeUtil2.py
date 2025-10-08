@@ -138,10 +138,18 @@ def get_function_names_code(code: str, patch_ranges: list):
 
     return list(matched_functions), list(matched_functions_code), None
 
-def get_caller_function_names(code: str, check_range):
+def get_caller_function_names(code: str, check_range, label):
     '''
     Return caller function names and its location.
     Optionally, also return the definition or the function body of the caller function
+
+    label with options:
+     * 1: "first_public_check"  to get the first public function
+     * 2: "public_caller"       to get the caller of the first public function to have a reference of accessing
+     * 3[todo]: "public_caller_again" handle the same file with no imports issue.
+            e.g., affetced function C, with B-->C, and B, C in the same file, no imports
+                we get A-->B, to check how B is imported in file that contains A
+                like: from module_tmp import B, then we know that we can call C by "from module_tmp import C" 
     '''
     try:
         tree = cst.parse_module(code)
@@ -156,7 +164,8 @@ def get_caller_function_names(code: str, check_range):
 
     # Match the function by patch range
     call_function = []
-    caller_func_info = ""
+    ref_imports = None
+    signature_docstring = None
     target_line = (check_range[0] + check_range[1]) / 2 + 1 # +1 to let it start at 1
 
     for func in collector.functions:
@@ -171,29 +180,41 @@ def get_caller_function_names(code: str, check_range):
             # caller_func_info = "\n".join(collector.imports) + "\n" + module_with_node.code
 
             # # option 2: return the signature
-            signature = get_function_signature(func_node)
-
-            # Get docstring if it exists
-            docstring = None
-            if func_node.body.body:
-                first_stmt = func_node.body.body[0]
-                if (
-                    isinstance(first_stmt, cst.SimpleStatementLine) and
-                    first_stmt.body and
-                    isinstance(first_stmt.body[0], cst.SimpleString)
-                ):
-                    docstring = first_stmt.body[0].value  # This includes the quotes
+            if label == 1 and is_public(call_function_name): # only collect signature and docsting of public functions
+                signature = get_function_signature(func_node)
+                # Get docstring if it exists
+                docstring = None
+                if func_node.body.body:
+                    first_stmt = func_node.body.body[0]
+                    if (
+                        isinstance(first_stmt, cst.SimpleStatementLine) and
+                        first_stmt.body and
+                        isinstance(first_stmt.body[0], cst.SimpleString)
+                    ):
+                        docstring = first_stmt.body[0].value  # This includes the quotes
+                
+                signature_docstring = f"\n\n{signature}\n"
+                if docstring:
+                    caller_func_info += f"{docstring}\n"
             
             # TODO maybe get some hint from the API documentation
-            # caller_func_info = "\n".join(collector.imports) # all imports, includes the irrelavant ones
-            for import_line in collector.imports:
-                if call_function_name in import_line:
-                    caller_func_info += f"{import_line}\n"
-            caller_func_info += f"\n{signature}\n"
-            if docstring:
-                caller_func_info += f"{docstring}\n"
+            if label == 2:
+                selected_refs = []
+                # caller_func_info = "\n".join(collector.imports) # all imports, includes the irrelavant ones
+                for import_line in collector.imports:
+                    if call_function_name in import_line:
+                    # if f".{call_function_name}" in import_line or f" {call_function_name}" in import_line:
+                        selected_refs.append(import_line) # ideally only one statement
+                
+                if ref_imports:
+                    # no import line, still no reference about how to access the target changed function, not a good reference
+                    ref_imports = "\n".join(collector.imports)
+            break
+    return call_function, ref_imports, signature_docstring
 
-    return call_function, caller_func_info
+def is_public(function_name):
+    # TODO change to check API
+    return not function_name.startswith("_")
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """Safely extract a readable function signature from a FunctionDef node."""

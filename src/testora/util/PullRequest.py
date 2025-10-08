@@ -256,9 +256,10 @@ class PullRequest:
                     if type(function_names[0]) == tuple: 
                         if Config.call_gragh == True and version == "new":
                             self.call_gragh_paths = []
-                            self.signatures = []
+                            self.signatures_docstrings = []
+                            self.imports = []
                             
-                            # update "self.call_gragh_paths" and "self.signatures"
+                            # update "self.call_gragh_paths", "self.signatures_docstrings", and self.imports
                             self.get_call_gragh_info(server, modified_file, function_names, version)
                             
                             for func_name in function_names:
@@ -296,45 +297,45 @@ class PullRequest:
             func_name, start_line_0_based, start_col_0_based = func_info
             try:
                 func_level_call_gragh_paths = []
-                func_level_signatures = []
-
-                target_func_type = "public"
-                if func_name.startswith("_"):
-                    target_func_type = "private"
+                func_level_imports = []
+                func_level_signatures = [] # element: each path with a signature
 
                 visited = set()
                 queue = deque()
-                # Each item: (current_func_name, start_line, start_col, path_so_far, signature_so_far)
-                queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], ""))
+                # Each item: (current_func_name, start_line, start_col, path_so_far, import_lines, signature_so_far, task_label)
+                queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], "", "", 1))
 
                 while queue:
-                    curr_func, curr_line, curr_col, path, signature = queue.popleft()
-                    if (curr_func, curr_line, curr_col, tuple(path)) in visited:
-                        continue
-                    visited.add((curr_func, curr_line, curr_col, tuple(path)))
-
+                    # this is single piece of info of current func
+                    # signature_docstring can be collected only if the checked func is the first public function
+                    # ref_imports can be colleted only if the checked func is the caller of first public function
+                    curr_func, curr_line, curr_col, path, signature_docstring, ref_imports, label = queue.popleft()
                     callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
-
                     '''  
                     If the 2nd (1-based) function in the path is public, record the full path from caller to target (min length 2)
                     With two senarios: 
-                     * 1. target - private function: [public/private A, public B, target(private) C]
-                     * 2. target - public function: [public/private D, target(public) C]
+                        * 1. target - private function: [public/private A, public B, target(private) C]
+                        * 2. target - public function: [public/private D, target(public) C]
                     
                     Collect the import lines, signatures, and docstrings here:
-                     * import lines:                from the path[0] (e.g., public/private A and D)
+                        * import lines:                from the path[0] (e.g., public/private A and D)
                         --> the import lines from this function consider as reference to access the path[1]
 
-                     * singnature and docstrings:   from the path[1] (e.g., public B and target(public) C)
+                        * singnature and docstrings:   from the path[1] (e.g., public B and target(public) C)
                         --> this is the function should be called by the tests. Provide the signature to know what kinds of paras to use
                     '''
-                    if len(path) >= 2:
-                        second_func = path[1]
-                        if (target_func_type == "public" and len(path) == 2) or \
-                                (target_func_type == "private" and (not second_func.startswith("_")) and len(path) > 2):
-                            func_level_call_gragh_paths.append(path)
-                            func_level_signatures.append(signature)
-                            break
+                    if (signature_docstring and ref_imports) or (signature_docstring and not callers): 
+                        func_level_call_gragh_paths.append(path)
+                        func_level_imports.append(ref_imports)
+                        if func_name.startswith("_"):
+                            func_level_signatures.append(signature_docstring)
+                        else:
+                            func_level_signatures.append("")
+                        break
+
+                    if (curr_func, curr_line, curr_col, tuple(path)) in visited:
+                        continue
+                    visited.add((curr_func, curr_line, curr_col, tuple(path)))
 
                     if not callers:
                         # No more callers, but no public function found in the path
@@ -343,21 +344,31 @@ class PullRequest:
                     for caller in callers:
                         with open(caller["absolutePath"], "r") as f:
                             caller_file_content = f.read()
-                        call_function, caller_func_info = get_caller_function_names(
-                            caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
+                        call_function, new_ref_imports, new_signature_docstring = get_caller_function_names(
+                            caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]], label
                         )
                         next_func, next_line, next_col = call_function
                         new_path = [next_func] + path
-                        # Record signature and docstring only when the current caller function is public
-                        if not next_func.startswith("_"): # TODO change to about the public API
-                            new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
-                        queue.append((next_func, next_line, next_col, new_path, new_signature))
+                        if label == 1:
+                            if new_signature_docstring: # the first public function found
+                                signature_docstring_to_queue = f"* From file {caller['relativePath']}:\n{new_signature_docstring}\n" # the file path works as a alternative of import lines
+                                # change label to 2 to get the import lines, more details refer to get_caller_function_names
+                                queue.append((next_func, next_line, next_col, new_path, signature_docstring_to_queue, new_ref_imports, 2))
+                            else:
+                                queue.append((next_func, next_line, next_col, new_path, new_signature_docstring, new_ref_imports, 1))
+                        elif label == 2:
+                            if not new_ref_imports:
+                                queue.append((next_func, next_line, next_col, new_path, signature_docstring, new_ref_imports, 1)) # get the caller again
+                            else:
+                                queue.append((next_func, next_line, next_col, new_path, signature_docstring, new_ref_imports, 2)) # end the traverse
 
                 self.call_gragh_paths.append(func_level_call_gragh_paths)
-                self.signatures.append(func_level_signatures)
+                self.signatures_docstrings.append(func_level_signatures)
+                self.imports.append(func_level_imports)
             except Exception as e:
                 self.call_gragh_paths.append([]) # add empty to map it back when combine with changed functions (roughly, RegressionFinder line 310)
-                self.signatures.append([])
+                self.signatures_docstrings.append([])
+                self.imports.append([])
                 print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
 
     def get_test_function_code(self, cloned_repo, version):

@@ -293,32 +293,37 @@ def generate_tests(pr, github_repo, changed_functions):
     filtered_diff_len_nonequal_fit = False
 
     call_graph_info_str = ""
-    call_graph_info_str_prefix_added = False
+    call_graph_info_str_prefix = (
+        f"For each affected function, the following provides its call graph information, if available. "
+        f"This includes the call graph path(s), the function signature(s), and the function docstring(s).\n"
+        f"A call graph path represents the sequence of function calls leading to an affected function "
+        f"(for example, Path #0: a → b → affected). Note that a single affected function may have multiple paths.\n"
+        f"For each call graph path, list the related import statements about how to access the first function (in this example, a), "
+        f"and list its function signature and docstring, if available.\n\n"
+    ) # to make sure provide only available info to the prompt
     if Config.call_gragh == True:
         # form the info about call gragh
         # each of them are a triple list: pr_level[function_level[path level]]
-        for func_name, cg_path_func_level, sig_func_level in zip(changed_functions, pr.call_gragh_paths, pr.signatures): 
+        for func_name, cg_path_func_level, imports_func_level, sig_func_level in zip(changed_functions, pr.call_gragh_paths, pr.imports, pr.signatures_docstrings): 
             if cg_path_func_level:
-                if call_graph_info_str_prefix_added == False:
-                    # to make sure provide only available info to the prompt
-                    call_graph_info_str += (
-                        f"For each affected function, the following provides its call graph information, if available. "
-                        f"This includes the call graph path(s), the function signature(s), and the function docstring(s).\n"
-                        f"A call graph path represents the sequence of function calls leading to an affected function "
-                        f"(for example, Path #0: a → b → affected). Note that a single affected function may have multiple paths.\n"
-                        f"For each call graph path, list the related import statements used in that part of the code.\n"
-                        f"For the second function in the path (in this example, b), include its function signature and docstring, if available.\n\n"
-                    )
-                    call_graph_info_str_prefix_added = True
+                call_graph_info_str_sub = ""
+                for idx, (cg_path_path_level, import_path_level, sig_path_level) in enumerate(zip(cg_path_func_level, imports_func_level, sig_func_level)):
+                    if import_path_level or sig_path_level:
+                        path = " -> ".join(cg_path_path_level)
+                        call_graph_info_str_sub += f"Path #{idx}: {path}\n"
+                        if import_path_level:
+                            call_graph_info_str_sub += f"\n{import_path_level}\n"
+                        if sig_path_level:
+                            call_graph_info_str_sub += f"\n{sig_path_level}\n"
+                    
+                if call_graph_info_str_sub:
+                    call_graph_info_str_sub = f"Call graph information about the changed function {func_name}:\n" + call_graph_info_str_sub
+        
+        if call_graph_info_str_sub:
+            call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_sub 
 
-                call_graph_info_str += f"Call graph information about the changed function {func_name}:\n"
-                for idx, (cg_path_path_level, sig_path_level) in enumerate(zip(cg_path_func_level, sig_func_level)):
-                    path = " --> ".join(cg_path_path_level)
-                    call_graph_info_str += f"Path #{idx}: {path}\n\n"
-                    call_graph_info_str += f"{sig_path_level}\n"
-
-    # print(call_graph_info_str)
-    # exit()
+    print(call_graph_info_str)
+    exit()
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
         prompt_full_diff = None
