@@ -156,7 +156,7 @@ def get_caller_function_names(code: str, check_range):
 
     # Match the function by patch range
     call_function = []
-    caller_func_info = None
+    caller_func_info = ""
     target_line = (check_range[0] + check_range[1]) / 2 + 1 # +1 to let it start at 1
 
     for func in collector.functions:
@@ -184,10 +184,12 @@ def get_caller_function_names(code: str, check_range):
                 ):
                     docstring = first_stmt.body[0].value  # This includes the quotes
             
-            # TODO collector.imports should be about how to access the public API
             # TODO maybe get some hint from the API documentation
-            caller_func_info = "\n".join(collector.imports)
-            caller_func_info += f"\n\n{signature}\n"
+            # caller_func_info = "\n".join(collector.imports) # all imports, includes the irrelavant ones
+            for import_line in collector.imports:
+                if call_function_name in import_line:
+                    caller_func_info += f"{import_line}\n"
+            caller_func_info += f"\n{signature}\n"
             if docstring:
                 caller_func_info += f"{docstring}\n"
 

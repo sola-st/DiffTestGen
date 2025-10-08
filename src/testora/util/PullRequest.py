@@ -297,13 +297,15 @@ class PullRequest:
             try:
                 func_level_call_gragh_paths = []
                 func_level_signatures = []
+
+                target_func_type = "public"
+                if func_name.startswith("_"):
+                    target_func_type = "private"
+
                 visited = set()
                 queue = deque()
                 # Each item: (current_func_name, start_line, start_col, path_so_far, signature_so_far)
                 queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], ""))
-
-                # Map: public_func_name -> (shortest_path, signature)
-                public_func_paths = {}
 
                 while queue:
                     curr_func, curr_line, curr_col, path, signature = queue.popleft()
@@ -312,31 +314,26 @@ class PullRequest:
                     visited.add((curr_func, curr_line, curr_col, tuple(path)))
 
                     callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
-                    if callers and len(path) == 1:
-                        # If at the start function and there are callers, expand at least once
-                        for caller in callers:
-                            with open(caller["absolutePath"], "r") as f:
-                                caller_file_content = f.read()
-                            call_function, caller_func_info = get_caller_function_names(
-                                caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
-                            )
-                            next_func, next_line, next_col = call_function
-                            new_path = [next_func] + path
-                            new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
-                            queue.append((next_func, next_line, next_col, new_path, new_signature))
-                        continue
 
-                    # If the 2nd (1-based) function in the path is public or the target
-                    # record the full path from caller to target (min length 2)
+                    '''  
+                    If the 2nd (1-based) function in the path is public, record the full path from caller to target (min length 2)
+                    With two senarios: 
+                     * 1. target - private function: [public/private A, public B, target(private) C]
+                     * 2. target - public function: [public/private D, target(public) C]
+                    
+                    Collect the import lines, signatures, and docstrings here:
+                     * import lines:                from the path[0] (e.g., public/private A and D)
+                        --> the import lines from this function consider as reference to access the path[1]
+
+                     * singnature and docstrings:   from the path[1] (e.g., public B and target(public) C)
+                        --> this is the function should be called by the tests. Provide the signature to know what kinds of paras to use
+                    '''
                     if len(path) >= 2:
                         second_func = path[1]
-                        # If the 2nd function is public or is the target function
-                        if not second_func.startswith("_") or second_func == path[-1]: # may helps when use public API criteria
+                        if (target_func_type == "public" and len(path) == 2) or \
+                                (target_func_type == "private" and (not second_func.startswith("_")) and len(path) > 2):
                             func_level_call_gragh_paths.append(path)
-                            func_level_signatures.append(
-                                "The following are the related import statements, signatures and docstrings (if available) of the frist function in the above call gragh path:\n"
-                                + signature
-                            )
+                            func_level_signatures.append(signature)
                             break
 
                     if not callers:
@@ -351,20 +348,15 @@ class PullRequest:
                         )
                         next_func, next_line, next_col = call_function
                         new_path = [next_func] + path
-                        new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
+                        # Record signature and docstring only when the current caller function is public
+                        if not next_func.startswith("_"): # TODO change to about the public API
+                            new_signature = signature + f"* From file {caller['relativePath']}:\n{caller_func_info}\n"
                         queue.append((next_func, next_line, next_col, new_path, new_signature))
-
-                # Only accept shortest paths with at least 2 function names
-                for pub_func, (shortest_path, shortest_signature) in public_func_paths.items():
-                    if shortest_path and len(shortest_path) >= 2:
-                        # TODO change the imports to about the public API
-                        func_level_call_gragh_paths.append(shortest_path)
-                        func_level_signatures.append(shortest_signature)
 
                 self.call_gragh_paths.append(func_level_call_gragh_paths)
                 self.signatures.append(func_level_signatures)
             except Exception as e:
-                self.call_gragh_paths.append([])
+                self.call_gragh_paths.append([]) # add empty to map it back when combine with changed functions (roughly, RegressionFinder line 310)
                 self.signatures.append([])
                 print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
 
