@@ -1241,8 +1241,13 @@ def main():
     start_logging()
     if args.paras:
         # auto-updates the prompt versions, available for both db mode and single-pr mode
-        Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
-                Config.use_error_feedback, Config.fix_static_error, Config.use_existing_tests, Config.iteration, Config.model_version = args.paras
+        if len(args.paras) == 6: # comparison mdoe
+            Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
+                    Config.use_error_feedback, Config.fix_static_error, Config.use_existing_tests, Config.iteration, Config.model_version = args.paras
+        else: # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
+             Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
+                    Config.use_existing_tests, Config.call_gragh, Config.fix_static_error, Config.use_error_feedback, \
+                    Config.iteration, Config.model_version = args.paras
         
     if args.db:
         if args.project or args.pr:

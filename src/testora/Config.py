@@ -49,7 +49,7 @@ feedback_test_generation_prompt_version = 2
 # different versions of contexts
 # it follows a similar version above, but versions 2 and 3 are from the same implementation
 # the implementation can return for both the versions, use one or both the returned info as needed.
-context_version = 2 # available from 1 to 5 (with 2 and 3 direct to the same inplementation)
+context_version = 2 # available from 1 to 8 (with 2 and 3 direct to the same implementation)
 
 
 # full_coverage_level = "union" # valid values: "union", "single"
