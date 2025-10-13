@@ -301,26 +301,44 @@ def generate_tests(pr, github_repo, changed_functions):
         f"For each call graph path, list the related import statements about how to access the first function (in this example, a), "
         f"and list its function signature and docstring, if available.\n\n"
     ) # to make sure provide only available info to the prompt
-    if Config.call_gragh == True:
-        # form the info about call gragh
+    if Config.call_graph == True:
+        # form the info about call graph
         # each of them are a triple list: pr_level[function_level[path level]]
-        call_graph_info_str_sub = ""
-        for func_name, cg_path_func_level, imports_func_level, sig_func_level in zip(changed_functions, pr.call_gragh_paths, pr.imports, pr.signatures_docstrings): 
+        call_graph_info_str_funcs = ""
+
+        for func_name, cg_path_func_level in pr.call_graph_paths.items():
+            call_graph_info_str_function_level = ""
             if cg_path_func_level:
-                for idx, (cg_path_path_level, import_path_level, sig_path_level) in enumerate(zip(cg_path_func_level, imports_func_level, sig_func_level)):
-                    if import_path_level or sig_path_level:
-                        path = " -> ".join(cg_path_path_level)
-                        call_graph_info_str_sub += f"Path #{idx}: {path}\n"
-                        if import_path_level:
-                            call_graph_info_str_sub += f"\n{import_path_level}\n"
-                        if sig_path_level:
-                            call_graph_info_str_sub += f"\n{sig_path_level}\n"
-                    
-                if call_graph_info_str_sub:
-                    call_graph_info_str_sub = f"Call graph information about the changed function {func_name}:\n" + call_graph_info_str_sub
+                for label, cg_paths in cg_path_func_level.items():
+                    call_graph_info_str_sub = ""
+                    if cg_paths:
+                        for i, cg in enumerate(cg_paths):
+                            sig_doc = pr.signatures_docstrings[func_name][label][i]
+                            imports = pr.imports[func_name][label][i]
+                            # if sig_doc or imports:
+                            path = " -> ".join(cg)
+                            call_graph_info_str_sub += f"Path #{i}: {path}\n"
+                            if sig_doc:
+                                call_graph_info_str_sub += f"\n{sig_doc}\n"
+                            if imports:
+                                call_graph_info_str_sub += f"\n{imports}\n"
+                        
+                        if call_graph_info_str_sub:
+                            if label == "common":
+                                call_graph_info_str_sub = f"The following infomation is avaliable for both the old and the new versions of code:\n{call_graph_info_str_sub}"
+                            elif label == "old":
+                                call_graph_info_str_sub = f"The following infomation is avaliable only for the old code version:\n{call_graph_info_str_sub}" 
+                            else:
+                                call_graph_info_str_sub = f"The following infomation is avaliable only for the new code version:\n{call_graph_info_str_sub}"
+                            
+                            call_graph_info_str_function_level += call_graph_info_str_sub
+
+                if call_graph_info_str_function_level:
+                    call_graph_info_str_function_level = f"Call graph information about the changed function {func_name}:\n\n{call_graph_info_str_function_level}"
+                    call_graph_info_str_funcs += call_graph_info_str_function_level
         
-        if call_graph_info_str_sub:
-            call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_sub 
+        if call_graph_info_str_funcs:
+            call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
 
     print(call_graph_info_str)
     exit()
@@ -625,16 +643,16 @@ def check_pr(github_repo, cloned_repo_manager, pr):
      * if Config.use_existing_tests == "pr-modified":
         this function call wil also add the test function body to the pr 
         -> 'old_test_function_code' and 'new_test_function_code'
-     * if Config.call_gragh == True:
+     * if Config.call_graph == True:
         this function will also return the callers and callees of the changed functions 
     '''
     changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
     # return
     # note: the initial round do not have converage info.
 
-    # # extract call gragh and dependency gragh
+    # # extract call graph and dependency graph
     # output_dir = join("data", "results", github_repo.name)
-    # call_gragh, dependency_gragh = extract_graphs_from_specified_files(
+    # call_graph, dependency_graph = extract_graphs_from_specified_files(
     #         github_repo, raw_info_changed_functions, output_dir)
 
     # existing developer-written tests
@@ -1241,12 +1259,12 @@ def main():
     start_logging()
     if args.paras:
         # auto-updates the prompt versions, available for both db mode and single-pr mode
-        if len(args.paras) == 6: # comparison mdoe
+        if len(args.paras) == 8: # comparison mdoe
             Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
                     Config.use_error_feedback, Config.fix_static_error, Config.use_existing_tests, Config.iteration, Config.model_version = args.paras
-        else: # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
+        else: # 9'. pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
              Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
-                    Config.use_existing_tests, Config.call_gragh, Config.fix_static_error, Config.use_error_feedback, \
+                    Config.use_existing_tests, Config.call_graph, Config.fix_static_error, Config.use_error_feedback, \
                     Config.iteration, Config.model_version = args.paras
         
     if args.db:

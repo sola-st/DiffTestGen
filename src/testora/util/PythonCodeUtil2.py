@@ -339,7 +339,7 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
                 # # option 1: origianl testora
                 # matched_functions.add(func_node.name.value)
 
-                # # option 2: matching with call gragh tools
+                # # option 2: matching with call graph tools
                 # matched_functions.add(f"{class_name}.{func_node.name.value}")
 
                 # option 3: language server

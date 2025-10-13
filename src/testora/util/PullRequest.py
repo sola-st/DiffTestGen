@@ -182,31 +182,33 @@ class PullRequest:
         return result
     
     def get_changed_function_names_and_context(self, prompt_base):
-        # get_changed_function_names_and_context
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-        changed_function_qualified_names_old = self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
+        # update self.changed_function_qualified_names_old
+        self.changed_function_qualified_names_old = []
+        self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
+
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
-        changed_function_qualified_names_new = self.get_helper(post_commit_cloned_repo, "new", prompt_base)
+        # update self.changed_function_qualified_names_new
+        self.changed_function_qualified_names_new = []
+        self.get_helper(post_commit_cloned_repo, "new", prompt_base)
 
         # get test function code
         if Config.use_existing_tests == "pr-modified":
             self.get_test_function_code(pre_commit_cloned_repo, "old") # update self.xxx_test_function_code
             self.get_test_function_code(post_commit_cloned_repo, "new") # TODO check whether repeated the repo build
 
-        all_changed_func = list(set(changed_function_qualified_names_new).union(set(changed_function_qualified_names_old)))
-        return all_changed_func
+        self.union_changed_function_qualified_names = list(set(set(self.changed_function_qualified_names_old).union(set(self.changed_function_qualified_names_new))))
+        return self.union_changed_function_qualified_names
     
     def get_helper(self, cloned_repo, version, prompt_base):
-        changed_functions = None
-        if Config.call_gragh == True:
+        # update changed_functions for old or new version
+        if Config.call_graph == True:
             # the server stays alive for the entire workspace
             server = ExtractCallerCallee(cloned_repo.repo.working_dir)
             with server.lsp.start_server(): # start only once, automatic stop
-                changed_functions = self.helper_inner(cloned_repo, version, prompt_base, server)
+                self.helper_inner(cloned_repo, version, prompt_base, server)
         else:
-            changed_functions = self.helper_inner(cloned_repo, version, prompt_base)
-
-        return changed_functions  
+            self.helper_inner(cloned_repo, version, prompt_base)
 
     def helper_inner(self, cloned_repo, version, prompt_base, server=None):
         changed_functions = []
@@ -254,17 +256,25 @@ class PullRequest:
 
                 if function_names:
                     if type(function_names[0]) == tuple: 
-                        if Config.call_gragh == True and version == "new":
-                            self.call_gragh_paths = []
-                            self.signatures_docstrings = []
-                            self.imports = []
-                            
-                            # update "self.call_gragh_paths", "self.signatures_docstrings", and self.imports
-                            self.get_call_gragh_info(server, modified_file, function_names, version)
-                            
-                            for func_name in function_names:
-                                function_name, start_line_0_based, start_col_0_based = func_name
-                                changed_functions.append(f"{module_name}.{function_name}")
+                        if Config.call_graph == True:
+                            if version == "old":
+                                self.call_graph_paths_old = []
+                                self.signatures_docstrings_old = []
+                                self.imports_old = []
+                                for func_name in function_names:
+                                    function_name, start_line_0_based, start_col_0_based = func_name
+                                    self.changed_function_qualified_names_old.append(f"{module_name}.{function_name}")
+                                # update "self.call_graph_paths", "self.signatures_docstrings", and self.imports
+                                self.get_call_graph_info(server, modified_file, function_names, version)
+                            else: # new code version
+                                self.call_graph_paths_new = []
+                                self.signatures_docstrings_new = []
+                                self.imports_new = []
+                                for func_name in function_names:
+                                    function_name, start_line_0_based, start_col_0_based = func_name
+                                    self.changed_function_qualified_names_new.append(f"{module_name}.{function_name}")
+                                self.get_call_graph_info(server, modified_file, function_names, version)
+                                self.get_union_call_graph()
                     else:
                         for func_name in function_names:
                             changed_functions.append(f"{module_name}.{func_name}") # func_name also includes class_name if the setting goes like that
@@ -291,12 +301,112 @@ class PullRequest:
                 self.new_context_with_line_num = code_context_with_line_num_str 
                 
         return changed_functions
+    
+    def get_union_call_graph(self):
+        # update the following three:
+        self.call_graph_paths = {}
+        self.signatures_docstrings = {}
+        self.imports = {}
+        
+        non_checked_new_indices = list(range(len(self.changed_function_qualified_names_new)))
+        for qualified_func, old_cg_func_level_list, old_sig_doc_func_level_list, old_imports_func_level_list in \
+                zip(self.changed_function_qualified_names_old, self.call_graph_paths_old, self.signatures_docstrings_old, self.imports_old):
+            self.call_graph_paths.update(
+                {qualified_func: {
+                    "common": [],
+                    "old": [],
+                    "new": []
+                }})
+            self.signatures_docstrings.update(
+                {qualified_func: {
+                    "common": [],
+                    "old": [],
+                    "new": []
+                }})
+            self.imports.update(
+                {qualified_func: {
+                    "common": [],
+                    "old": [],
+                    "new": []
+                }})
+            if qualified_func in self.changed_function_qualified_names_new:
+                # the same qualified function in both the versions
+                idx = self.changed_function_qualified_names_new.index(qualified_func)
+                try:
+                    new_cg_func_level_list = self.call_graph_paths_new[idx]
+                    new_sig_doc_func_level_list = self.signatures_docstrings_new[idx]
+                    new_imports_func_level_list = self.imports_old[idx] 
+                    non_checked_new_indices.remove(idx)
+                except:
+                    continue
 
-    def get_call_gragh_info(self, server, modified_file, function_names, version):
+                # the same in both, so far, get details from old
+                # cg_common_in_both = list([set(old_cg_func_level_list).intersection(new_cg_func_level_list)])
+                cg_common_in_both = [x for x in old_cg_func_level_list if x in new_cg_func_level_list]
+                sig_doc_common = []
+                import_common = []
+                for common in cg_common_in_both:
+                    map_idx = old_cg_func_level_list.index(common)
+                    sig_doc_common.append(old_sig_doc_func_level_list[map_idx])
+                    import_common.append(old_imports_func_level_list[idx])
+                
+                # unique in old
+                # cg_unique_in_old = list([set(old_cg_func_level_list).difference(new_cg_func_level_list)])
+                cg_unique_in_old = [x for x in old_cg_func_level_list if x not in new_cg_func_level_list]
+                sig_doc_unique_in_old = []
+                import_unique_in_old = []
+                for unique in cg_unique_in_old:
+                    map_idx = old_cg_func_level_list.index(unique)
+                    sig_doc_unique_in_old.append(old_sig_doc_func_level_list[map_idx])
+                    import_unique_in_old.append(old_imports_func_level_list[idx])
+
+                # unique in new
+                # cg_unique_in_new = list([set(new_cg_func_level_list).difference(old_cg_func_level_list)])
+                cg_unique_in_new = [x for x in new_cg_func_level_list if x not in old_cg_func_level_list]
+                sig_doc_unique_in_new = []
+                import_unique_in_new = []
+                for unique in cg_unique_in_new:
+                    map_idx = old_cg_func_level_list.index(unique)
+                    sig_doc_unique_in_new.append(new_sig_doc_func_level_list[map_idx])
+                    import_unique_in_new.append(new_imports_func_level_list[idx])
+
+                # union info
+                self.call_graph_paths[qualified_func]["common"].extend(cg_common_in_both)
+                self.signatures_docstrings[qualified_func]["common"].extend(sig_doc_common)
+                self.imports[qualified_func]["common"].extend(import_common)
+
+                self.call_graph_paths[qualified_func]["old"].extend(cg_unique_in_old)
+                self.signatures_docstrings[qualified_func]["old"].extend(sig_doc_common)
+                self.imports[qualified_func]["old"].extend(import_unique_in_old)
+
+                self.call_graph_paths[qualified_func]["new"].extend(cg_unique_in_new)
+                self.signatures_docstrings[qualified_func]["new"].extend(cg_unique_in_new)
+                self.imports[qualified_func]["new"].extend(import_unique_in_new)
+
+            else: # unique in old
+                self.call_graph_paths[qualified_func]["old"] = old_cg_func_level_list
+                self.signatures_docstrings[qualified_func]["old"] = old_sig_doc_func_level_list
+                self.imports[qualified_func]["old"] = old_imports_func_level_list
+
+        if non_checked_new_indices: # unique in new
+            for idx in non_checked_new_indices:
+                func = self.changed_function_qualified_names_new[idx]
+                
+                self.call_graph_paths.update({func: {
+                    "new": self.call_graph_paths_new[idx]
+                }})
+                self.signatures_docstrings.update({func: {
+                    "new": self.signatures_docstrings_new[idx]
+                }})
+                self.imports.update({func: {
+                    "new": self.imports_new[idx]
+                }})
+
+    def get_call_graph_info(self, server, modified_file, function_names, version):
         for func_info in function_names:
             func_name, start_line_0_based, start_col_0_based = func_info
             try:
-                func_level_call_gragh_paths = []
+                func_level_call_graph_paths = []
                 func_level_imports = []
                 func_level_signatures = [] # element: each path with a signature
 
@@ -325,7 +435,7 @@ class PullRequest:
                         --> this is the function should be called by the tests. Provide the signature to know what kinds of paras to use
                     '''
                     if (signature_docstring and ref_imports) or (signature_docstring and not callers): 
-                        func_level_call_gragh_paths.append(path)
+                        func_level_call_graph_paths.append(path)
                         func_level_imports.append(ref_imports)
                         if func_name.startswith("_"):
                             func_level_signatures.append(signature_docstring)
@@ -362,13 +472,23 @@ class PullRequest:
                             else:
                                 queue.append((next_func, next_line, next_col, new_path, signature_docstring, new_ref_imports, 2)) # end the traverse
 
-                self.call_gragh_paths.append(func_level_call_gragh_paths)
-                self.signatures_docstrings.append(func_level_signatures)
-                self.imports.append(func_level_imports)
+                if version == "old":
+                    self.call_graph_paths_old.append(func_level_call_graph_paths)
+                    self.signatures_docstrings_old.append(func_level_signatures)
+                    self.imports_old.append(func_level_imports)
+                else:
+                    self.call_graph_paths_new.append(func_level_call_graph_paths)
+                    self.signatures_docstrings_new.append(func_level_signatures)
+                    self.imports_new.append(func_level_imports)
             except Exception as e:
-                self.call_gragh_paths.append([]) # add empty to map it back when combine with changed functions (roughly, RegressionFinder line 310)
-                self.signatures_docstrings.append([])
-                self.imports.append([])
+                if version == "old":
+                    self.call_graph_paths_old.append([]) # add empty to map it back when combine with changed functions (roughly, RegressionFinder line 310)
+                    self.signatures_docstrings_old.append([])
+                    self.imports_old.append([])
+                else:
+                    self.call_graph_paths_new.append([])
+                    self.signatures_docstrings_new.append([])
+                    self.imports_new.append([])
                 print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
 
     def get_test_function_code(self, cloned_repo, version):

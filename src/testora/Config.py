@@ -66,7 +66,7 @@ fix_static_error = False
 # "all": use PR-modified tests + local tests
 use_existing_tests = "pr-modified"
 
-call_gragh = True
+call_graph = True
 
 # # KEEP THIS AT THE END: log the current configuration
 # current_globals = set(globals().keys())
