@@ -1,3 +1,6 @@
+from testora.util.Logs import Event, append_event
+
+
 class RegressionTestGeneratorPromptV345:
     def __init__(self, project_name, fut_qualified_names, diff, old_context, new_context, old_tests=None, new_tests=None, call_graph_info=""):
         self.project_name = project_name
@@ -29,16 +32,41 @@ class RegressionTestGeneratorPromptV345:
 
         self.use_json_output = False
 
-    def create_prompt(self):
-        template = """
+    def create_prompt(self, default_len_limit=40000):
+        # option 1: raise the legnth to handle the "too long" prompts, e.g., to 100,000
+#         template = """
+# Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff:
+
+# {diff}
+
+# {changed_function_block}
+# {call_graph_block}
+# {test_function_block}
+# The usage examples you create should use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
+
+# Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
+# Each example must be an executable piece of Python code, including all necessary imports.
+# Print all relevant values, including intermediate values, in a human-readable form.
+
+# If multiples examples are generated, do not combine them as a single Python code block. Instead, wrap each individual example in its own separate Python code block using the following output format:
+# ```python
+# # Example 1:
+# ...
+# ```
+# ```python
+# # Example 2:
+# ...
+# ```
+# etc.
+# """
+
+        # option 2: dynamically add info
+        template_prefix = """
 Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff:
 
 {diff}
-
-{changed_function_block}
-{call_graph_block}
-{test_function_block}
-The usage examples you create should use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
+"""     
+        template_postfix = """The usage examples you create should use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
 Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
 Each example must be an executable piece of Python code, including all necessary imports.
@@ -55,12 +83,31 @@ If multiples examples are generated, do not combine them as a single Python code
 ```
 etc.
 """
+        template_prefix_str = template_prefix.format(project_name=self.project_name, diff=self.diff)
+        template_postfix_str = template_postfix.format(project_name=self.project_name, diff=self.diff)
+        current_len = len(template_prefix_str) + len(template_postfix_str)
 
-        return template.format(project_name=self.project_name,
-                               diff=self.diff,
-                               changed_function_block = self.changed_function_block,
-                               call_graph_block = self.call_graph_block,
-                               test_function_block = self.test_function_block)
+        # template part 1
+        template_prompt = template_prefix_str
+
+        # template part 2
+        # collect the available blocks until reaching len limit.
+        if current_len + len(self.changed_function_block) <= default_len_limit:
+            template_prompt += f"\{self.changed_function_block}"
+            append_event(Event(pr_nb=0, message="Added info about changed function body"))
+
+        if current_len + len(self.call_graph_block) <= default_len_limit:
+            template_prompt += f"\{self.call_graph_block}"
+            append_event(Event(pr_nb=0, message="Added info about call graph"))
+
+        if current_len + len(self.test_function_block) <= default_len_limit:
+            template_prompt += f"\{self.test_function_block}"
+            append_event(Event(pr_nb=0, message="Added info about test function body"))
+
+        # template part 3
+        template_prompt += template_postfix_str
+
+        return template_prompt
 
     def remove_unnecessary_indentation(self, code):
         lines = code.split("\n")
