@@ -51,6 +51,21 @@ class PullRequest:
         if Config.use_existing_tests != None:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
+        
+        if Config.call_graph == True:
+            self.call_graph_paths_old = []
+            self.signatures_docstrings_old = []
+            self.imports_old = []
+
+            self.call_graph_paths_new = []
+            self.signatures_docstrings_new = []
+            self.imports_new = []
+
+            with open ("src/testora/util/to_check_api.txt", "r") as f:
+                apis = f.readlines()
+            existing_pub_apis = [a.split("\t")[0] for a in apis]
+            self.public_apis_old = existing_pub_apis
+            self.public_apis_new = existing_pub_apis
 
     def _pr_url_to_patch(self): 
         ''' 
@@ -258,18 +273,12 @@ class PullRequest:
                     if type(function_names[0]) == tuple: 
                         if Config.call_graph == True:
                             if version == "old":
-                                self.call_graph_paths_old = []
-                                self.signatures_docstrings_old = []
-                                self.imports_old = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based = func_name
                                     self.changed_function_qualified_names_old.append(f"{module_name}.{function_name}")
                                 # update "self.call_graph_paths", "self.signatures_docstrings", and self.imports
                                 self.get_call_graph_info(server, modified_file, function_names, version)
                             else: # new code version
-                                self.call_graph_paths_new = []
-                                self.signatures_docstrings_new = []
-                                self.imports_new = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based = func_name
                                     self.changed_function_qualified_names_new.append(f"{module_name}.{function_name}")
@@ -415,6 +424,10 @@ class PullRequest:
                 # Each item: (current_func_name, start_line, start_col, path_so_far, import_line, signature_so_far)
                 queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], "", ""))
 
+                public_apis_list = self.public_apis_old
+                if version == "new":
+                    public_apis_list = self.public_apis_new
+
                 while queue:
                     curr_func, curr_line, curr_col, path, ref_import, signature_docstring = queue.popleft()
                     if signature_docstring and ref_import: 
@@ -436,14 +449,15 @@ class PullRequest:
                         with open(caller["absolutePath"], "r") as f:
                             caller_file_content = f.read()
                         call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
-                            caller["relativePath"], caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]]
+                            caller["relativePath"], caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]],
+                            public_apis_list
                         )
                         next_func, next_line, next_col = call_function
                         new_path = [next_func] + path
                         if new_signature_docstring: # found the public function
                             # * From file {caller['relativePath']}:\n
                             new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
-                            signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}':\n{new_signature_docstring}\n"
+                            signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
                         queue.append((next_func, next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
 
                 if version == "old":

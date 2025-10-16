@@ -1,6 +1,5 @@
 import libcst as cst
 from libcst.metadata import MetadataWrapper, PositionProvider
-from testora.util.PublicAPIRetrival import find_public_import_path
 
 
 class FunctionCollector(cst.CSTVisitor):
@@ -8,15 +7,13 @@ class FunctionCollector(cst.CSTVisitor):
 
     def __init__(self):
         self.functions = []
-        # self.class_stack = []
+        self.class_stack = []
 
-    # for pyan to mapping the nodes
-    # def visit_ClassDef(self, node: cst.ClassDef):
-    #     self.class_stack.append(node.name.value)
+    def visit_ClassDef(self, node: cst.ClassDef):
+        self.class_stack.append(node.name.value)
 
-    # def leave_ClassDef(self, node: cst.ClassDef):
-    #     # TODO remove class name when decided
-    #     self.class_stack.pop()
+    def leave_ClassDef(self, node: cst.ClassDef):
+        self.class_stack.pop()
 
     def visit_FunctionDef(self, node: cst.FunctionDef):
         # position of the entire 'def ...' statement (starts at 'def')
@@ -24,14 +21,14 @@ class FunctionCollector(cst.CSTVisitor):
 
         # position of the function *name* (starts at 'foo')
         name_pos = self.get_metadata(PositionProvider, node.name)
-        # parent_class = self.class_stack[-1] if self.class_stack else None
+        parent_class = self.class_stack[-1] if self.class_stack else None
         self.functions.append((
             node,
             full_pos.start.line,
             full_pos.end.line,
             name_pos.start.line-1,      # <-- use this for LSP refs/defs
             name_pos.start.column,    # <-- use this for LSP refs/defs
-            # parent_class
+            parent_class
         ))
 
 
@@ -41,26 +38,35 @@ class CallerFunctionCollector(cst.CSTVisitor):
 
     def __init__(self):
         self.functions = []
-        self.imports = []
+        self.class_stack = []
+        # self.imports = []
+    
+    def visit_ClassDef(self, node: cst.ClassDef):
+        self.class_stack.append(node.name.value)
+
+    def leave_ClassDef(self, node: cst.ClassDef):
+        self.class_stack.pop()
 
     def visit_FunctionDef(self, node: cst.FunctionDef):
         # the same with FunctionCollector
         full_pos = self.get_metadata(PositionProvider, node)
 
         name_pos = self.get_metadata(PositionProvider, node.name)
+        parent_class = self.class_stack[-1] if self.class_stack else None
         self.functions.append((
             node,
             full_pos.start.line,
             full_pos.end.line,
             name_pos.start.line-1,      # <-- use this for LSP refs/defs
             name_pos.start.column,    # <-- use this for LSP refs/defs
+            parent_class
         ))
 
-    def visit_Import(self, node: cst.Import):
-        self.imports.append(cst.Module([]).code_for_node(node))
+    # def visit_Import(self, node: cst.Import):
+    #     self.imports.append(cst.Module([]).code_for_node(node))
 
-    def visit_ImportFrom(self, node: cst.ImportFrom):
-        self.imports.append(cst.Module([]).code_for_node(node))
+    # def visit_ImportFrom(self, node: cst.ImportFrom):
+    #     self.imports.append(cst.Module([]).code_for_node(node))
 
 class TestFunctionCollector(cst.CSTVisitor):
     METADATA_DEPENDENCIES = (PositionProvider,)
@@ -104,7 +110,9 @@ def get_function_names(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base = func
+            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            if target_line < start_line:
+                break # no matched function
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value) # Consider multiple functions involved in a single range
@@ -128,7 +136,9 @@ def get_function_names_code(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base = func
+            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            if target_line < start_line:
+                break # no matched function
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value) 
@@ -138,7 +148,7 @@ def get_function_names_code(code: str, patch_ranges: list):
 
     return list(matched_functions), list(matched_functions_code), None
 
-def get_caller_function_names(relativePath: str, code: str, check_range):
+def get_caller_function_names(relativePath: str, code: str, check_range, public_apis_list):
     '''
     Return caller function names and its location.
     Optionally, also return the definition or the function body of the caller function
@@ -161,7 +171,9 @@ def get_caller_function_names(relativePath: str, code: str, check_range):
     target_line = (check_range[0] + check_range[1]) / 2 + 1 # +1 to let it start at 1
 
     for func in collector.functions:
-        func_node, start_line, end_line, name_start_line_0base, name_start_col_0base = func
+        func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+        if target_line < start_line:
+            break # no matched function
         # the start and end lines are both included, and start at 1.
         if start_line <= target_line <= end_line:
             call_function_name = func_node.name.value
@@ -172,8 +184,18 @@ def get_caller_function_names(relativePath: str, code: str, check_range):
             # caller_func_info = "\n".join(collector.imports) + "\n" + module_with_node.code
 
             # # option 2: return the signature
-            is_public, import_line = find_public_import_path(relativePath, call_function_name)
-            if is_public == True:
+            tmp = relativePath.lstrip("src/").replace(".py", "")
+            current_module = tmp.replace("/", ".")
+            current_module_parent = tmp.rsplit("/", 1)[0].replace("/", ".")
+            # Construct import line
+            module_candi1 = f"{current_module}.{call_function_name}"
+            module_candi2 = f"{current_module_parent}.{parent_class}.{call_function_name}"
+            if module_candi1 in public_apis_list: 
+                import_line = f"from {current_module} import {call_function_name}"
+            elif module_candi2 in public_apis_list: 
+                import_line = f"from {current_module_parent}.{parent_class} import {call_function_name}"
+                
+            if import_line:
                 signature = get_function_signature(func_node)
                 # Get docstring if it exists
                 docstring = None
@@ -192,28 +214,20 @@ def get_caller_function_names(relativePath: str, code: str, check_range):
 
             break
     return call_function, import_line, signature_docstring
-    
-# def is_public(module, function_name):
-#     # If __all__ exists, check there first
-#     if hasattr(module, "__all__"):
-#         return function_name in module.__all__
-#     # Otherwise, fall back to naming convention
-#     return not function_name.startswith("_")
 
 def get_function_signature(node: cst.FunctionDef) -> str:
-    """Safely extract a readable function signature from a FunctionDef node."""
+    """Extract a readable function signature from a FunctionDef node."""
     params = node.params
     parts = []
 
-    def format_param(param: cst.Param) -> str:
-        name = param.name.value if param.name else ""
-        annotation = (
-            f": {param.annotation.annotation.value}" if param.annotation else ""
-        )
-        default = f"={param.default.value}" if param.default else ""
-        return f"{name}{annotation}{default}"
+    module = cst.Module(body=[node])
 
-    # positional-only + normal params
+    # Format a single parameter
+    def format_param(param: cst.Param) -> str:
+        # Use module.code_for_node to get exact source code
+        return module.code_for_node(param).strip()
+
+    # positional-only + normal parameters
     for p in params.posonly_params + params.params:
         parts.append(format_param(p))
 
@@ -224,7 +238,7 @@ def get_function_signature(node: cst.FunctionDef) -> str:
         else:
             parts.append("*")
 
-    # keyword-only params
+    # keyword-only parameters
     for p in params.kwonly_params:
         parts.append(format_param(p))
 
@@ -232,12 +246,13 @@ def get_function_signature(node: cst.FunctionDef) -> str:
     if isinstance(params.star_kwarg, cst.Param):
         parts.append(f"**{format_param(params.star_kwarg)}")
 
-    signature = ", ".join(parts)
-    returns = node.returns.annotation.value if node.returns else ""
-    if returns:
-        return f"{node.name.value}({signature}) -> {returns}"
-    else:
-        return f"{node.name.value}({signature})"
+    # Join parameters
+    signature = " ".join(parts)
+
+    # Return annotation
+    returns = f" -> {module.code_for_node(node.returns).strip()}" if node.returns else ""
+
+    return f"{node.name.value}({signature}){returns}"
 
 def get_test_function_names_code_imports(code: str, patch_ranges: list):
     try:
@@ -255,6 +270,8 @@ def get_test_function_names_code_imports(code: str, patch_ranges: list):
 
         for func in collector.functions:
             func_node, start_line, end_line = func
+            if target_line < start_line:
+                break # no matched function
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 module_with_node = cst.Module(body=[func_node])
@@ -280,7 +297,9 @@ def get_function_names_code_with_line_num(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base = func
+            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            if target_line < start_line:
+                break # no matched function
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 matched_functions.add(func_node.name.value)
@@ -317,7 +336,9 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base = func
+            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            if target_line < start_line:
+                break # no matched function
             # the start and end lines are both included, and start at 1.
             if start_line <= target_line <= end_line:
                 # # option 1: origianl testora

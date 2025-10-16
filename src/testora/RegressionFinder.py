@@ -318,10 +318,10 @@ def generate_tests(pr, github_repo, changed_functions):
                             # if sig_doc or imports:
                             path = " -> ".join(cg)
                             call_graph_info_str_sub += f"Path #{i}: {path}\n"
-                            if sig_doc:
-                                call_graph_info_str_sub += f"\n{sig_doc}\n"
                             if imports:
-                                call_graph_info_str_sub += f"\n{imports}\n"
+                                call_graph_info_str_sub += f"{imports}" # import info endswith "\n", refer to PullRequest.py
+                            if sig_doc:
+                                call_graph_info_str_sub += f"{sig_doc}\n"
                         
                         if call_graph_info_str_sub:
                             if label == "common":
