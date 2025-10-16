@@ -414,70 +414,72 @@ class PullRequest:
     def get_call_graph_info(self, server, modified_file, function_names, version):
         for func_info in function_names:
             func_name, start_line_0_based, start_col_0_based = func_info
-            try:
-                func_level_call_graph_paths = []
-                func_level_imports = []
-                func_level_signatures = [] # element: each path with a signature
+            # try:
+            func_level_call_graph_paths = []
+            func_level_imports = []
+            func_level_signatures = [] # element: each path with a signature
 
-                unique_entry_funcs = set()
-                queue = deque()
-                # Each item: (current_func_name, start_line, start_col, path_so_far, import_line, signature_so_far)
-                queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], "", ""))
+            unique_entry_funcs = set()
+            queue = deque()
+            # Each item: (current_func_name, start_line, start_col, path_so_far, import_line, signature_so_far)
+            queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], "", ""))
 
-                public_apis_list = self.public_apis_old
-                if version == "new":
-                    public_apis_list = self.public_apis_new
+            public_apis_list = self.public_apis_old
+            if version == "new":
+                public_apis_list = self.public_apis_new
 
-                while queue:
-                    curr_func, curr_line, curr_col, path, ref_import, signature_docstring = queue.popleft()
-                    if signature_docstring and ref_import: 
-                        # TODO get the shortest path for each unique entry func
-                        func_level_call_graph_paths.append(path)
-                        unique_entry_funcs.add(path[0])
-                        func_level_imports.append(ref_import)
-                        func_level_signatures.append(signature_docstring)
-                        # break # this gets the only one shortest
-                        continue # this ends the current path, and goes for other paths
-                    
-                    callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
+            while queue:
+                curr_func, curr_line, curr_col, path, ref_import, signature_docstring = queue.popleft()
+                if signature_docstring and ref_import: 
+                    # TODO get the shortest path for each unique entry func
+                    func_level_call_graph_paths.append(path)
+                    unique_entry_funcs.add(path[0])
+                    func_level_imports.append(ref_import)
+                    func_level_signatures.append(signature_docstring)
+                    # break # this gets the only one shortest
+                    continue # this ends the current path, and goes for other paths
+                
+                callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
 
-                    if not callers:
-                        # No more callers, but no public function found in the path
-                        continue
+                if not callers:
+                    # No more callers, but no public function found in the path
+                    continue
 
-                    for caller in callers:
-                        with open(caller["absolutePath"], "r") as f:
-                            caller_file_content = f.read()
-                        call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
-                            caller["relativePath"], caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]],
-                            public_apis_list
-                        )
-                        next_func, next_line, next_col = call_function
-                        new_path = [next_func] + path
-                        if new_signature_docstring: # found the public function
-                            # * From file {caller['relativePath']}:\n
-                            new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
-                            signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
-                        queue.append((next_func, next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
+                for caller in callers:
+                    with open(caller["absolutePath"], "r") as f:
+                        caller_file_content = f.read()
+                    call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
+                        caller["relativePath"], caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]],
+                        public_apis_list
+                    )
+                    next_func, next_line, next_col = call_function
+                    new_path = [next_func] + path
+                    new_ref_imports_to_queue = ""
+                    signature_docstring_to_queue = ""
+                    if new_signature_docstring: # found the public function
+                        # * From file {caller['relativePath']}:\n
+                        new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
+                        signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
+                    queue.append((next_func, next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
 
-                if version == "old":
-                    self.call_graph_paths_old.append(func_level_call_graph_paths)
-                    self.signatures_docstrings_old.append(func_level_signatures)
-                    self.imports_old.append(func_level_imports)
-                else:
-                    self.call_graph_paths_new.append(func_level_call_graph_paths)
-                    self.signatures_docstrings_new.append(func_level_signatures)
-                    self.imports_new.append(func_level_imports)
-            except Exception as e:
-                if version == "old":
-                    self.call_graph_paths_old.append([]) # add empty to map it back when combine with changed functions (roughly, RegressionFinder line 310)
-                    self.signatures_docstrings_old.append([])
-                    self.imports_old.append([])
-                else:
-                    self.call_graph_paths_new.append([])
-                    self.signatures_docstrings_new.append([])
-                    self.imports_new.append([])
-                print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
+            if version == "old":
+                self.call_graph_paths_old.append(func_level_call_graph_paths)
+                self.signatures_docstrings_old.append(func_level_signatures)
+                self.imports_old.append(func_level_imports)
+            else:
+                self.call_graph_paths_new.append(func_level_call_graph_paths)
+                self.signatures_docstrings_new.append(func_level_signatures)
+                self.imports_new.append(func_level_imports)
+            # except Exception as e:
+            #     if version == "old":
+            #         self.call_graph_paths_old.append([]) # add empty to map it back when combine with changed functions (roughly, RegressionFinder line 310)
+            #         self.signatures_docstrings_old.append([])
+            #         self.imports_old.append([])
+            #     else:
+            #         self.call_graph_paths_new.append([])
+            #         self.signatures_docstrings_new.append([])
+            #         self.imports_new.append([])
+            #     print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
     
     def get_test_function_code(self, cloned_repo, version):
         code_context = ""
