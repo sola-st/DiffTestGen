@@ -298,6 +298,27 @@ def generate_tests(pr, github_repo, changed_functions):
         "Each method specifies which function to call, along with its signature and docstring (if available), to guide how it should be used.\n\n"
     ) # to make sure provide only available info to the prompt
     if Config.call_graph == True:
+        info_public_and_private = ""
+
+        # for public functions
+        import_lines_info = ""
+        for label, import_lines in pr.public_func_imports.items():
+            import_lines_info_sub = ""
+            if import_lines:
+                info = "\n".join(import_lines)
+                if label == "common":
+                    import_lines_info_sub = f"The following infomation is avaliable for both the old and the new versions of code:\n{info}"
+                elif label == "old":
+                    import_lines_info_sub = f"The following infomation is avaliable only for the old code version:\n{info}" 
+                else:
+                    import_lines_info_sub = f"The following infomation is avaliable only for the new code version:\n{info}"
+                
+                import_lines_info += f"{import_lines_info_sub}\n"
+            
+        if import_lines_info:
+            info_public_and_private = f"For each affected public function, the following lists the available ways to access it.\n\n{import_lines_info}\n\n"
+
+        # for private functions
         # form the info about call graph
         # each of them are a triple list: pr_level[function_level[path level]]
         call_graph_info_str_funcs = ""
@@ -338,8 +359,10 @@ def generate_tests(pr, github_repo, changed_functions):
         
         if call_graph_info_str_funcs:
             call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
+            info_public_and_private += call_graph_info_str
 
-    print(call_graph_info_str)
+
+    print(info_public_and_private)
     exit()
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
@@ -347,7 +370,7 @@ def generate_tests(pr, github_repo, changed_functions):
         # full diff with GPT4, 5
         if Config.initial_test_generation_prompt_version == 5: # TODO specific version of prompts
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, \
-                pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=call_graph_info_str)
+                pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=info_public_and_private)
         else: # e.g., other prompts, and testora
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
         
@@ -363,7 +386,7 @@ def generate_tests(pr, github_repo, changed_functions):
         # filtered diff with GPT4
         if Config.initial_test_generation_prompt_version == 5:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, \
-                    pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=call_graph_info_str)
+                    pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=info_public_and_private)
         else:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         

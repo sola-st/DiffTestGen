@@ -187,14 +187,7 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             tmp = relativePath.lstrip("src/").replace(".py", "")
             current_module = tmp.replace("/", ".")
             current_module_parent = tmp.rsplit("/", 1)[0].replace("/", ".")
-            # Construct import line
-            module_candi1 = f"{current_module}.{call_function_name}"
-            module_candi2 = f"{current_module_parent}.{parent_class}.{call_function_name}"
-            if module_candi1 in public_apis_list: 
-                import_line = f"from {current_module} import {call_function_name}"
-            elif module_candi2 in public_apis_list: 
-                import_line = f"from {current_module_parent}.{parent_class} import {call_function_name}"
-                
+            import_line, __ = is_public(current_module, current_module_parent, parent_class, call_function_name, public_apis_list)
             if import_line:
                 signature = get_function_signature(func_node)
                 # Get docstring if it exists
@@ -214,6 +207,18 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
 
             break
     return call_function, import_line, signature_docstring
+
+def is_public(module, module_parent, parent_class, func_name, public_apis_list) -> str:
+    # if the function is public, return its import line, if not, return "".
+    import_line = ""
+    module_candi1 = f"{module}.{func_name}"
+    module_candi2 = f"{module}.{parent_class}.{func_name}"
+    if module_candi1 in public_apis_list: 
+        import_line = f"from {module} import {func_name}"
+    elif module_candi2 in public_apis_list: 
+        import_line = f"from {module_parent}.{parent_class} import {func_name}"
+        module = f"{module_parent}.{parent_class}"
+    return import_line, module
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """
@@ -372,7 +377,7 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
                 # matched_functions.add(f"{class_name}.{func_node.name.value}")
 
                 # option 3: language server
-                matched_functions.add((func_node.name.value, name_start_line_0base, name_start_col_0base)) # languge server is 0-based
+                matched_functions.add((func_node.name.value, name_start_line_0base, name_start_col_0base, parent_class)) # languge server is 0-based
 
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code

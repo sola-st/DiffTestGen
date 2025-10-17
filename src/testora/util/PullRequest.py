@@ -10,7 +10,8 @@ from testora.util.PythonCodeUtil2 import (
         get_function_names_code, 
         get_function_names_code_with_line_num,
         get_function_names_code_to_with_mark,
-        get_test_function_names_code_imports
+        get_test_function_names_code_imports,
+        is_public
 )
 from testora.util.ExtractCallerCallee import ExtractCallerCallee
 from collections import deque
@@ -53,6 +54,26 @@ class PullRequest:
             self._compute_modified_test_python_files()
         
         if Config.call_graph == True:
+            with open ("src/testora/util/to_check_api.txt", "r") as f:
+                apis = f.readlines()
+            existing_pub_apis = [a.split("\t")[0] for a in apis]
+            self.public_apis_old = existing_pub_apis
+            self.public_apis_new = existing_pub_apis
+
+            # for public changed functions
+            # to 'return'
+            self.public_func_imports = {}
+            # for middle status
+            self.public_func_imports_old = set()
+            self.public_func_imports_new = set()
+
+            # for private changed functions
+            # to 'return'
+            self.call_graph_paths = {}
+            self.signatures_docstrings = {}
+            self.imports = {}
+
+            # for middle status
             self.call_graph_paths_old = []
             self.signatures_docstrings_old = []
             self.imports_old = []
@@ -61,11 +82,6 @@ class PullRequest:
             self.signatures_docstrings_new = []
             self.imports_new = []
 
-            with open ("src/testora/util/to_check_api.txt", "r") as f:
-                apis = f.readlines()
-            existing_pub_apis = [a.split("\t")[0] for a in apis]
-            self.public_apis_old = existing_pub_apis
-            self.public_apis_new = existing_pub_apis
 
     def _pr_url_to_patch(self): 
         ''' 
@@ -235,7 +251,10 @@ class PullRequest:
             if modified_file.path in self._get_relevant_changed_files():
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     file_content = f.read()
-                module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
+                # module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
+                tmp = modified_file.path.lstrip("src/").replace(".py", "")
+                module_name = tmp.replace("/", ".")
+                
                 patch_ranges = []
                 for hunk in modified_file:
                     patch_range = None
@@ -272,17 +291,34 @@ class PullRequest:
                 if function_names:
                     if type(function_names[0]) == tuple: 
                         if Config.call_graph == True:
+                            module_parent = tmp.rsplit("/", 1)[0].replace("/", ".")
                             if version == "old":
+                                function_names_to_get_cg_old = []
                                 for func_name in function_names:
-                                    function_name, start_line_0_based, start_col_0_based = func_name
-                                    self.changed_function_qualified_names_old.append(f"{module_name}.{function_name}")
+                                    function_name, start_line_0_based, start_col_0_based, parent_class = func_name
+                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, func_name, self.public_apis_old)
+                                    fully_qulified_name = f"{adjusted_module}.{function_name}"
+                                    self.changed_function_qualified_names_old.append(fully_qulified_name)
+                                    if import_line: # public
+                                        self.public_func_imports_old.add(f"To access changed function '{fully_qulified_name}': {import_line}")
+                                    else:
+                                        function_names_to_get_cg_old.append(func_name)
+                                    
                                 # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
-                                self.get_call_graph_info(server, modified_file, function_names, version)
+                                self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
                             else: # new code version
+                                function_names_to_get_cg_new = []
                                 for func_name in function_names:
-                                    function_name, start_line_0_based, start_col_0_based = func_name
-                                    self.changed_function_qualified_names_new.append(f"{module_name}.{function_name}")
-                                self.get_call_graph_info(server, modified_file, function_names, version)
+                                    function_name, start_line_0_based, start_col_0_based, parent_class = func_name
+                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, func_name, self.public_apis_new)
+                                    fully_qulified_name = f"{adjusted_module}.{function_name}"
+                                    self.changed_function_qualified_names_new.append(fully_qulified_name)
+                                    if import_line: # public
+                                        self.public_func_imports_new.add(f"To access changed function '{fully_qulified_name}': {import_line}")
+                                    else:
+                                        function_names_to_get_cg_new.append(func_name)
+
+                                self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
                                 self.get_union_call_graph()
                                 self.get_shortest_path_each_entry()
                     else:
@@ -313,7 +349,18 @@ class PullRequest:
         return changed_functions
     
     def get_union_call_graph(self):
-        # update the following three:
+        # for public functions
+        common_in_both = self.public_func_imports_old.intersection(self.public_func_imports_new)
+        unique_in_old = self.public_func_imports_old.difference(self.public_func_imports_new)
+        unique_in_new = self.public_func_imports_new.difference(self.public_func_imports_old)
+
+        self.public_func_imports = {
+            "common": list(common_in_both),
+            "old": list(unique_in_old),
+            "new": list(unique_in_new)
+        }
+
+        # for private functions, update the following three:
         self.all_call_graph_paths = {}
         self.all_signatures_docstrings = {}
         self.all_imports = {}
@@ -351,7 +398,6 @@ class PullRequest:
                     continue
 
                 # the same in both, so far, get details from old
-                # cg_common_in_both = list([set(old_cg_func_level_list).intersection(new_cg_func_level_list)])
                 cg_common_in_both = [x for x in old_cg_func_level_list if x in new_cg_func_level_list]
                 sig_doc_common = []
                 import_common = []
@@ -361,7 +407,6 @@ class PullRequest:
                     import_common.append(old_imports_func_level_list[idx])
                 
                 # unique in old
-                # cg_unique_in_old = list([set(old_cg_func_level_list).difference(new_cg_func_level_list)])
                 cg_unique_in_old = [x for x in old_cg_func_level_list if x not in new_cg_func_level_list]
                 sig_doc_unique_in_old = []
                 import_unique_in_old = []
@@ -371,7 +416,6 @@ class PullRequest:
                     import_unique_in_old.append(old_imports_func_level_list[idx])
 
                 # unique in new
-                # cg_unique_in_new = list([set(new_cg_func_level_list).difference(old_cg_func_level_list)])
                 cg_unique_in_new = [x for x in new_cg_func_level_list if x not in old_cg_func_level_list]
                 sig_doc_unique_in_new = []
                 import_unique_in_new = []
@@ -413,11 +457,6 @@ class PullRequest:
                 }})
 
     def get_shortest_path_each_entry(self):
-        # self.all_call_graph_paths includes all the paths, to get the shortest paths
-        self.call_graph_paths = {}
-        self.signatures_docstrings = {}
-        self.imports = {}
-
         for func_name, cg_path_func_level in self.all_call_graph_paths.items():
             if cg_path_func_level:
                 self.call_graph_paths.update(
@@ -463,7 +502,7 @@ class PullRequest:
 
     def get_call_graph_info(self, server, modified_file, function_names, version):
         for func_info in function_names:
-            func_name, start_line_0_based, start_col_0_based = func_info
+            func_name, start_line_0_based, start_col_0_based, parent_class = func_info
             # try:
             func_level_call_graph_paths = []
             func_level_imports = []
@@ -481,7 +520,6 @@ class PullRequest:
             while queue:
                 curr_func, curr_line, curr_col, path, ref_import, signature_docstring = queue.popleft()
                 if signature_docstring and ref_import: 
-                    # TODO get the shortest path for each unique entry func
                     func_level_call_graph_paths.append(path)
                     unique_entry_funcs.add(path[0])
                     func_level_imports.append(ref_import)
