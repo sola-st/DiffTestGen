@@ -294,12 +294,8 @@ def generate_tests(pr, github_repo, changed_functions):
 
     call_graph_info_str = ""
     call_graph_info_str_prefix = (
-        f"For each affected function, the following provides its call graph information, if available. "
-        f"This includes the call graph path(s), the function signature(s), and the function docstring(s).\n"
-        f"A call graph path represents the sequence of function calls leading to an affected function "
-        f"(for example, Path #0: a → b → affected). Note that a single affected function may have multiple paths.\n"
-        f"For each call graph path, list the related import statements about how to access the first function (in this example, a), "
-        f"and list its function signature and docstring, if available.\n\n"
+        "For each affected non-public function, the following lists the available methods to access it, if any. "
+        "Each method specifies which function to call, along with its signature and docstring (if available), to guide how it should be used.\n\n"
     ) # to make sure provide only available info to the prompt
     if Config.call_graph == True:
         # form the info about call graph
@@ -315,9 +311,12 @@ def generate_tests(pr, github_repo, changed_functions):
                         for i, cg in enumerate(cg_paths):
                             sig_doc = pr.signatures_docstrings[func_name][label][i]
                             imports = pr.imports[func_name][label][i]
-                            # if sig_doc or imports:
-                            path = " -> ".join(cg)
-                            call_graph_info_str_sub += f"Path #{i}: {path}\n"
+                            '''
+                            two options:
+                            * provide the entire call graph path to the prompt
+                            * provide only the entry function (Prefer)
+                            '''
+                            call_graph_info_str_sub += f"Method #{i}: by calling function '{cg[0]}'\n"
                             if imports:
                                 call_graph_info_str_sub += f"{imports}" # import info endswith "\n", refer to PullRequest.py
                             if sig_doc:
@@ -334,7 +333,7 @@ def generate_tests(pr, github_repo, changed_functions):
                             call_graph_info_str_function_level += call_graph_info_str_sub
 
                 if call_graph_info_str_function_level:
-                    call_graph_info_str_function_level = f"Call graph information about the changed function {func_name}:\n\n{call_graph_info_str_function_level}"
+                    call_graph_info_str_function_level = f"To access the changed function {func_name}:\n\n{call_graph_info_str_function_level}"
                     call_graph_info_str_funcs += call_graph_info_str_function_level
         
         if call_graph_info_str_funcs:

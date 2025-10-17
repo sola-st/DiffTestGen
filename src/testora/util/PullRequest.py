@@ -276,7 +276,7 @@ class PullRequest:
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based = func_name
                                     self.changed_function_qualified_names_old.append(f"{module_name}.{function_name}")
-                                # update "self.call_graph_paths", "self.signatures_docstrings", and self.imports
+                                # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
                                 self.get_call_graph_info(server, modified_file, function_names, version)
                             else: # new code version
                                 for func_name in function_names:
@@ -284,6 +284,7 @@ class PullRequest:
                                     self.changed_function_qualified_names_new.append(f"{module_name}.{function_name}")
                                 self.get_call_graph_info(server, modified_file, function_names, version)
                                 self.get_union_call_graph()
+                                self.get_shortest_path_each_entry()
                     else:
                         for func_name in function_names:
                             changed_functions.append(f"{module_name}.{func_name}") # func_name also includes class_name if the setting goes like that
@@ -313,26 +314,26 @@ class PullRequest:
     
     def get_union_call_graph(self):
         # update the following three:
-        self.call_graph_paths = {}
-        self.signatures_docstrings = {}
-        self.imports = {}
+        self.all_call_graph_paths = {}
+        self.all_signatures_docstrings = {}
+        self.all_imports = {}
         
         non_checked_new_indices = list(range(len(self.changed_function_qualified_names_new)))
         for qualified_func, old_cg_func_level_list, old_sig_doc_func_level_list, old_imports_func_level_list in \
                 zip(self.changed_function_qualified_names_old, self.call_graph_paths_old, self.signatures_docstrings_old, self.imports_old):
-            self.call_graph_paths.update(
+            self.all_call_graph_paths.update(
                 {qualified_func: {
                     "common": [],
                     "old": [],
                     "new": []
                 }})
-            self.signatures_docstrings.update(
+            self.all_signatures_docstrings.update(
                 {qualified_func: {
                     "common": [],
                     "old": [],
                     "new": []
                 }})
-            self.imports.update(
+            self.all_imports.update(
                 {qualified_func: {
                     "common": [],
                     "old": [],
@@ -380,36 +381,85 @@ class PullRequest:
                     import_unique_in_new.append(new_imports_func_level_list[idx])
 
                 # union info
-                self.call_graph_paths[qualified_func]["common"].extend(cg_common_in_both)
-                self.signatures_docstrings[qualified_func]["common"].extend(sig_doc_common)
-                self.imports[qualified_func]["common"].extend(import_common)
+                self.all_call_graph_paths[qualified_func]["common"].extend(cg_common_in_both)
+                self.all_signatures_docstrings[qualified_func]["common"].extend(sig_doc_common)
+                self.all_imports[qualified_func]["common"].extend(import_common)
 
-                self.call_graph_paths[qualified_func]["old"].extend(cg_unique_in_old)
-                self.signatures_docstrings[qualified_func]["old"].extend(sig_doc_common)
-                self.imports[qualified_func]["old"].extend(import_unique_in_old)
+                self.all_call_graph_paths[qualified_func]["old"].extend(cg_unique_in_old)
+                self.all_signatures_docstrings[qualified_func]["old"].extend(sig_doc_common)
+                self.all_imports[qualified_func]["old"].extend(import_unique_in_old)
 
-                self.call_graph_paths[qualified_func]["new"].extend(cg_unique_in_new)
-                self.signatures_docstrings[qualified_func]["new"].extend(cg_unique_in_new)
-                self.imports[qualified_func]["new"].extend(import_unique_in_new)
+                self.all_call_graph_paths[qualified_func]["new"].extend(cg_unique_in_new)
+                self.all_signatures_docstrings[qualified_func]["new"].extend(cg_unique_in_new)
+                self.all_imports[qualified_func]["new"].extend(import_unique_in_new)
 
             else: # unique in old
-                self.call_graph_paths[qualified_func]["old"] = old_cg_func_level_list
-                self.signatures_docstrings[qualified_func]["old"] = old_sig_doc_func_level_list
-                self.imports[qualified_func]["old"] = old_imports_func_level_list
+                self.all_call_graph_paths[qualified_func]["old"] = old_cg_func_level_list
+                self.all_signatures_docstrings[qualified_func]["old"] = old_sig_doc_func_level_list
+                self.all_imports[qualified_func]["old"] = old_imports_func_level_list
 
         if non_checked_new_indices: # unique in new
             for idx in non_checked_new_indices:
                 func = self.changed_function_qualified_names_new[idx]
                 
-                self.call_graph_paths.update({func: {
+                self.all_call_graph_paths.update({func: {
                     "new": self.call_graph_paths_new[idx]
                 }})
-                self.signatures_docstrings.update({func: {
+                self.all_signatures_docstrings.update({func: {
                     "new": self.signatures_docstrings_new[idx]
                 }})
-                self.imports.update({func: {
+                self.all_imports.update({func: {
                     "new": self.imports_new[idx]
                 }})
+
+    def get_shortest_path_each_entry(self):
+        # self.all_call_graph_paths includes all the paths, to get the shortest paths
+        self.call_graph_paths = {}
+        self.signatures_docstrings = {}
+        self.imports = {}
+
+        for func_name, cg_path_func_level in self.all_call_graph_paths.items():
+            if cg_path_func_level:
+                self.call_graph_paths.update(
+                    {func_name: {
+                        "common": [],
+                        "old": [],
+                        "new": []
+                    }})
+                self.signatures_docstrings.update(
+                    {func_name: {
+                        "common": [],
+                        "old": [],
+                        "new": []
+                    }})
+                self.imports.update(
+                    {func_name: {
+                        "common": [],
+                        "old": [],
+                        "new": []
+                    }})
+        
+                for label, cg_paths in cg_path_func_level.items(): # label could be common, old, and new
+                    if cg_paths:
+                        entry_func_to_paths = {}
+                        for i, cg in enumerate(cg_paths):
+                            cg.append(i) # to mark the idx, and map to signatures and imports
+                            entry_func = cg[0]
+                            if entry_func not in entry_func_to_paths.keys():
+                                entry_func_to_paths.update({entry_func: [cg]})
+                            else:
+                                entry_func_to_paths[entry_func].append(cg)
+
+                        for entry_func, paths in entry_func_to_paths.items():
+                            shortest_path_tmp = min(paths, key=len)
+                            shortest_path = shortest_path_tmp[:-1]
+                            idx = shortest_path_tmp[-1]
+                            sig_doc = self.all_signatures_docstrings[func_name][label][idx]
+                            imports = self.all_imports[func_name][label][idx]
+
+                            self.call_graph_paths[func_name][label].append(shortest_path)
+                            self.signatures_docstrings[func_name][label].append(sig_doc)
+                            self.imports[func_name][label].append(imports)
 
     def get_call_graph_info(self, server, modified_file, function_names, version):
         for func_info in function_names:
@@ -458,8 +508,10 @@ class PullRequest:
                     signature_docstring_to_queue = ""
                     if new_signature_docstring: # found the public function
                         # * From file {caller['relativePath']}:\n
-                        new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
-                        signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
+                        # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
+                        # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
+                        new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
+                        signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
                     queue.append((next_func, next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
 
             if version == "old":

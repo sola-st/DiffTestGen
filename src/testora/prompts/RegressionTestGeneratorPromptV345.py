@@ -20,7 +20,7 @@ class RegressionTestGeneratorPromptV345:
 
         self.call_graph_block = ""
         if call_graph_info:
-            self.call_graph_block = f"The following provides call graph information for the affected functions. This information can serve as a reference for understanding how to access or invoke the functions:\n{call_graph_info}"
+            self.call_graph_block = f"The following provides reference information on how to access or invoke the affected functions:\n{call_graph_info}"
 
         self.test_function_block = ""
         if old_tests or new_tests:
