@@ -133,14 +133,14 @@ def get_function_names_code(code: str, patch_ranges: list):
     matched_functions = set() # function names
     matched_functions_code = set()
     for patch_range in patch_ranges:
-        target_line = (patch_range[0] + patch_range[1]) / 2
-
         for func in collector.functions:
             func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
-            if target_line < start_line:
+            if patch_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
                 break # no matched function
-            # the start and end lines are both included, and start at 1.
-            if start_line <= target_line <= end_line:
+            
+            if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
+                # current function has overlaps with the modified lines
+                # the start and end lines are both included, and start at 1.
                 matched_functions.add(func_node.name.value) 
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
@@ -168,14 +168,15 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
     call_function = []
     import_line = None
     signature_docstring = None
-    target_line = (check_range[0] + check_range[1]) / 2 + 1 # +1 to let it start at 1
 
     for func in collector.functions:
         func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
-        if target_line < start_line:
+        if check_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
             break # no matched function
-        # the start and end lines are both included, and start at 1.
-        if start_line <= target_line <= end_line:
+            
+        if set(list(range(start_line, end_line+1))).intersection(set(list(check_range))):
+            # current function has overlaps with the modified lines
+            # the start and end lines are both included, and start at 1.
             call_function_name = func_node.name.value
             call_function = [call_function_name, name_start_line_0base, name_start_col_0base] # languge server is 0-based
 
@@ -295,14 +296,13 @@ def get_test_function_names_code_imports(code: str, patch_ranges: list):
 
     matched_functions_code = set()
     for patch_range in patch_ranges:
-        target_line = (patch_range[0] + patch_range[1]) / 2
-
         for func in collector.functions:
             func_node, start_line, end_line = func
-            if target_line < start_line:
+            if patch_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
                 break # no matched function
-            # the start and end lines are both included, and start at 1.
-            if start_line <= target_line <= end_line:
+            
+            if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
+                # the start and end lines are both included, and start at 1.
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
                 matched_functions_code.add(function_code)
@@ -323,14 +323,12 @@ def get_function_names_code_with_line_num(code: str, patch_ranges: list):
     matched_functions = set() # function names
     matched_functions_code = set()
     for patch_range in patch_ranges:
-        target_line = (patch_range[0] + patch_range[1]) / 2
-
         for func in collector.functions:
             func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
-            if target_line < start_line:
+            if patch_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
                 break # no matched function
-            # the start and end lines are both included, and start at 1.
-            if start_line <= target_line <= end_line:
+            
+            if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
                 matched_functions.add(func_node.name.value)
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
@@ -362,14 +360,12 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
     matched_functions_code = set() # used in initial test generation
     matched_function_code_with_line_num = set() # used to mark to_cover lines in the feedback loop
     for patch_range in patch_ranges:
-        target_line = (patch_range[0] + patch_range[1]) / 2
-
         for func in collector.functions:
             func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
-            if target_line < start_line:
+            if patch_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
                 break # no matched function
-            # the start and end lines are both included, and start at 1.
-            if start_line <= target_line <= end_line:
+            
+            if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
                 # # option 1: origianl testora
                 # matched_functions.add(func_node.name.value)
 

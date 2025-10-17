@@ -1,7 +1,7 @@
-import json
 import requests
 from unidiff import PatchSet
 # import urllib.request
+from testora.execution.CoverageAnalyzer import set_to_ranges
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
 from testora.util.PythonCodeUtil2 import (
@@ -32,6 +32,7 @@ class PullRequest:
 
         self.full_diff = self.get_full_diff() 
         self._compute_modified_lines() # extract from full_diff, all modified lines, includes the non-excutable ones
+        self._get_refined_changed_hunks()
 
         # only compute diffs once, full_diff at above location, and filtered diff at the initial round test generation
         # all the following feedback rounds will get the diff strs by these two attributes.
@@ -185,7 +186,7 @@ class PullRequest:
 
         return post_commit_cloned_repo.repo.git.diff(self.pre_commit, self.post_commit)
 
-    def get_changed_function_names(self):
+    def get_changed_function_names(self): # only been used in original Testora
         result = []
         
         # H: only the function name in new version
@@ -256,17 +257,23 @@ class PullRequest:
                 module_name = tmp.replace("/", ".")
                 
                 patch_ranges = []
-                for hunk in modified_file:
-                    patch_range = None
-                    if version == "new":
-                        start_line = hunk.target_start
-                        end_line = hunk.target_start + hunk.target_length
-                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
+                if Config.context_version == 1: # original Testora
+                    for hunk in modified_file:
+                        patch_range = None
+                        if version == "new":
+                            start_line = hunk.target_start
+                            end_line = hunk.target_start + hunk.target_length
+                            patch_range = (start_line, end_line) # numbers start at 1 and end_line included
+                        else:
+                            start_line = hunk.source_start
+                            end_line = hunk.source_start + hunk.source_length
+                            patch_range = (start_line, end_line) # numbers start at 1 and end_line included
+                        patch_ranges.append(patch_range)
+                else:
+                    if version == "old":
+                        patch_ranges = self.old_file_path_to_change_hunks[modified_file.path]
                     else:
-                        start_line = hunk.source_start
-                        end_line = hunk.source_start + hunk.source_length
-                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
-                    patch_ranges.append(patch_range) 
+                        patch_ranges = self.new_file_path_to_change_hunks[modified_file.path]
 
                 function_names = None
                 functions_code = None
@@ -536,10 +543,9 @@ class PullRequest:
                 for caller in callers:
                     with open(caller["absolutePath"], "r") as f:
                         caller_file_content = f.read()
+                    range_starts_at1 = range(caller["range"]["start"]["line"]+1, caller["range"]["end"]["line"]+1)
                     call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
-                        caller["relativePath"], caller_file_content, [caller["range"]["start"]["line"], caller["range"]["end"]["line"]],
-                        public_apis_list
-                    )
+                        caller["relativePath"], caller_file_content, range_starts_at1, public_apis_list)
                     next_func, next_line, next_col = call_function
                     new_path = [next_func] + path
                     new_ref_imports_to_queue = ""
@@ -578,17 +584,10 @@ class PullRequest:
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     file_content = f.read()
                 patch_ranges = []
-                for hunk in modified_file:
-                    patch_range = None
-                    if version == "new":
-                        start_line = hunk.target_start
-                        end_line = hunk.target_start + hunk.target_length
-                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
-                    else:
-                        start_line = hunk.source_start
-                        end_line = hunk.source_start + hunk.source_length
-                        patch_range = (start_line, end_line) # numbers start at 1 andend_line included
-                    patch_ranges.append(patch_range)
+                if version == "old":
+                    patch_ranges = self.old_file_path_to_change_hunks[modified_file.path]
+                else:
+                    patch_ranges = self.new_file_path_to_change_hunks[modified_file.path]
 
                 test_functions_code, test_file_imports = get_test_function_names_code_imports(file_content, patch_ranges)
                 
@@ -618,3 +617,32 @@ class PullRequest:
                         self.old_file_path_to_all_modified_lines[patched_file.path].add(line.source_line_no)
                     elif line.is_added:
                         self.new_file_path_to_all_modified_lines[patched_file.path].add(line.target_line_no)
+
+    def _get_refined_changed_hunks(self):
+        # to use the exact changed hunks, without unchanged lines, to locate the functions.
+        self.old_file_path_to_change_hunks = _get_refined_changed_hunks_helper(self.old_file_path_to_all_modified_lines)
+        self.new_file_path_to_change_hunks = _get_refined_changed_hunks_helper(self.new_file_path_to_all_modified_lines)
+
+
+def _get_refined_changed_hunks_helper(file_path_to_all_modified_lines):
+    file_path_to_change_hunks = {}
+    for file_path, changed_lines in file_path_to_all_modified_lines.items():
+        changed_hunks = set_to_ranges(changed_lines)
+        file_path_to_change_hunks.update({file_path: changed_hunks})
+    return file_path_to_change_hunks
+
+# def set_to_ranges2(numbers:set):
+#     # tranfer numbers to ranges, start and end line included 
+#     # e.g., from {1, 2, 10, 11, 12, 13, 25} to [(1, 2), (10, 13), (25, 25)]
+#     ranges = []
+#     if numbers:
+#         sorted_numbers = sorted(numbers)
+#         start = sorted_numbers[0]
+
+#         for i in range(1, len(sorted_numbers)):
+#             if sorted_numbers[i] != sorted_numbers[i - 1] + 1: 
+#                 ranges.append((start, sorted_numbers[i - 1]))
+#                 start = sorted_numbers[i]
+
+#         ranges.append((start, sorted_numbers[-1]))
+#     return ranges
