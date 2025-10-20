@@ -65,7 +65,7 @@ class PullRequest:
         # existing_pub_apis = [a.split("\t")[0] for a in apis]
         # self.public_apis_old = existing_pub_apis
         # self.public_apis_new = existing_pub_apis
-        self.public_apis_new = [] 
+        self.public_apis_old = [] 
         self.public_apis_new = []
 
         # for public changed functions
