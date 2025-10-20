@@ -233,48 +233,30 @@ def is_public(module, module_parent, parent_class, func_name, public_apis_list) 
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """
-    Safely extract a readable function signature from a FunctionDef node.
-    Works for both parsed and manually constructed nodes.
+    Extract a reliable, fully formatted function signature from a FunctionDef node.
+    Works for nodes parsed via libcst.parse_module().
     """
-    
-    def format_param(param: cst.Param) -> str:
-        name = param.name.value if param.name else ""
-        
-        # Annotation
-        annotation = ""
-        if param.annotation:
-            try:
-                # Attempt to use code if available
-                annotation = f": {param.annotation.annotation.code}"
-            except AttributeError:
-                # Fallback to value for manually constructed nodes
-                annotation = f": {getattr(param.annotation.annotation, 'value', '...')}"
-        
-        # Default
-        default = ""
-        if param.default:
-            try:
-                default = f"={param.default.code}"
-            except AttributeError:
-                default = f"={getattr(param.default, 'value', '...')}"
-        
-        return f"{name}{annotation}{default}"
-
     params = node.params
     parts = []
 
-    # Positional-only + normal parameters
+    module = cst.Module(body=[node])
+
+    def format_param(param: cst.Param) -> str:
+        # The CST node retains full syntax, including annotations/defaults
+        return module.code_for_node(param).strip()
+
+    # Positional-only + regular params
     for p in params.posonly_params + params.params:
         parts.append(format_param(p))
 
     # *args or bare *
-    if isinstance(params.star_arg, cst.Param):
-        if params.star_arg.name is not None:
+    if params.star_arg:
+        if isinstance(params.star_arg, cst.Param):
             parts.append(f"*{format_param(params.star_arg)}")
         else:
-            parts.append("*")
+            parts.append("*,")
 
-    # Keyword-only parameters
+    # Keyword-only params
     for p in params.kwonly_params:
         parts.append(format_param(p))
 
@@ -287,10 +269,7 @@ def get_function_signature(node: cst.FunctionDef) -> str:
     # Return annotation
     returns = ""
     if node.returns:
-        try:
-            returns = f" -> {node.returns.annotation.code}"
-        except AttributeError:
-            returns = f" -> {getattr(node.returns.annotation, 'value', '...')}"
+        returns = f" -> {module.code_for_node(node.returns.annotation).strip()}"
 
     return f"{node.name.value}({signature}){returns}"
 
