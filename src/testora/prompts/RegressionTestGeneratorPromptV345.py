@@ -68,7 +68,7 @@ Your task is to generate usage examples of the {project_name} project that expos
 """     
         template_postfix = """The usage examples you create should use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
 
-Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
+Answer by giving ten usage examples that cover normal usage scenarios and ten usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
 Each example must be an executable piece of Python code, including all necessary imports.
 Print all relevant values, including intermediate values, in a human-readable form.
 
@@ -92,16 +92,16 @@ etc.
 
         # template part 2
         # collect the available blocks until reaching len limit.
-        if current_len + len(self.changed_function_block) <= default_len_limit:
-            template_prompt += f"\{self.changed_function_block}"
+        if len(self.changed_function_block) > 0 and (current_len + len(self.changed_function_block) <= default_len_limit):
+            template_prompt += f"\n{self.changed_function_block}"
             append_event(Event(pr_nb=0, message="Added info about changed function body"))
 
-        if current_len + len(self.call_graph_block) <= default_len_limit:
-            template_prompt += f"\{self.call_graph_block}"
+        if len(self.call_graph_block) > 0 and (current_len + len(self.call_graph_block) <= default_len_limit):
+            template_prompt += f"\n{self.call_graph_block}"
             append_event(Event(pr_nb=0, message="Added info about call graph"))
 
-        if current_len + len(self.test_function_block) <= default_len_limit:
-            template_prompt += f"\{self.test_function_block}"
+        if len(self.test_function_block) > 0 and (current_len + len(self.test_function_block) <= default_len_limit):
+            template_prompt += f"\n{self.test_function_block}"
             append_event(Event(pr_nb=0, message="Added info about test function body"))
 
         # template part 3

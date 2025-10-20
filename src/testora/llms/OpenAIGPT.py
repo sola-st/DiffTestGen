@@ -32,7 +32,7 @@ class OpenAIGPT:
         append_event(LLMEvent(pr_nb=-1,
                               message=f"Querying {self.model}",
                               content=f"System message:\n{system_message}\nUser message:\n{user_message}"))
-        exit()
+        
         while True:
             try:
                 if prompt.use_json_output:

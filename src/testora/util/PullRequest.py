@@ -330,7 +330,7 @@ class PullRequest:
                                 # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
                                 self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
                             else: # new code version
-                                self.public_apis_new = get_apis(f"api_{container_name}.inv")
+                                self.public_apis_new = get_apis(f"api_{container_name}/objects.inv")
 
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
