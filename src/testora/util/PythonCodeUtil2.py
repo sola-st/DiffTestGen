@@ -19,11 +19,20 @@ class FunctionCollector(cst.CSTVisitor):
         # position of the entire 'def ...' statement (starts at 'def')
         full_pos = self.get_metadata(PositionProvider, node)
 
+        deco_start_line = None
+        # If decorators exist, adjust start line/column to include them
+        if node.decorators:
+            first_decorator = node.decorators[0]
+            deco_pos = self.get_metadata(PositionProvider, first_decorator)
+            # Replace start of function with start of first decorator
+            deco_start_line = deco_pos.start.line
+
         # position of the function *name* (starts at 'foo')
         name_pos = self.get_metadata(PositionProvider, node.name)
         parent_class = self.class_stack[-1] if self.class_stack else None
         self.functions.append((
             node,
+            deco_start_line,
             full_pos.start.line,
             full_pos.end.line,
             name_pos.start.line-1,      # <-- use this for LSP refs/defs
@@ -110,7 +119,7 @@ def get_function_names(code: str, patch_ranges: list):
         target_line = (patch_range[0] + patch_range[1]) / 2
 
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            func_node, deco_start_line, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
             if target_line < start_line:
                 break # no matched function
             # the start and end lines are both included, and start at 1.
@@ -134,11 +143,12 @@ def get_function_names_code(code: str, patch_ranges: list):
     matched_functions_code = set()
     for patch_range in patch_ranges:
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
-            if patch_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
+            func_node, deco_start_line, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            start_to_compare = deco_start_line if deco_start_line else start_line
+            if patch_range.stop -1 < start_to_compare: # if range is range(1, 6), stop is 6
                 break # no matched function
             
-            if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
+            if set(list(range(start_to_compare, end_line+1))).intersection(set(list(patch_range))):
                 # current function has overlaps with the modified lines
                 # the start and end lines are both included, and start at 1.
                 matched_functions.add(func_node.name.value) 
@@ -324,15 +334,16 @@ def get_function_names_code_with_line_num(code: str, patch_ranges: list):
     matched_functions_code = set()
     for patch_range in patch_ranges:
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
-            if patch_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
+            func_node, deco_start_line, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            start_to_compare = deco_start_line if deco_start_line else start_line
+            if patch_range.stop -1 < start_to_compare: # if range is range(1, 6), stop is 6
                 break # no matched function
             
-            if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
+            if set(list(range(start_to_compare, end_line+1))).intersection(set(list(patch_range))):
                 matched_functions.add(func_node.name.value)
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
-                numbered_lines = [f"<{start_line + i}> {line}" for i, line in enumerate(function_code.splitlines())]
+                numbered_lines = [f"<{start_to_compare + i}> {line}" for i, line in enumerate(function_code.splitlines())]
                 function_code_with_line_numbers = "\n".join(numbered_lines)
                 matched_functions_code.add(function_code_with_line_numbers)
 
@@ -361,11 +372,12 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
     matched_function_code_with_line_num = set() # used to mark to_cover lines in the feedback loop
     for patch_range in patch_ranges:
         for func in collector.functions:
-            func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
-            if patch_range.stop -1 < start_line: # if range is range(1, 6), stop is 6
+            func_node, deco_start_line, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
+            start_to_compare = deco_start_line if deco_start_line else start_line
+            if patch_range.stop -1 < start_to_compare: # if range is range(1, 6), stop is 6
                 break # no matched function
             
-            if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
+            if set(list(range(start_to_compare, end_line+1))).intersection(set(list(patch_range))):
                 # # option 1: origianl testora
                 # matched_functions.add(func_node.name.value)
 
@@ -378,7 +390,7 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
                 module_with_node = cst.Module(body=[func_node])
                 function_code = module_with_node.code
                 matched_functions_code.add(function_code)
-                numbered_lines = [f"<{start_line + i}> {line}" for i, line in enumerate(function_code.splitlines())]
+                numbered_lines = [f"<{start_to_compare + i}> {line}" for i, line in enumerate(function_code.splitlines())]
                 function_code_with_line_numbers = "\n".join(numbered_lines)
                 matched_function_code_with_line_num.add(function_code_with_line_numbers)
 

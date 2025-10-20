@@ -361,9 +361,6 @@ def generate_tests(pr, github_repo, changed_functions):
             call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
             info_public_and_private += call_graph_info_str
 
-
-    print(info_public_and_private)
-    exit()
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
         prompt_full_diff = None

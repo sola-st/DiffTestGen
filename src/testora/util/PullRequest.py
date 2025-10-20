@@ -326,11 +326,13 @@ class PullRequest:
                                         function_names_to_get_cg_new.append(func_name)
 
                                 self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
-                                self.get_union_call_graph()
-                                self.get_shortest_path_each_entry()
                     else:
                         for func_name in function_names:
                             changed_functions.append(f"{module_name}.{func_name}") # func_name also includes class_name if the setting goes like that
+                
+                if version == "new" and (self.call_graph_paths_old or self.call_graph_paths_new):
+                    self.get_union_call_graph()
+                    self.get_shortest_path_each_entry()
 
                 if functions_code:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
@@ -543,7 +545,7 @@ class PullRequest:
                 for caller in callers:
                     with open(caller["absolutePath"], "r") as f:
                         caller_file_content = f.read()
-                    range_starts_at1 = range(caller["range"]["start"]["line"]+1, caller["range"]["end"]["line"]+1)
+                    range_starts_at1 = range(caller["range"]["start"]["line"]+1, caller["range"]["end"]["line"]+2) # +1 to start at 1, +1 to be a right-open range
                     call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
                         caller["relativePath"], caller_file_content, range_starts_at1, public_apis_list)
                     next_func, next_line, next_col = call_function
