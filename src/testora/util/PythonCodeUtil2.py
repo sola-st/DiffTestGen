@@ -212,9 +212,9 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
                     ):
                         docstring = first_stmt.body[0].value  # This includes the quotes
                 
-                signature_docstring = f"{signature}\n"
+                signature_docstring = f"{signature}"
                 if docstring:
-                    signature_docstring += f"{docstring}"
+                    signature_docstring += f"\n{docstring}"
 
             break
     return call_function, import_line, signature_docstring

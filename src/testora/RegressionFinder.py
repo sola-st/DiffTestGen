@@ -35,6 +35,7 @@ from testora.prompts.RegressionClassificationPromptV4 import RegressionClassific
 from testora.prompts.RegressionClassificationPromptV5 import RegressionClassificationPromptV5
 from testora.prompts.RegressionClassificationPromptV6 import RegressionClassificationPromptV6
 from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorPrompt
+from testora.util import BuildDocumentation
 from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
@@ -670,11 +671,6 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
     # return
     # note: the initial round do not have converage info.
-
-    # # extract call graph and dependency graph
-    # output_dir = join("data", "results", github_repo.name)
-    # call_graph, dependency_graph = extract_graphs_from_specified_files(
-    #         github_repo, raw_info_changed_functions, output_dir)
 
     # existing developer-written tests
     # "none": do not make any extra effort about developer-written tests,

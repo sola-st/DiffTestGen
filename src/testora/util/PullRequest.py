@@ -2,6 +2,8 @@ import requests
 from unidiff import PatchSet
 # import urllib.request
 from testora.execution.CoverageAnalyzer import set_to_ranges
+from testora.util.BuildDocumentation import BuildDocumentation
+from testora.util.ListPublicAPIsLocal import get_apis
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
 from testora.util.PythonCodeUtil2 import (
@@ -55,34 +57,38 @@ class PullRequest:
             self._compute_modified_test_python_files()
         
         if Config.call_graph == True:
-            with open ("src/testora/util/to_check_api.txt", "r") as f:
-                apis = f.readlines()
-            existing_pub_apis = [a.split("\t")[0] for a in apis]
-            self.public_apis_old = existing_pub_apis
-            self.public_apis_new = existing_pub_apis
+            self._prepae_to_use_call_graph()
 
-            # for public changed functions
-            # to 'return'
-            self.public_func_imports = {}
-            # for middle status
-            self.public_func_imports_old = set()
-            self.public_func_imports_new = set()
+    def _prepae_to_use_call_graph(self):
+        # with open ("src/testora/util/to_check_api.txt", "r") as f:
+        #     apis = f.readlines() 
+        # existing_pub_apis = [a.split("\t")[0] for a in apis]
+        # self.public_apis_old = existing_pub_apis
+        # self.public_apis_new = existing_pub_apis
+        self.public_apis_new = [] 
+        self.public_apis_new = []
 
-            # for private changed functions
-            # to 'return'
-            self.call_graph_paths = {}
-            self.signatures_docstrings = {}
-            self.imports = {}
+        # for public changed functions
+        # to 'return'
+        self.public_func_imports = {}
+        # for middle status
+        self.public_func_imports_old = set()
+        self.public_func_imports_new = set()
 
-            # for middle status
-            self.call_graph_paths_old = []
-            self.signatures_docstrings_old = []
-            self.imports_old = []
+        # for private changed functions
+        # to 'return'
+        self.call_graph_paths = {}
+        self.signatures_docstrings = {}
+        self.imports = {}
 
-            self.call_graph_paths_new = []
-            self.signatures_docstrings_new = []
-            self.imports_new = []
+        # for middle status
+        self.call_graph_paths_old = []
+        self.signatures_docstrings_old = []
+        self.imports_old = []
 
+        self.call_graph_paths_new = []
+        self.signatures_docstrings_new = []
+        self.imports_new = []
 
     def _pr_url_to_patch(self): 
         ''' 
@@ -299,7 +305,17 @@ class PullRequest:
                     if type(function_names[0]) == tuple: 
                         if Config.call_graph == True:
                             module_parent = tmp.rsplit("/", 1)[0].replace("/", ".")
+
+                            # to build documentation
+                            container_name = cloned_repo.container_name
+                            project_name = self.cloned_repo_manager.repo_name
+                            # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
+                            BuildDocumentation(container_name, project_name).build()
+                            
                             if version == "old":
+                                # get public apis
+                                self.public_apis_old = get_apis(f"api_{container_name}/objects.inv")
+
                                 function_names_to_get_cg_old = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
@@ -314,6 +330,8 @@ class PullRequest:
                                 # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
                                 self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
                             else: # new code version
+                                self.public_apis_new = get_apis(f"api_{container_name}.inv")
+
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
