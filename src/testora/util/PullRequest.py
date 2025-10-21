@@ -308,9 +308,11 @@ class PullRequest:
 
                             # to build documentation
                             container_name = cloned_repo.container_name
-                            project_name = self.cloned_repo_manager.repo_name
-                            # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
-                            BuildDocumentation(container_name, project_name).build()
+                            if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
+                                # to build only once per version
+                                project_name = self.cloned_repo_manager.repo_name
+                                # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
+                                BuildDocumentation(container_name, project_name).build()
                             
                             if version == "old":
                                 # get public apis
@@ -447,7 +449,7 @@ class PullRequest:
                 sig_doc_unique_in_new = []
                 import_unique_in_new = []
                 for unique in cg_unique_in_new:
-                    map_idx = old_cg_func_level_list.index(unique)
+                    map_idx = new_cg_func_level_list.index(unique)
                     sig_doc_unique_in_new.append(new_sig_doc_func_level_list[map_idx])
                     import_unique_in_new.append(new_imports_func_level_list[idx])
 
@@ -457,11 +459,11 @@ class PullRequest:
                 self.all_imports[qualified_func]["common"].extend(import_common)
 
                 self.all_call_graph_paths[qualified_func]["old"].extend(cg_unique_in_old)
-                self.all_signatures_docstrings[qualified_func]["old"].extend(sig_doc_common)
+                self.all_signatures_docstrings[qualified_func]["old"].extend(sig_doc_unique_in_old)
                 self.all_imports[qualified_func]["old"].extend(import_unique_in_old)
 
                 self.all_call_graph_paths[qualified_func]["new"].extend(cg_unique_in_new)
-                self.all_signatures_docstrings[qualified_func]["new"].extend(cg_unique_in_new)
+                self.all_signatures_docstrings[qualified_func]["new"].extend(sig_doc_unique_in_new)
                 self.all_imports[qualified_func]["new"].extend(import_unique_in_new)
 
             else: # unique in old
@@ -566,17 +568,19 @@ class PullRequest:
                     range_starts_at1 = range(caller["range"]["start"]["line"]+1, caller["range"]["end"]["line"]+2) # +1 to start at 1, +1 to be a right-open range
                     call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
                         caller["relativePath"], caller_file_content, range_starts_at1, public_apis_list)
-                    next_func, next_line, next_col = call_function
-                    new_path = [next_func] + path
-                    new_ref_imports_to_queue = ""
-                    signature_docstring_to_queue = ""
-                    if new_signature_docstring: # found the public function
-                        # * From file {caller['relativePath']}:\n
-                        # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
-                        # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
-                        new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
-                        signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
-                    queue.append((next_func, next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
+                    
+                    if call_function:
+                        next_func, next_line, next_col = call_function
+                        new_path = [next_func] + path
+                        new_ref_imports_to_queue = ""
+                        signature_docstring_to_queue = ""
+                        if new_signature_docstring: # found the public function
+                            # * From file {caller['relativePath']}:\n
+                            # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
+                            # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
+                            new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
+                            signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
+                        queue.append((next_func, next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
 
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)
