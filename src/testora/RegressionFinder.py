@@ -307,6 +307,7 @@ def generate_tests(pr, github_repo, changed_functions):
             import_lines_info_sub = ""
             if import_lines:
                 info = "\n".join(import_lines)
+                # here the old and new labeled info exists only when some functions/classes have been affected in only one version, there is no confusing info.
                 if label == "common":
                     import_lines_info_sub = f"The following infomation is avaliable for both the old and the new versions of code:\n{info}"
                 elif label == "old":
@@ -347,7 +348,7 @@ def generate_tests(pr, github_repo, changed_functions):
                         if call_graph_info_str_sub:
                             if label == "common":
                                 call_graph_info_str_sub = f"The following infomation is avaliable for both the old and the new versions of code:\n{call_graph_info_str_sub}"
-                                # if common info exists, only provide it to avoid any confusion from the one-version-info
+                                # if common info exists for a changed function, only provide it to avoid any confusion from the one-version-info
                                 # option 1: get all the information, but only privide common to prompts
                                 call_graph_info_str_function_level += call_graph_info_str_sub
                                 break 
