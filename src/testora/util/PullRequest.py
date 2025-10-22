@@ -222,12 +222,14 @@ class PullRequest:
     def get_changed_function_names_and_context(self, prompt_base):
         pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
         # update self.changed_function_qualified_names_old
-        self.changed_function_qualified_names_old = []
+        self.changed_function_qualified_names_old = [] # all: public + private + unsure
+        self.changed_function_qualified_names_old_non_public = []
         self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
 
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         # update self.changed_function_qualified_names_new
         self.changed_function_qualified_names_new = []
+        self.changed_function_qualified_names_new_no_public = []
         self.get_helper(post_commit_cloned_repo, "new", prompt_base)
 
         # get test function code
@@ -321,31 +323,35 @@ class PullRequest:
                                 function_names_to_get_cg_old = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, func_name, self.public_apis_old)
+                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, function_name, self.public_apis_old)
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_old.append(fully_qulified_name)
                                     if import_line: # public
                                         self.public_func_imports_old.add(f"To access changed function '{fully_qulified_name}': {import_line}")
                                     else:
+                                        self.changed_function_qualified_names_old_non_public.append(fully_qulified_name)
                                         function_names_to_get_cg_old.append(func_name)
                                     
                                 # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
-                                self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
+                                if function_names_to_get_cg_old:
+                                    self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
                             else: # new code version
                                 self.public_apis_new = get_apis(f"api_{container_name}/objects.inv")
 
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, func_name, self.public_apis_new)
+                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, function_name, self.public_apis_new)
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_new.append(fully_qulified_name)
                                     if import_line: # public
                                         self.public_func_imports_new.add(f"To access changed function '{fully_qulified_name}': {import_line}")
                                     else:
+                                        self.changed_function_qualified_names_new_no_public.append(fully_qulified_name)
                                         function_names_to_get_cg_new.append(func_name)
-
-                                self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
+                                
+                                if function_names_to_get_cg_new:
+                                    self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
                     else:
                         for func_name in function_names:
                             changed_functions.append(f"{module_name}.{func_name}") # func_name also includes class_name if the setting goes like that
@@ -394,9 +400,9 @@ class PullRequest:
         self.all_signatures_docstrings = {}
         self.all_imports = {}
         
-        non_checked_new_indices = list(range(len(self.changed_function_qualified_names_new)))
+        non_checked_new_indices = list(range(len(self.changed_function_qualified_names_new_no_public)))
         for qualified_func, old_cg_func_level_list, old_sig_doc_func_level_list, old_imports_func_level_list in \
-                zip(self.changed_function_qualified_names_old, self.call_graph_paths_old, self.signatures_docstrings_old, self.imports_old):
+                zip(self.changed_function_qualified_names_old_non_public, self.call_graph_paths_old, self.signatures_docstrings_old, self.imports_old):
             self.all_call_graph_paths.update(
                 {qualified_func: {
                     "common": [],
@@ -415,9 +421,9 @@ class PullRequest:
                     "old": [],
                     "new": []
                 }})
-            if qualified_func in self.changed_function_qualified_names_new:
+            if qualified_func in self.changed_function_qualified_names_new_no_public:
                 # the same qualified function in both the versions
-                idx = self.changed_function_qualified_names_new.index(qualified_func)
+                idx = self.changed_function_qualified_names_new_no_public.index(qualified_func)
                 try:
                     new_cg_func_level_list = self.call_graph_paths_new[idx]
                     new_sig_doc_func_level_list = self.signatures_docstrings_new[idx]
@@ -473,7 +479,7 @@ class PullRequest:
 
         if non_checked_new_indices: # unique in new
             for idx in non_checked_new_indices:
-                func = self.changed_function_qualified_names_new[idx]
+                func = self.changed_function_qualified_names_new_no_public[idx]
                 
                 self.all_call_graph_paths.update({func: {
                     "new": self.call_graph_paths_new[idx]
