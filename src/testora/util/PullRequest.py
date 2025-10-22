@@ -349,15 +349,15 @@ class PullRequest:
                     else:
                         for func_name in function_names:
                             changed_functions.append(f"{module_name}.{func_name}") # func_name also includes class_name if the setting goes like that
-                
-                if version == "new" and (self.call_graph_paths_old or self.call_graph_paths_new):
-                    self.get_union_call_graph()
-                    self.get_shortest_path_each_entry()
 
                 if functions_code:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
                     code_context += "\n\n".join(functions_code)
                     code_context += "\n"
+
+        if version == "new" and (self.call_graph_paths_old or self.call_graph_paths_new):
+            self.get_union_call_graph()
+            self.get_shortest_path_each_entry()
 
         if version == "old":
             self.old_context = code_context
