@@ -347,6 +347,11 @@ def generate_tests(pr, github_repo, changed_functions):
                         if call_graph_info_str_sub:
                             if label == "common":
                                 call_graph_info_str_sub = f"The following infomation is avaliable for both the old and the new versions of code:\n{call_graph_info_str_sub}"
+                                # if common info exists, only provide it to avoid any confusion from the one-version-info
+                                # option 1: get all the information, but only privide common to prompts
+                                call_graph_info_str_function_level += call_graph_info_str_sub
+                                break 
+                                # option 2: get common_info and stop in PullRequest.py get_union_call_graph
                             elif label == "old":
                                 call_graph_info_str_sub = f"The following infomation is avaliable only for the old code version:\n{call_graph_info_str_sub}" 
                             else:
