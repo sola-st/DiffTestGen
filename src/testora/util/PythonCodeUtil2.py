@@ -158,7 +158,7 @@ def get_function_names_code(code: str, patch_ranges: list):
 
     return list(matched_functions), list(matched_functions_code), None
 
-def get_caller_function_names(relativePath: str, code: str, check_range, public_apis_list):
+def get_caller_function_names(relativePath: str, code: str, check_range, public_apis_list, server):
     '''
     Return caller function names and its location.
     Optionally, also return the definition or the function body of the caller function
@@ -195,40 +195,48 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             # caller_func_info = "\n".join(collector.imports) + "\n" + module_with_node.code
 
             # # option 2: return the signature
-            tmp = relativePath.lstrip("src/").replace(".py", "")
-            current_module = tmp.replace("/", ".")
-            current_module_parent = tmp.rsplit("/", 1)[0].replace("/", ".")
-            import_line, __ = is_public(current_module, current_module_parent, parent_class, call_function_name, public_apis_list)
+            current_module = relativePath.lstrip("src/").replace(".py", "").replace("/", ".")
+            import_line, __ = is_public(current_module, parent_class, call_function_name, public_apis_list)
             if import_line:
-                signature = get_function_signature(func_node)
-                # Get docstring if it exists
-                docstring = None
-                if func_node.body.body:
-                    first_stmt = func_node.body.body[0]
-                    if (
-                        isinstance(first_stmt, cst.SimpleStatementLine) and
-                        first_stmt.body and
-                        isinstance(first_stmt.body[0], cst.SimpleString)
-                    ):
-                        docstring = first_stmt.body[0].value  # This includes the quotes
-                
-                signature_docstring = f"{signature}"
-                if docstring:
-                    signature_docstring += f"\n{docstring}"
+                # option 1: using cst to get signature and docstrings
+                # signature = get_function_signature(func_node)
+                # signature_docstring = f"{signature}"
+
+                # option 2: get hover text with lsp
+                signature_docstring_tmp = server.get_hover_text(relativePath, name_start_line_0base, name_start_col_0base)
+                '''
+                format of signature_docstring_tmp:
+                    python code block wrapped signature:
+                        ```python
+                        <signature>
+                        ```
+                    hovered docsting (not exactly the same as the docstring in functions)
+                '''
+                # TODO take care of the length
+                signature_docstring = signature_docstring_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
 
             break
     return call_function, import_line, signature_docstring
 
-def is_public(module, module_parent, parent_class, func_name, public_apis_list) -> str:
+def is_public(module, parent_class, func_name, public_apis_list) -> str:
     # if the function is public, return its import line, if not, return "".
     import_line = ""
-    module_candi1 = f"{module}.{func_name}"
-    module_candi2 = f"{module}.{parent_class}.{func_name}"
-    if module_candi1 in public_apis_list: 
-        import_line = f"from {module} import {func_name}"
-    elif module_candi2 in public_apis_list: 
-        import_line = f"from {module_parent}.{parent_class} import {func_name}"
-        module = f"{module_parent}.{parent_class}"
+    # module_ori = module
+    module_candi = f"{module}.{func_name}"
+    if parent_class:
+        module = f"{module}.{parent_class}" # accurate module
+        if func_name == "__init__":
+            module_candi = module
+        else:
+            module_candi = f"{module}.{func_name}"
+        
+    if module_candi in public_apis_list: 
+        if func_name == "__init__": # here the parent class should absolutely exist
+            import_line = f"from {module} import {parent_class}" # import the class
+            import_line += f"\nRefer to the above given '__init__' function of class '{parent_class}' to initialize it.\n"
+        else:
+            import_line = f"from {module} import {func_name}" # import the function
+        
     return import_line, module
 
 def get_function_signature(node: cst.FunctionDef) -> str:

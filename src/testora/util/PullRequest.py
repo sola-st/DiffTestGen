@@ -220,11 +220,12 @@ class PullRequest:
         return result
     
     def get_changed_function_names_and_context(self, prompt_base):
-        pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
-        # update self.changed_function_qualified_names_old
         self.changed_function_qualified_names_old = [] # all: public + private + unsure
-        self.changed_function_qualified_names_old_non_public = []
-        self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
+        if Config.context_version != 1: # orgianl Testora does not goes for oldversion og changed functions
+            pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
+            # update self.changed_function_qualified_names_old
+            self.changed_function_qualified_names_old_non_public = []
+            self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
 
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         # update self.changed_function_qualified_names_new
@@ -251,7 +252,6 @@ class PullRequest:
             self.helper_inner(cloned_repo, version, prompt_base)
 
     def helper_inner(self, cloned_repo, version, prompt_base, server=None):
-        changed_functions = []
         code_context = ""
         code_context_with_line_num_str = ""
         code_context_with_line_num = {}
@@ -261,8 +261,8 @@ class PullRequest:
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     file_content = f.read()
                 # module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
-                tmp = modified_file.path.lstrip("src/").replace(".py", "")
-                module_name = tmp.replace("/", ".")
+                # fully dotted path, not always the same as actual module
+                module_name = modified_file.path.lstrip("src/").replace(".py", "").replace("/", ".") 
                 
                 patch_ranges = []
                 if Config.context_version == 1: # original Testora
@@ -304,10 +304,8 @@ class PullRequest:
                         code_context_with_line_num_str += "\n"
 
                 if function_names:
-                    if type(function_names[0]) == tuple: 
+                    if type(function_names[0]) == tuple: # our approach
                         if Config.call_graph == True:
-                            module_parent = tmp.rsplit("/", 1)[0].replace("/", ".")
-
                             # to build documentation
                             container_name = cloned_repo.container_name
                             if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
@@ -323,7 +321,7 @@ class PullRequest:
                                 function_names_to_get_cg_old = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, function_name, self.public_apis_old)
+                                    import_line, adjusted_module = is_public(module_name, parent_class, function_name, self.public_apis_old)
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_old.append(fully_qulified_name)
                                     if import_line: # public
@@ -341,7 +339,7 @@ class PullRequest:
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(module_name, module_parent, parent_class, function_name, self.public_apis_new)
+                                    import_line, adjusted_module = is_public(module_name, parent_class, function_name, self.public_apis_new)
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_new.append(fully_qulified_name)
                                     if import_line: # public
@@ -352,16 +350,16 @@ class PullRequest:
                                 
                                 if function_names_to_get_cg_new:
                                     self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
-                    else:
+                    else: # original Testora
                         for func_name in function_names:
-                            changed_functions.append(f"{module_name}.{func_name}") # func_name also includes class_name if the setting goes like that
+                            self.changed_function_qualified_names_new.append(f"{module_name}.{func_name}")
 
                 if functions_code:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
                     code_context += "\n\n".join(functions_code)
                     code_context += "\n"
 
-        if version == "new" and (self.call_graph_paths_old or self.call_graph_paths_new):
+        if version == "new" and (self.call_graph_paths_old or self.call_graph_paths_new or self.public_func_imports_old or self.public_func_imports_new):
             self.get_union_call_graph()
             self.get_shortest_path_each_entry()
 
@@ -380,8 +378,6 @@ class PullRequest:
                 self.old_context_with_line_num = code_context_with_line_num_str 
             else:
                 self.new_context_with_line_num = code_context_with_line_num_str 
-                
-        return changed_functions
     
     def get_union_call_graph(self):
         # for public functions
@@ -573,7 +569,7 @@ class PullRequest:
                         caller_file_content = f.read()
                     range_starts_at1 = range(caller["range"]["start"]["line"]+1, caller["range"]["end"]["line"]+2) # +1 to start at 1, +1 to be a right-open range
                     call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
-                        caller["relativePath"], caller_file_content, range_starts_at1, public_apis_list)
+                        caller["relativePath"], caller_file_content, range_starts_at1, public_apis_list, server)
                     
                     if call_function:
                         next_func, next_line, next_col = call_function

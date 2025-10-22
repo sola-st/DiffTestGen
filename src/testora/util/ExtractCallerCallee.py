@@ -70,6 +70,14 @@ class ExtractCallerCallee:
         rel = os.path.relpath(full, self.repo_path)
         return full, Path(rel).as_posix()
 
+    def get_hover_text(self, file_path, line, column):
+        # from PythonLanguageServer.py
+        raw_result = self.lsp.request_hover(file_path, line, column)
+        if type(raw_result) == dict and "contents" in raw_result:
+            return raw_result["contents"]["value"]
+        else:
+            return ""
+        
     def get_function_callers(self, file_path, def_line: int, def_col: int):
         """
         Return list of references (callers) for symbol at (file_path, def_line, def_col).
