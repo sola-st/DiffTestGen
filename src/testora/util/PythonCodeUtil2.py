@@ -227,8 +227,11 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
     # module_ori = module
     module_candi = f"{module}.{func_name}"
 
-    parent_class_name, class_name_start_line_0base, class_name_start_col_0base = parent_class
-    if parent_class_name:
+    parent_class_name = None
+    class_name_start_line_0base = None
+    class_name_start_col_0base = None
+    if parent_class:
+        parent_class_name, class_name_start_line_0base, class_name_start_col_0base = parent_class
         module = f"{module}.{parent_class_name}" # accurate module
         if func_name == "__init__":
             module_candi = module
