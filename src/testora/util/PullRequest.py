@@ -321,7 +321,7 @@ class PullRequest:
                                 function_names_to_get_cg_old = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(module_name, parent_class, function_name, self.public_apis_old)
+                                    import_line, adjusted_module = is_public(server, modified_file.path, module_name, parent_class, function_name, self.public_apis_old)
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_old.append(fully_qulified_name)
                                     if import_line: # public
@@ -339,7 +339,7 @@ class PullRequest:
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(module_name, parent_class, function_name, self.public_apis_new)
+                                    import_line, adjusted_module = is_public(server, modified_file.path, module_name, parent_class, function_name, self.public_apis_new)
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_new.append(fully_qulified_name)
                                     if import_line: # public

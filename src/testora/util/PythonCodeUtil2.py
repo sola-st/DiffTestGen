@@ -10,7 +10,8 @@ class FunctionCollector(cst.CSTVisitor):
         self.class_stack = []
 
     def visit_ClassDef(self, node: cst.ClassDef):
-        self.class_stack.append(node.name.value)
+        class_name_pos = self.get_metadata(PositionProvider, node.name)
+        self.class_stack.append((node.name.value, class_name_pos.start.line-1, class_name_pos.start.column))
 
     def leave_ClassDef(self, node: cst.ClassDef):
         self.class_stack.pop()
@@ -51,7 +52,8 @@ class CallerFunctionCollector(cst.CSTVisitor):
         # self.imports = []
     
     def visit_ClassDef(self, node: cst.ClassDef):
-        self.class_stack.append(node.name.value)
+        class_name_pos = self.get_metadata(PositionProvider, node.name)
+        self.class_stack.append((node.name.value, class_name_pos.start.line-1, class_name_pos.start.column))
 
     def leave_ClassDef(self, node: cst.ClassDef):
         self.class_stack.pop()
@@ -196,7 +198,7 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
 
             # # option 2: return the signature
             current_module = relativePath.lstrip("src/").replace(".py", "").replace("/", ".")
-            import_line, __ = is_public(current_module, parent_class, call_function_name, public_apis_list)
+            import_line, __ = is_public(server, relativePath, current_module, parent_class, call_function_name, public_apis_list)
             if import_line:
                 # option 1: using cst to get signature and docstrings
                 # signature = get_function_signature(func_node)
@@ -218,22 +220,31 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             break
     return call_function, import_line, signature_docstring
 
-def is_public(module, parent_class, func_name, public_apis_list) -> str:
+def is_public(server, file_path, module, parent_class, func_name, public_apis_list) -> str:
     # if the function is public, return its import line, if not, return "".
     import_line = ""
+
     # module_ori = module
     module_candi = f"{module}.{func_name}"
-    if parent_class:
-        module = f"{module}.{parent_class}" # accurate module
+
+    parent_class_name, class_name_start_line_0base, class_name_start_col_0base = parent_class
+    if parent_class_name:
+        module = f"{module}.{parent_class_name}" # accurate module
         if func_name == "__init__":
             module_candi = module
         else:
             module_candi = f"{module}.{func_name}"
         
     if module_candi in public_apis_list: 
-        if func_name == "__init__": # here the parent class should absolutely exist
-            import_line = f"from {module} import {parent_class}" # import the class
-            import_line += f"\nRefer to the above given '__init__' function of class '{parent_class}' to initialize it.\n"
+        if parent_class_name:
+            if func_name == "__init__": # here the parent class should absolutely exist
+                import_line = f"from {module} import {parent_class_name}" # import the class
+                import_line += f"\nRefer to the above given '__init__' function of class '{parent_class_name}' to initialize it.\n"
+            else: # normal function from a class
+                import_line = f"from {module} import {func_name}"
+                class_hover_text_tmp = server.get_hover_text(file_path, class_name_start_line_0base, class_name_start_col_0base)
+                class_hover_text = class_hover_text_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
+                import_line += f"\nTo initialize the class {parent_class_name}, refer to the signature and docstring of its __init__ function: \n{class_hover_text}\n"
         else:
             import_line = f"from {module} import {func_name}" # import the function
         
