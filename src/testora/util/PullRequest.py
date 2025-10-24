@@ -60,13 +60,15 @@ class PullRequest:
             self._prepae_to_use_call_graph()
 
     def _prepae_to_use_call_graph(self):
-        # with open ("src/testora/util/to_check_api.txt", "r") as f:
-        #     apis = f.readlines() 
-        # existing_pub_apis = [a.split("\t")[0] for a in apis]
-        # self.public_apis_old = existing_pub_apis
-        # self.public_apis_new = existing_pub_apis
         self.public_apis_old = [] 
         self.public_apis_new = []
+        '''
+        A variable could have two versions (irrelevant to 'old' and 'new'):
+            For the one with '_all"       it stores all the infomation
+            For the one without '_all"      it stores the shortest call graph path related information
+        '''
+        # For both public and non-public ones, to return
+        self.class_hover_texts = set() # shortest path related classes
 
         # for public changed functions
         # to 'return'
@@ -74,6 +76,8 @@ class PullRequest:
         # for middle status
         self.public_func_imports_old = set()
         self.public_func_imports_new = set()
+        self.public_class_hover_text_old = {}
+        self.public_class_hover_text_new = {}
 
         # for private changed functions
         # to 'return'
@@ -85,10 +89,12 @@ class PullRequest:
         self.call_graph_paths_old = []
         self.signatures_docstrings_old = []
         self.imports_old = []
+        self.non_public_class_hover_text_old = {}
 
         self.call_graph_paths_new = []
         self.signatures_docstrings_new = []
         self.imports_new = []
+        self.non_public_class_hover_text_new = {}
 
     def _pr_url_to_patch(self): 
         ''' 
@@ -314,6 +320,7 @@ class PullRequest:
                                 # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
                                 BuildDocumentation(container_name, project_name).build()
                             
+                            checked_parent_class = [] 
                             if version == "old":
                                 # get public apis
                                 self.public_apis_old = get_apis(f"api_{container_name}/objects.inv")
@@ -321,7 +328,24 @@ class PullRequest:
                                 function_names_to_get_cg_old = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(server, modified_file.path, module_name, parent_class, function_name, self.public_apis_old)
+                                    if func_name == "__init__":
+                                        checked_parent_class.append(parent_class)
+
+                                    check_parent_class = True
+                                    if parent_class:
+                                        if parent_class in checked_parent_class:
+                                            check_parent_class = False
+                                        else:
+                                            checked_parent_class.append(parent_class)
+                                    else: # the cases with no parent class
+                                        check_parent_class = False
+
+                                    import_line, adjusted_module, class_hover_text = is_public(server, modified_file.path, module_name, 
+                                            parent_class, function_name, self.public_apis_old, check_parent_class)
+                                    if class_hover_text:
+                                        # here adjusted_module ends with class name
+                                        self.public_class_hover_text_old.update({adjusted_module: class_hover_text})
+
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_old.append(fully_qulified_name)
                                     if import_line: # public
@@ -332,14 +356,30 @@ class PullRequest:
                                     
                                 # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
                                 if function_names_to_get_cg_old:
-                                    self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
+                                    self.get_call_graph_info(server, modified_file, module_name, function_names_to_get_cg_old, version)
                             else: # new code version
                                 self.public_apis_new = get_apis(f"api_{container_name}/objects.inv")
 
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
                                     function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                    import_line, adjusted_module = is_public(server, modified_file.path, module_name, parent_class, function_name, self.public_apis_new)
+                                    if func_name == "__init__":
+                                        checked_parent_class.append(parent_class)
+                                        
+                                    check_parent_class = True
+                                    if parent_class:
+                                        if parent_class in checked_parent_class:
+                                            checked_parent_class = False
+                                        else:
+                                            checked_parent_class.append(parent_class)
+                                    else: # the cases with no parent class
+                                        checked_parent_class = False
+
+                                    import_line, adjusted_module, class_hover_text = is_public(server, modified_file.path, module_name, 
+                                            parent_class, function_name, self.public_apis_new, check_parent_class)
+                                    if class_hover_text:
+                                        self.public_class_hover_text_new.update({adjusted_module: class_hover_text})
+                                    
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_new.append(fully_qulified_name)
                                     if import_line: # public
@@ -349,7 +389,7 @@ class PullRequest:
                                         function_names_to_get_cg_new.append(func_name)
                                 
                                 if function_names_to_get_cg_new:
-                                    self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
+                                    self.get_call_graph_info(server, modified_file, module_name, function_names_to_get_cg_new, version)
                     else: # original Testora
                         for func_name in function_names:
                             self.changed_function_qualified_names_new.append(f"{module_name}.{func_name}")
@@ -380,6 +420,12 @@ class PullRequest:
                 self.new_context_with_line_num = code_context_with_line_num_str 
     
     def get_union_call_graph(self):
+        # for public and non-public, get the uinon of dicts
+        # if two items get the same key, the later one will overwrite the former one. Here should has no duplicated keys.
+        public_hover = self.public_class_hover_text_old | self.public_class_hover_text_new 
+        nonpublic_hover = self.non_public_class_hover_text_old | self.non_public_class_hover_text_new
+        self.class_hover_texts_all = public_hover | nonpublic_hover
+
         # for public functions
         common_in_both = self.public_func_imports_old.intersection(self.public_func_imports_new)
         unique_in_old = self.public_func_imports_old.difference(self.public_func_imports_new)
@@ -488,6 +534,7 @@ class PullRequest:
                 }})
 
     def get_shortest_path_each_entry(self):
+        all_class = self.class_hover_texts_all.keys()
         for func_name, cg_path_func_level in self.all_call_graph_paths.items():
             if cg_path_func_level:
                 self.call_graph_paths.update(
@@ -508,7 +555,8 @@ class PullRequest:
                         "old": [],
                         "new": []
                     }})
-        
+
+                common_recorded = False
                 for label, cg_paths in cg_path_func_level.items(): # label could be common, old, and new
                     if cg_paths:
                         entry_func_to_paths = {}
@@ -531,7 +579,17 @@ class PullRequest:
                             self.signatures_docstrings[func_name][label].append(sig_doc)
                             self.imports[func_name][label].append(imports)
 
-    def get_call_graph_info(self, server, modified_file, function_names, version):
+                            if common_recorded == False: # only provides the info related to both versions, to avoid confusion
+                                # align with the prompt info preparation part in file RegressionFinder.py. function 'generate_tests'
+                                module_endswith_class = imports.split(" import ")[0].split("from ")[1]
+                                if module_endswith_class in all_class:
+                                    # self.class_hover_texts.update({module_endswith_class, self.class_hover_texts_all[module_endswith_class]})
+                                    self.class_hover_texts.add(self.class_hover_texts_all[module_endswith_class])
+                        
+                        if label == "common":
+                            common_recorded = True
+
+    def get_call_graph_info(self, server, modified_file, module_name, function_names, version):
         for func_info in function_names:
             func_name, start_line_0_based, start_col_0_based, parent_class = func_info
             # try:
@@ -563,13 +621,27 @@ class PullRequest:
                 if not callers:
                     # No more callers, but no public function found in the path
                     continue
-
+                
+                checked_parent_class = []
+                parent_class = None
                 for caller in callers:
                     with open(caller["absolutePath"], "r") as f:
                         caller_file_content = f.read()
+
+                    check_parent_class = True
+                    if parent_class in checked_parent_class:
+                        check_parent_class = False
                     range_starts_at1 = range(caller["range"]["start"]["line"]+1, caller["range"]["end"]["line"]+2) # +1 to start at 1, +1 to be a right-open range
-                    call_function, new_ref_import, new_signature_docstring = get_caller_function_names(
-                        caller["relativePath"], caller_file_content, range_starts_at1, public_apis_list, server)
+                    call_function, new_ref_import, new_signature_docstring, parent_class, class_hover_text = get_caller_function_names(
+                        caller["relativePath"], caller_file_content, range_starts_at1, public_apis_list, server, check_parent_class)
+                    
+                    checked_parent_class.append(parent_class)
+                    if class_hover_text: # class exists
+                        module_endswith_class = f"{module_name}.{parent_class[0]}"
+                        if version == "old":
+                            self.non_public_class_hover_text_old.update({module_endswith_class: class_hover_text})
+                        else:
+                            self.non_public_class_hover_text_new.update({module_endswith_class: class_hover_text})
                     
                     if call_function:
                         next_func, next_line, next_col = call_function

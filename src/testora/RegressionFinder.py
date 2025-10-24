@@ -367,7 +367,13 @@ def generate_tests(pr, github_repo, changed_functions):
         if call_graph_info_str_funcs:
             call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
             info_public_and_private += call_graph_info_str
-    
+
+            if pr.class_hover_texts:
+                info_public_and_private += f"\nThe following shows the __init__ function signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
+                # add the relevant class hover texts
+                # for module_endswith_class, hover_text in pr.class_hover_texts.items():
+                info_public_and_private += "\n".join(pr.class_hover_texts)
+
     # print(info_public_and_private)
     # exit()
     if len(pr.full_diff.split("\n")) <= 200:
