@@ -30,7 +30,7 @@ class OpenAIGPT:
             return [""]
 
         append_event(LLMEvent(pr_nb=-1,
-                              message=f"Querying {self.model}",
+                              message=f"Querying {self.model}, message length: {len(user_message)}",
                               content=f"System message:\n{system_message}\nUser message:\n{user_message}"))
         
         while True:
