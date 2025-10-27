@@ -61,7 +61,10 @@ class ClonedRepoManager:
             cloned_repo = Repo(cloned_repo_dir)
             cloned_repo.git.rm('--cached', '-rf', '.')
             cloned_repo.git.reset('--hard')
-            cloned_repo.git.clean('-f', '-d')
+            if "pandas" in self.repo_name:
+                cloned_repo.git.clean('-f', '-d', '-e', 'doc/source/_build/')
+            else:
+                cloned_repo.git.clean('-f', '-d')
             origin = cloned_repo.remotes.origin
             origin.fetch()
 

@@ -29,7 +29,17 @@ class BuildDocumentation:
         
         # Execute sphinx-build in the project directory
         working_dir = f"/home/{self.project_name}"
+
         build_command = f"sphinx-build -b html {build_folder}/ {build_folder}/_build/html"
+        if self.project_name == "pandas":
+            build_command = (
+                'sh -c "sphinx-build -b html '
+                '-a -E -j auto '
+                '-D extensions=sphinx.ext.intersphinx,sphinx.ext.autodoc,sphinx.ext.autosummary,numpydoc '
+                '-D nbsphinx_execute=never '
+                'doc/source doc/source/_build/html"'
+            )
+        # self.container.exec_run("pip install sphinx-version-warning") # numpydoc jinja2 pydata-sphinx-theme", workdir=working_dir)
         self.container.exec_run(build_command, workdir=working_dir)
             
         self.copy_file_from_container(
