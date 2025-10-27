@@ -29,24 +29,26 @@ class BuildDocumentation:
         
         # Execute sphinx-build in the project directory
         working_dir = f"/home/{self.project_name}"
-
-        build_command = f"sphinx-build -b html {build_folder}/ {build_folder}/_build/html"
-        if self.project_name == "pandas":
-            build_command = (
-                'sh -c "sphinx-build -b html '
-                '-a -E -j auto '
-                '-D extensions=sphinx.ext.intersphinx,sphinx.ext.autodoc,sphinx.ext.autosummary,numpydoc '
-                '-D nbsphinx_execute=never '
-                'doc/source doc/source/_build/html"'
-            ) 
-        elif self.project_name == "scipy":
+        '''
+        To speed up the building:
+         * -d {build_folder}/_build/doctrees:       store doctrees → incremental builds
+         * -j auto:                                 parallel builds using all cores
+         * -D 'extensions=[]':                      overrides all extensions → safest for speed and avoiding missing imports
+        '''
+        build_command = f"sphinx-build -b html -d {build_folder}/_build/doctrees -j auto -D \"extensions=[]\" {build_folder}/ {build_folder}/_build/html"
+        # if self.project_name == "pandas":
+        #     build_command = (
+        #         'sh -c "sphinx-build -b html -d doc/source/_build/doctrees -j auto '
+        #         '-D extensions=sphinx.ext.intersphinx,sphinx.ext.autodoc,sphinx.ext.autosummary,numpydoc '
+        #         '-D nbsphinx_execute=never '
+        #         'doc/source doc/source/_build/html"'
+        #     ) 
+        if self.project_name == "scipy":
             build_command = (
                 f"bash -c 'source /root/conda/etc/profile.d/conda.sh"
                 f" && source /root/conda/etc/profile.d/mamba.sh && mamba activate scipy-dev"
                 f" && {build_command}'"
             )
-        # self.container.exec_run("pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning") # scipy
-        # self.container.exec_run("pip install sphinx-version-warning") # numpydoc jinja2 pydata-sphinx-theme", workdir=working_dir) # pandas
         self.container.exec_run(build_command, workdir=working_dir)
             
         self.copy_file_from_container(
