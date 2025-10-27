@@ -369,11 +369,11 @@ class PullRequest:
                                     check_parent_class = True
                                     if parent_class:
                                         if parent_class in checked_parent_class:
-                                            checked_parent_class = False
+                                            check_parent_class = False
                                         else:
                                             checked_parent_class.append(parent_class)
                                     else: # the cases with no parent class
-                                        checked_parent_class = False
+                                        check_parent_class = False
 
                                     import_line, adjusted_module, class_hover_text = is_public(server, modified_file.path, module_name, 
                                             parent_class, function_name, self.public_apis_new, check_parent_class)
