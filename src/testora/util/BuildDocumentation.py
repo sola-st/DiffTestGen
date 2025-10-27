@@ -38,8 +38,15 @@ class BuildDocumentation:
                 '-D extensions=sphinx.ext.intersphinx,sphinx.ext.autodoc,sphinx.ext.autosummary,numpydoc '
                 '-D nbsphinx_execute=never '
                 'doc/source doc/source/_build/html"'
+            ) 
+        elif self.project_name == "scipy":
+            build_command = (
+                f"bash -c 'source /root/conda/etc/profile.d/conda.sh"
+                f" && source /root/conda/etc/profile.d/mamba.sh && mamba activate scipy-dev"
+                f" && {build_command}'"
             )
-        # self.container.exec_run("pip install sphinx-version-warning") # numpydoc jinja2 pydata-sphinx-theme", workdir=working_dir)
+        # self.container.exec_run("pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning") # scipy
+        # self.container.exec_run("pip install sphinx-version-warning") # numpydoc jinja2 pydata-sphinx-theme", workdir=working_dir) # pandas
         self.container.exec_run(build_command, workdir=working_dir)
             
         self.copy_file_from_container(
