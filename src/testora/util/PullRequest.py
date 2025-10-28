@@ -599,15 +599,15 @@ class PullRequest:
 
             unique_entry_funcs = set()
             queue = deque()
-            # Each item: (current_func_name, start_line, start_col, path_so_far, import_line, signature_so_far)
-            queue.append((func_name, start_line_0_based, start_col_0_based, [func_name], "", ""))
+            # Each item: (current_func_name, file rel path, start_line, start_col, path_so_far, import_line, signature_so_far)
+            queue.append((func_name, modified_file.path, start_line_0_based, start_col_0_based, [func_name], "", ""))
 
             public_apis_list = self.public_apis_old
             if version == "new":
                 public_apis_list = self.public_apis_new
 
             while queue:
-                curr_func, curr_line, curr_col, path, ref_import, signature_docstring = queue.popleft()
+                curr_func, curr_rel_file_path, curr_line, curr_col, path, ref_import, signature_docstring = queue.popleft()
                 if signature_docstring and ref_import: 
                     func_level_call_graph_paths.append(path)
                     unique_entry_funcs.add(path[0])
@@ -616,7 +616,7 @@ class PullRequest:
                     # break # this gets the only one shortest
                     continue # this ends the current path, and goes for other paths
                 
-                callers = server.get_function_callers(modified_file.path, curr_line, curr_col)
+                callers = server.get_function_callers(curr_rel_file_path, curr_line, curr_col)
 
                 if not callers:
                     # No more callers, but no public function found in the path
@@ -654,7 +654,7 @@ class PullRequest:
                             # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
                             new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
                             signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
-                        queue.append((next_func, next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
+                        queue.append((next_func, caller["relativePath"], next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
 
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)

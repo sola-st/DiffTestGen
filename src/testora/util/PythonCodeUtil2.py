@@ -235,17 +235,24 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
     if parent_class:
         parent_class_name, class_name_start_line_0base, class_name_start_col_0base = parent_class
         module = f"{module}.{parent_class_name}" # accurate module
-        if func_name == "__init__":
+        if func_name.startswith("__"): # special methods
             module_candi = module
         else:
             module_candi = f"{module}.{func_name}"
         
     if module_candi in public_apis_list: 
         if parent_class_name:
-            if func_name == "__init__": # here the parent class should absolutely exist
-                import_line = f"from {module} import {parent_class_name}" # import the class
-                import_line += f"\nRefer to the above given '__init__' function of class '{parent_class_name}' to initialize it.\n"
-                # class_hover_text_to_return = parent_class
+            if func_name.startswith("__"):
+                if func_name == "__init__": # here the parent class should absolutely exist
+                    import_line = f"from {module} import {parent_class_name}" # import the class
+                    import_line += f"\nRefer to the above given '__init__' function of class '{parent_class_name}' to initialize it.\n"
+                    # class_hover_text_to_return = parent_class
+                else: # other special methods
+                    import_line = f"from {module} import {parent_class_name}" # import the class
+                    import_line += (f"\nMethod '{func_name}' is a special method of class '{module}'. Its behavior follows Python’s data model.\n"
+                            f"To use this special method, write code that triggers it naturally, "
+                            f"e.g., for the '__add__' method, writing 'a + b' will automatically call '__add__'.\n")
+
             else: # normal function from a class
                 import_line = f"from {module} import {func_name}"
                 if check_parent_class == True:

@@ -93,7 +93,6 @@ class ExtractCallerCallee:
 
         callers = []
         for r in refs:
-            # TODO check here whether necessary
             # Filter out the definition itself
             if r["relativePath"] == rel_path and r["range"]["start"]["line"] == def_line:
                 continue
