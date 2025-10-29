@@ -115,27 +115,24 @@ class ExtractCallerCallee:
             except:
                 pass
             for d in defs:
-                # if self.repo_path in d["absolutePath"]: # to filter out the built-in functions
-                #     callees_with_defs.append(d)
-
                 absolute = d.get("absolutePath")
-                relative = d.get("relativePath")
-                rng = d.get("range", {})
-                start = rng.get("start", {})
-                def_line = start.get("line")
-                def_col = start.get("character") or start.get("column") or start.get("col")
-                info = {
-                    "callee_name": callee_name,
-                    "call_location": {"file": str(full_path), "line": call_start_line, "col": call_start_col},
-                    "definition": {
-                        "absolute": absolute,
-                        "relative": relative,
-                        "line": def_line,
-                        "col": def_col,
-                        "raw": d,
-                    },
-                }
-                if self.repo_path in str(absolute):
+                if self.repo_path in absolute: # to filter out the built-in functions
+                    relative = d.get("relativePath")
+                    rng = d.get("range", {})
+                    start = rng.get("start", {})
+                    def_line = start.get("line")
+                    def_col = start.get("character") or start.get("column") or start.get("col")
+                    info = {
+                        "callee_name": callee_name,
+                        "call_location": {"file": str(full_path), "line": call_start_line, "col": call_start_col},
+                        "definition": {
+                            "absolute": absolute,
+                            "relative": relative,
+                            "line": def_line,
+                            "col": def_col,
+                            "raw": d,
+                        },
+                    }
                     callees_with_defs.append(info)
 
         return callees_with_defs

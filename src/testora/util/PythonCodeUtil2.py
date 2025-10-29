@@ -97,6 +97,56 @@ class TestFunctionCollector(cst.CSTVisitor):
         self.imports.append(cst.Module([]).code_for_node(node))
 
 
+class RepoCallCollector(cst.CSTVisitor):
+    # TODO callees and attributes are duplicated
+    def __init__(self, repo_package):
+        self.repo_package = repo_package
+        self.imports = {}  # local alias → full import path
+        self.accesses = []  # (module, name, type: 'call' or 'attr')
+
+    def visit_Import(self, node: cst.Import):
+        for alias in node.names:
+            full = alias.name.value
+            if full.startswith(self.repo_package):
+                local = alias.asname.name.value if alias.asname else full.split(".")[-1]
+                self.imports[local] = full
+
+    def visit_ImportFrom(self, node: cst.ImportFrom):
+        if node.module and node.module.value.startswith(self.repo_package):
+            module = node.module.value
+            for alias in node.names:
+                local = alias.asname.name.value if alias.asname else alias.name.value
+                self.imports[local] = f"{module}.{alias.name.value}"
+
+    def _resolve_chain(self, node):
+        """Return full dotted name for attribute chain (e.g., u.sub.helper)."""
+        parts = []
+        cur = node
+        while isinstance(cur, cst.Attribute):
+            parts.append(cur.attr.value)
+            cur = cur.value
+        if isinstance(cur, cst.Name):
+            parts.append(cur.value)
+        return list(reversed(parts))  # ['u', 'sub', 'helper']
+
+    def visit_Call(self, node: cst.Call):
+        chain = self._resolve_chain(node.func)
+        if chain and chain[0] in self.imports:
+            base_mod = self.imports[chain[0]]
+            module = base_mod
+            if len(chain) > 1:
+                module = f"{base_mod}." + ".".join(chain[1:-1])
+            self.accesses.append((module, chain[-1], "calls the function"))
+
+    def visit_Attribute(self, node: cst.Attribute):
+        chain = self._resolve_chain(node)
+        if chain and chain[0] in self.imports:
+            base_mod = self.imports[chain[0]]
+            module = base_mod
+            if len(chain) > 1:
+                module = f"{base_mod}." + ".".join(chain[1:-1])
+            self.accesses.append((module, chain[-1], "accesses the attribute"))
+            
 '''
 The following functions are some different versions of file analyis to return various information
 All functions return 3 values.
@@ -222,7 +272,7 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             break
     return call_function, import_line, signature_docstring, parent_class, class_hover_text
 
-def is_public(server, file_path, module, parent_class, func_name, public_apis_list, check_parent_class) -> str:
+def is_public(server, file_path, module, parent_class, func_name, public_apis_list, check_parent_class, return_bool=False) -> str:
     # if the function is public, return its import line, if not, return "".
     import_line = ""
     class_hover_text_to_return = ""
@@ -239,6 +289,12 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
             module_candi = module
         else:
             module_candi = f"{module}.{func_name}"
+
+    if return_bool == True:
+        if module_candi in public_apis_list: 
+            return True
+        else:
+            return False
         
     if module_candi in public_apis_list: 
         if parent_class_name:
@@ -263,6 +319,30 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
             import_line = f"from {module} import {func_name}" # import the function
         
     return import_line, module, class_hover_text_to_return
+
+def has_private_accesses_or_fails_to_parse_v2(code, public_apis, repo_package):
+    '''
+    Make V2 totally independent from 'has_private_accesses_or_fails_to_parse' (consider as V1) in PythonCodeUtil.py, also the cst parsers
+    V1 to reproduce Testora
+    V2 for our approach -> identify private functions with both name convention and public API reference.
+    '''
+    
+    static_error_msg = None
+    try:
+        tree = cst.parse_module(code)
+    except cst.ParserSyntaxError as e:
+        static_error_msg = f"The code snippet could not be parsed. Error message: {e}"
+        return True, static_error_msg
+
+    call_collector = RepoCallCollector(repo_package)
+    tree.visit(call_collector)
+
+    for module, callee, callee_type in call_collector.accesses: # includes callee functions and attributes
+        if is_public(None, None, module, None, callee, public_apis, None, return_bool=True) == False: # how to also use callee.startswith("_") 
+            static_error_msg = f"The code snippet {callee_type} '{callee}', which is not part of the public API."
+            return True, static_error_msg
+
+    return False, static_error_msg
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """

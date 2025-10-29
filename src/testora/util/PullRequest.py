@@ -60,6 +60,7 @@ class PullRequest:
             self._prepae_to_use_call_graph()
 
     def _prepae_to_use_call_graph(self):
+        self.public_apis_union = [] # for identifying the private functions in the generated tests
         self.public_apis_old = [] 
         self.public_apis_new = []
         '''
@@ -127,12 +128,12 @@ class PullRequest:
         # reference: https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests-files 
 
     def _compute_non_test_modified_files(self):
-        module_name = self.cloned_repo_manager.module_name
+        self.module_name = self.cloned_repo_manager.module_name
 
         # Python files only
         self.modified_python_files = [f for f in self.patch.modified_files if f.path.endswith(".py")] # [cython issue Sept.11] or f.path.endswith(".pyx")]
         self.non_test_modified_python_files = [f.path for f in self.modified_python_files 
-                if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
+                if "test" not in f.path and (f.path.startswith(self.module_name) or f.path.startswith(f"src/{self.module_name}"))]
 
         # Python and other PLs
         modified_code_files = [
@@ -144,7 +145,7 @@ class PullRequest:
             f.path.endswith(".h")
         ]
         self.non_test_modified_code_files = [f.path for f in modified_code_files 
-                if "test" not in f.path and (f.path.startswith(module_name) or f.path.startswith(f"src/{module_name}"))]
+                if "test" not in f.path and (f.path.startswith(self.module_name) or f.path.startswith(f"src/{self.module_name}"))]
 
     def get_modified_files(self):
         if Config.code_change_pl == "python":
@@ -359,6 +360,7 @@ class PullRequest:
                                     self.get_call_graph_info(server, modified_file, module_name, function_names_to_get_cg_old, version)
                             else: # new code version
                                 self.public_apis_new = get_apis(f"api_{container_name}/objects.inv")
+                                self.public_apis_union = self.public_apis_old + self.public_apis_new
 
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
