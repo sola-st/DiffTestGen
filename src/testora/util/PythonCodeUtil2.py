@@ -1,5 +1,5 @@
 import libcst as cst
-from libcst.metadata import MetadataWrapper, PositionProvider
+from libcst.metadata import MetadataWrapper, PositionProvider, ParentNodeProvider
 
 
 class FunctionCollector(cst.CSTVisitor):
@@ -98,7 +98,9 @@ class TestFunctionCollector(cst.CSTVisitor):
 
 
 class RepoCallCollector(cst.CSTVisitor):
-    # TODO callees and attributes are duplicated
+    # to get the callees which relevant to target repo in generated test code
+    METADATA_DEPENDENCIES = (PositionProvider, ParentNodeProvider)
+
     def __init__(self, repo_package):
         self.repo_package = repo_package
         self.imports = {}  # local alias → full import path
@@ -139,6 +141,11 @@ class RepoCallCollector(cst.CSTVisitor):
             self.accesses.append((module, chain[-1], "calls the function"))
 
     def visit_Attribute(self, node: cst.Attribute):
+        parent = self.get_metadata(ParentNodeProvider, node)
+        # if this attribute is the function being called, skip (we already handle it in visit_Call)
+        if isinstance(parent, cst.Call) and parent.func is node:
+            return
+        
         chain = self._resolve_chain(node)
         if chain and chain[0] in self.imports:
             base_mod = self.imports[chain[0]]
@@ -335,12 +342,18 @@ def has_private_accesses_or_fails_to_parse_v2(code, public_apis, repo_package):
         return True, static_error_msg
 
     call_collector = RepoCallCollector(repo_package)
-    tree.visit(call_collector)
+    # Use MetadataWrapper so metadata (PositionProvider, ParentNodeProvider) is populated
+    wrapper = MetadataWrapper(tree)
+    wrapper.visit(call_collector)
 
     for module, callee, callee_type in call_collector.accesses: # includes callee functions and attributes
-        if is_public(None, None, module, None, callee, public_apis, None, return_bool=True) == False: # how to also use callee.startswith("_") 
-            static_error_msg = f"The code snippet {callee_type} '{callee}', which is not part of the public API."
-            return True, static_error_msg
+        if not callee.startswith("_"): # may be public
+            if is_public(None, None, module, None, callee, public_apis, None, return_bool=True) == False: 
+                # private function and protected attribution = not in api list + startswith "_"
+                static_error_msg = f"The code snippet {callee_type} '{callee}', which is not part of the public API."
+                return True, static_error_msg
+            # else: # not in the public api list, but also not startswith "_" --> consider as public
+        # else: # consider as private
 
     return False, static_error_msg
 
