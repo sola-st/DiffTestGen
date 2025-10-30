@@ -39,13 +39,14 @@ from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
 from testora.util.ExtractExistingTests import ExtractExistingTests
+from testora.util.PrivateIdentification import has_private_accesses_or_fails_to_parse_api_lsp
 from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
 from testora.util.Logs import (CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
         ClassificationEvent, ErrorEvent, PREvent, SelectBehaviorEvent, TestExecutionEvent, append_event, 
         Event, ComparisonEvent, LLMEvent, get_logs_as_json, store_logs, reset_logs)
 from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
-from testora.util.PythonCodeUtil2 import has_private_accesses_or_fails_to_parse_v2, mark_code_stmt, mark_to_cover_code_stmt
+from testora.util.PythonCodeUtil2 import mark_code_stmt, mark_to_cover_code_stmt
 from testora.util.ReferenceTestsFilter import filter_tests_by_line_distance, get_str_from_dict
 from testora.util.UndefinedRefsFinder import get_undefined_references
 from testora.evaluation import EvalTaskManager
@@ -220,7 +221,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         static_err_fixed_tests_dedup = de_dup_tests_with_name(generated_tests)
 
         # clean tests, test_msg_pairs can be used to start another attmept if needed
-        static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests, pr.public_apis_union, pr.module_name)
+        static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests, pr)
 
         append_event(Event(pr_nb=pr.number,
                 message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
@@ -234,7 +235,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     generated_tests = list(dict.fromkeys(generated_tests))
 
     # clean tests
-    generated_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests, pr.public_apis_union, pr.module_name)
+    generated_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests, pr)
 
     append_event(Event(pr_nb=pr.number,
             message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
@@ -264,23 +265,40 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     return name_formatted_generated_tests, test_msg_pairs
 
 
-def remove_tests_with_private_call(tests, public_apis, repo_package_name):
+# def remove_tests_with_private_call(tests, public_apis, repo_package_name):
+#     result = []
+#     test_msg_pairs = [] # the msg could be parse error, could be private call issue
+
+#     for i, test in enumerate(tests):
+#         has = None
+#         static_error_msg = None
+#         if Config.initial_test_generation_prompt_version == 1: 
+#             has, static_error_msg = has_private_accesses_or_fails_to_parse(test)
+#         else: # for our approach
+#             has, static_error_msg = has_private_accesses_or_fails_to_parse_api_lsp(test, public_apis, repo_package_name)
+        
+#         if has == False:
+#             result.append(test)
+#         else:
+#             if static_error_msg:
+#                 test_msg_pairs.append([i, test, static_error_msg])
+
+#     return result, test_msg_pairs
+
+def remove_tests_with_private_call(tests, pr):
     result = []
     test_msg_pairs = [] # the msg could be parse error, could be private call issue
 
-    for i, test in enumerate(tests):
-        has = None
-        static_error_msg = None
-        if Config.initial_test_generation_prompt_version == 1: 
+    if Config.private_call_indentication == 2 and Config.initial_test_generation_prompt_version != 1: # check with public API
+        result, test_msg_pairs = has_private_accesses_or_fails_to_parse_api_lsp(tests, pr)
+    else:
+        for i, test in enumerate(tests):
             has, static_error_msg = has_private_accesses_or_fails_to_parse(test)
-        else: # for our approach
-            has, static_error_msg = has_private_accesses_or_fails_to_parse(test, public_apis, repo_package_name)
-        
-        if has == False:
-            result.append(test)
-        else:
-            if static_error_msg:
-                test_msg_pairs.append([i, test, static_error_msg])
+            if has == False:
+                result.append(test)
+            else:
+                if static_error_msg:
+                    test_msg_pairs.append([i, test, static_error_msg])
 
     return result, test_msg_pairs
 
@@ -1232,11 +1250,6 @@ def check_single_pr(project, pr_nb):
         FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV7
     elif Config.feedback_test_generation_prompt_version == 8:
         FeedbackTestGeneratorPrompt = FeedbackTestGeneratorPromptV8
-
-    
-    global has_private_accesses_or_fails_to_parse
-    if Config.initial_test_generation_prompt_version != 1: # V2 is our approach
-        has_private_accesses_or_fails_to_parse = has_private_accesses_or_fails_to_parse_v2
 
     github_repo, cloned_repo_manager = get_repo(project)
     github_pr = github_repo.get_pull(pr_nb)

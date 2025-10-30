@@ -1,5 +1,5 @@
 import libcst as cst
-from libcst.metadata import MetadataWrapper, PositionProvider, ParentNodeProvider
+from libcst.metadata import MetadataWrapper, PositionProvider
 
 
 class FunctionCollector(cst.CSTVisitor):
@@ -49,7 +49,6 @@ class CallerFunctionCollector(cst.CSTVisitor):
     def __init__(self):
         self.functions = []
         self.class_stack = []
-        # self.imports = []
     
     def visit_ClassDef(self, node: cst.ClassDef):
         class_name_pos = self.get_metadata(PositionProvider, node.name)
@@ -73,12 +72,6 @@ class CallerFunctionCollector(cst.CSTVisitor):
             parent_class
         ))
 
-    # def visit_Import(self, node: cst.Import):
-    #     self.imports.append(cst.Module([]).code_for_node(node))
-
-    # def visit_ImportFrom(self, node: cst.ImportFrom):
-    #     self.imports.append(cst.Module([]).code_for_node(node))
-
 class TestFunctionCollector(cst.CSTVisitor):
     METADATA_DEPENDENCIES = (PositionProvider,)
 
@@ -96,64 +89,6 @@ class TestFunctionCollector(cst.CSTVisitor):
     def visit_ImportFrom(self, node: cst.ImportFrom):
         self.imports.append(cst.Module([]).code_for_node(node))
 
-
-class RepoCallCollector(cst.CSTVisitor):
-    # to get the callees which relevant to target repo in generated test code
-    METADATA_DEPENDENCIES = (PositionProvider, ParentNodeProvider)
-
-    def __init__(self, repo_package):
-        self.repo_package = repo_package
-        self.imports = {}  # local alias → full import path
-        self.accesses = []  # (module, name, type: 'call' or 'attr')
-
-    def visit_Import(self, node: cst.Import):
-        for alias in node.names:
-            full = alias.name.value
-            if full.startswith(self.repo_package):
-                local = alias.asname.name.value if alias.asname else full.split(".")[-1]
-                self.imports[local] = full
-
-    def visit_ImportFrom(self, node: cst.ImportFrom):
-        if node.module and node.module.value.startswith(self.repo_package):
-            module = node.module.value
-            for alias in node.names:
-                local = alias.asname.name.value if alias.asname else alias.name.value
-                self.imports[local] = f"{module}.{alias.name.value}"
-
-    def _resolve_chain(self, node):
-        """Return full dotted name for attribute chain (e.g., u.sub.helper)."""
-        parts = []
-        cur = node
-        while isinstance(cur, cst.Attribute):
-            parts.append(cur.attr.value)
-            cur = cur.value
-        if isinstance(cur, cst.Name):
-            parts.append(cur.value)
-        return list(reversed(parts))  # ['u', 'sub', 'helper']
-
-    def visit_Call(self, node: cst.Call):
-        chain = self._resolve_chain(node.func)
-        if chain and chain[0] in self.imports:
-            base_mod = self.imports[chain[0]]
-            module = base_mod
-            if len(chain) > 1:
-                module = f"{base_mod}." + ".".join(chain[1:-1])
-            self.accesses.append((module, chain[-1], "calls the function"))
-
-    def visit_Attribute(self, node: cst.Attribute):
-        parent = self.get_metadata(ParentNodeProvider, node)
-        # if this attribute is the function being called, skip (we already handle it in visit_Call)
-        if isinstance(parent, cst.Call) and parent.func is node:
-            return
-        
-        chain = self._resolve_chain(node)
-        if chain and chain[0] in self.imports:
-            base_mod = self.imports[chain[0]]
-            module = base_mod
-            if len(chain) > 1:
-                module = f"{base_mod}." + ".".join(chain[1:-1])
-            self.accesses.append((module, chain[-1], "accesses the attribute"))
-            
 '''
 The following functions are some different versions of file analyis to return various information
 All functions return 3 values.
@@ -326,36 +261,6 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
             import_line = f"from {module} import {func_name}" # import the function
         
     return import_line, module, class_hover_text_to_return
-
-def has_private_accesses_or_fails_to_parse_v2(code, public_apis, repo_package):
-    '''
-    Make V2 totally independent from 'has_private_accesses_or_fails_to_parse' (consider as V1) in PythonCodeUtil.py, also the cst parsers
-    V1 to reproduce Testora
-    V2 for our approach -> identify private functions with both name convention and public API reference.
-    '''
-    
-    static_error_msg = None
-    try:
-        tree = cst.parse_module(code)
-    except cst.ParserSyntaxError as e:
-        static_error_msg = f"The code snippet could not be parsed. Error message: {e}"
-        return True, static_error_msg
-
-    call_collector = RepoCallCollector(repo_package)
-    # Use MetadataWrapper so metadata (PositionProvider, ParentNodeProvider) is populated
-    wrapper = MetadataWrapper(tree)
-    wrapper.visit(call_collector)
-
-    for module, callee, callee_type in call_collector.accesses: # includes callee functions and attributes
-        if not callee.startswith("_"): # may be public
-            if is_public(None, None, module, None, callee, public_apis, None, return_bool=True) == False: 
-                # private function and protected attribution = not in api list + startswith "_"
-                static_error_msg = f"The code snippet {callee_type} '{callee}', which is not part of the public API."
-                return True, static_error_msg
-            # else: # not in the public api list, but also not startswith "_" --> consider as public
-        # else: # consider as private
-
-    return False, static_error_msg
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """

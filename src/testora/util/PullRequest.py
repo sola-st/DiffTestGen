@@ -228,7 +228,7 @@ class PullRequest:
     
     def get_changed_function_names_and_context(self, prompt_base):
         self.changed_function_qualified_names_old = [] # all: public + private + unsure
-        if Config.context_version != 1: # orgianl Testora does not goes for oldversion og changed functions
+        if Config.context_version != 1: # original Testora does not goes for old version of changed functions
             pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
             # update self.changed_function_qualified_names_old
             self.changed_function_qualified_names_old_non_public = []

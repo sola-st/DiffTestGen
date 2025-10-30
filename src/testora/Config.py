@@ -68,6 +68,8 @@ use_existing_tests = "pr-modified"
 
 call_graph = True
 
+private_call_indentication = 2 # 1 with "_", 2 with lsp + API
+
 # # KEEP THIS AT THE END: log the current configuration
 # current_globals = set(globals().keys())
 # config_parameters = current_globals - initial_globals
