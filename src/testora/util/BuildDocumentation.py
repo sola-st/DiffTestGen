@@ -4,11 +4,12 @@ import tarfile
 
 
 class BuildDocumentation:
-    def __init__(self, container_name, project_name):
+    def __init__(self, container_name, project_name, pr_num):
         client = docker.from_env()
         self.container = client.containers.get(container_name)
         self.container.start()
         self.project_name = project_name
+        self.pr_num = pr_num
 
     def copy_file_from_container(self, file_path_in_container, target_dir):
         data, _ = self.container.get_archive(file_path_in_container)
@@ -50,8 +51,9 @@ class BuildDocumentation:
                 f" && {build_command}'"
             )
         self.container.exec_run(build_command, workdir=working_dir)
-            
+        
+        # it will automatically create the 'apis' folder
         self.copy_file_from_container(
-                f"/home/{self.project_name}/{build_folder}/_build/html/objects.inv", f"api_{self.container.name}")
+                f"/home/{self.project_name}/{build_folder}/_build/html/objects.inv", f"apis/api_{self.container.name}_{self.pr_num}")
         print(f"{self.container.name}: API file written done.")
 

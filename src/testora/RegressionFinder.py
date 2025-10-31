@@ -399,7 +399,8 @@ def generate_tests(pr, github_repo, changed_functions):
                 info_public_and_private += "\n".join(pr.class_hover_texts)
 
     # print(info_public_and_private)
-    # exit()
+    append_event(LLMEvent(pr_nb=pr.number, message=f"Call graph", content=info_public_and_private))
+    exit()
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
         prompt_full_diff = None

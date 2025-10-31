@@ -17,6 +17,7 @@ from testora.util.PythonCodeUtil2 import (
 )
 from testora.util.ExtractCallerCallee import ExtractCallerCallee
 from collections import deque
+from os.path import exists
 
 
 class PullRequest:
@@ -315,16 +316,18 @@ class PullRequest:
                         if Config.call_graph == True:
                             # to build documentation
                             container_name = cloned_repo.container_name
-                            if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
+                            # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
+                            api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
+                            if not exists(api_file): # write it to local for quick repetition
                                 # to build only once per version
                                 project_name = self.cloned_repo_manager.repo_name
                                 # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
-                                BuildDocumentation(container_name, project_name).build()
+                                BuildDocumentation(container_name, project_name, self.number).build()
                             
                             checked_parent_class = [] 
                             if version == "old":
                                 # get public apis
-                                self.public_apis_old = get_apis(f"api_{container_name}/objects.inv")
+                                self.public_apis_old = get_apis(api_file)
 
                                 function_names_to_get_cg_old = []
                                 for func_name in function_names:
@@ -359,7 +362,7 @@ class PullRequest:
                                 if function_names_to_get_cg_old:
                                     self.get_call_graph_info(server, modified_file, module_name, function_names_to_get_cg_old, version)
                             else: # new code version
-                                self.public_apis_new = get_apis(f"api_{container_name}/objects.inv")
+                                self.public_apis_new = get_apis(api_file)
                                 self.public_apis_union = self.public_apis_old + self.public_apis_new
 
                                 function_names_to_get_cg_new = []

@@ -21,4 +21,4 @@ coverage.json
 coverage_report
 .openrouter_token
 local
-api_*
+apis/*
