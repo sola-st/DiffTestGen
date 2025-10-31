@@ -61,7 +61,7 @@ class ClonedRepoManager:
             cloned_repo = Repo(cloned_repo_dir)
             cloned_repo.git.rm('--cached', '-rf', '.')
             cloned_repo.git.reset('--hard')
-            if "pandas" in self.repo_name:
+            if "pandas" in self.repo_name or "scipy" in self.repo_name:
                 cloned_repo.git.clean('-f', '-d', '-e', 'doc/source/_build/')
             else:
                 cloned_repo.git.clean('-f', '-d')
