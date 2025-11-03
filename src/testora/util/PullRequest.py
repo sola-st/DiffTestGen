@@ -270,7 +270,7 @@ class PullRequest:
                     file_content = f.read()
                 # module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
                 # fully dotted path, not always the same as actual module
-                module_name = modified_file.path.lstrip("src/").replace(".py", "").replace("/", ".") 
+                module_name = modified_file.path.replace("src/", "", 1).replace(".py", "").replace("/", ".")
                 
                 patch_ranges = []
                 if Config.context_version == 1: # original Testora
