@@ -72,11 +72,20 @@ class LanguageServer:
         :return LanguageServer: A language specific LanguageServer instance.
         """
         if config.code_language == Language.PYTHON:
-            from multilspy.language_servers.jedi_language_server.jedi_server import (
-                JediServer,
-            )
+            # choose python LSP backend based on config.python_lsp_backend
+            backend = getattr(config, "python_lsp_backend", "jedi")
+            if backend == "pyright":
+                from multilspy.language_servers.pyright_language_server.pyright_server import (
+                    PyrightServer,
+                )
 
-            return JediServer(config, logger, repository_root_path)
+                return PyrightServer(config, logger, repository_root_path)
+            else:
+                from multilspy.language_servers.jedi_language_server.jedi_server import (
+                    JediServer,
+                )
+
+                return JediServer(config, logger, repository_root_path)
         elif config.code_language == Language.JAVA:
             from multilspy.language_servers.eclipse_jdtls.eclipse_jdtls import (
                 EclipseJDTLS,
@@ -457,9 +466,11 @@ class LanguageServer:
 
         with self.open_file(relative_file_path):
             # sending request to the language server and waiting for response
+            # Request references and include declaration locations as some servers
+            # (including pyright) may only return declarations when asked.
             response = await self.server.send.references(
                 {
-                    "context": {"includeDeclaration": False},
+                    "context": {"includeDeclaration": True},
                     "textDocument": {
                         "uri": pathlib.Path(os.path.join(self.repository_root_path, relative_file_path)).as_uri()
                     },

@@ -24,6 +24,8 @@ class MultilspyConfig:
     Configuration parameters
     """
     code_language: Language
+    # backend for python language server: 'pyright' (default) or 'jedi'
+    python_lsp_backend: str = "pyright"
     trace_lsp_communication: bool = False
 
     @classmethod
