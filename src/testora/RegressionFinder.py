@@ -323,6 +323,15 @@ def generate_tests(pr, github_repo, changed_functions):
         "Each method specifies which function to call, along with its signature and docstring (if available), to guide how it should be used.\n\n"
     ) # to make sure provide only available info to the prompt
     if Config.call_graph == True:
+        # from the perspective of recording the call path length
+        cg_path_len = {
+            'shortest': [],
+            'shortest_avg': 0,
+            'all': [],
+            'all_avg': 0
+        }
+
+        # from the perspective of forming the call graph info str
         info_public_and_private = ""
 
         # for public functions
@@ -356,6 +365,7 @@ def generate_tests(pr, github_repo, changed_functions):
                     call_graph_info_str_sub = ""
                     if cg_paths:
                         for i, cg in enumerate(cg_paths):
+                            cg_path_len['shortest'].append(len(cg))
                             sig_doc = pr.signatures_docstrings[func_name][label][i]
                             imports = pr.imports[func_name][label][i]
                             '''
@@ -397,6 +407,18 @@ def generate_tests(pr, github_repo, changed_functions):
                 # add the relevant class hover texts
                 # for module_endswith_class, hover_text in pr.class_hover_texts.items():
                 info_public_and_private += "\n".join(pr.class_hover_texts)
+
+        if pr.all_call_graph_paths:
+            # record the length of call paths
+            cg_path_len['shortest_avg'] = sum(cg_path_len['shortest']) / len(cg_path_len['shortest'])
+
+            for func_name, cg_paths_with_label in pr.all_call_graph_paths.items():
+                for lable, cg_paths in cg_paths_with_label.items():
+                    if cg_paths:
+                        for cg in cg_paths:
+                            cg_path_len['all'].append(len(cg)-1) # -1 to remove the index mark
+            cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all'])
+            append_event(LLMEvent(pr_nb=pr.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
 
     # print(info_public_and_private)
     append_event(LLMEvent(pr_nb=pr.number, message=f"Call graph", content=info_public_and_private))
