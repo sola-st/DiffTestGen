@@ -72,20 +72,20 @@ class LanguageServer:
         :return LanguageServer: A language specific LanguageServer instance.
         """
         if config.code_language == Language.PYTHON:
-            # choose python LSP backend based on config.python_lsp_backend
-            backend = getattr(config, "python_lsp_backend", "jedi")
-            if backend == "pyright":
-                from multilspy.language_servers.pyright_language_server.pyright_server import (
-                    PyrightServer,
-                )
+            # # choose python LSP backend based on config.python_lsp_backend
+            # backend = getattr(config, "python_lsp_backend", "jedi")
+            # if backend == "pyright":
+            #     from multilspy.language_servers.pyright_language_server.pyright_server import (
+            #         PyrightServer,
+            #     )
 
-                return PyrightServer(config, logger, repository_root_path)
-            else:
-                from multilspy.language_servers.jedi_language_server.jedi_server import (
-                    JediServer,
-                )
+            #     return PyrightServer(config, logger, repository_root_path)
+            # else:
+            from multilspy.language_servers.jedi_language_server.jedi_server import (
+                JediServer,
+            )
 
-                return JediServer(config, logger, repository_root_path)
+            return JediServer(config, logger, repository_root_path)
         elif config.code_language == Language.JAVA:
             from multilspy.language_servers.eclipse_jdtls.eclipse_jdtls import (
                 EclipseJDTLS,
@@ -466,11 +466,9 @@ class LanguageServer:
 
         with self.open_file(relative_file_path):
             # sending request to the language server and waiting for response
-            # Request references and include declaration locations as some servers
-            # (including pyright) may only return declarations when asked.
             response = await self.server.send.references(
                 {
-                    "context": {"includeDeclaration": True},
+                    "context": {"includeDeclaration": False},
                     "textDocument": {
                         "uri": pathlib.Path(os.path.join(self.repository_root_path, relative_file_path)).as_uri()
                     },
@@ -479,10 +477,7 @@ class LanguageServer:
             )
 
         ret: List[multilspy_types.Location] = []
-        # TODO the 'self.server.send.references' allows to return None, why here can not?
         assert isinstance(response, list)
-        # if response == None:
-        #     return ret
         
         for item in response:
             assert isinstance(item, dict)
@@ -748,7 +743,7 @@ class SyncLanguageServer:
         return self.language_server.get_open_file_text(relative_file_path)
 
     @contextmanager
-    def start_server(self) -> Iterator["SyncLanguageServer"]:
+    def start_server(self, target_folder=None) -> Iterator["SyncLanguageServer"]:
         """
         Starts the language server process and connects to it.
 
@@ -758,7 +753,7 @@ class SyncLanguageServer:
         loop_thread = threading.Thread(
             target=self.loop.run_forever, daemon=True)
         loop_thread.start()
-        ctx = self.language_server.start_server()
+        ctx = self.language_server.start_server(target_folder)
         asyncio.run_coroutine_threadsafe(
             ctx.__aenter__(), loop=self.loop).result()
         yield self

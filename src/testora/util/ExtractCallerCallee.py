@@ -96,10 +96,7 @@ class ExtractCallerCallee:
         else:
             return ""
         
-    def get_function_callers(self, file_path, def_line: int, def_col: int,
-                             use_ast_fallback: bool = True,
-                             verify_with_lsp: bool = True,
-                             max_verifications: int = 500):
+    def get_function_callers(self, file_path, def_line: int, def_col: int):
         """
         Return list of references (callers) for symbol at (file_path, def_line, def_col).
         file_path may be absolute or repo-relative; def_line/def_col are 0-based.
@@ -118,133 +115,6 @@ class ExtractCallerCallee:
             if r["relativePath"] == rel_path and r["range"]["start"]["line"] == def_line:
                 continue
             callers.append(r)
-
-        # Fallback: if LSP returned no callers, do an AST-based search for calls to the function
-        # (helps when pyright doesn't return references but editor (Pylance) finds them).
-        if len(callers) == 0:
-            try:
-                # find target function name from the definition file
-                with open(str(full_path), "r", encoding="utf-8") as f:
-                    src = f.read()
-                try:
-                    tree = cst.parse_module(src)
-                except cst.ParserSyntaxError:
-                    return callers
-
-                func_name = None
-                
-                # Use MetadataWrapper visitor to find function by line
-                wrapper = MetadataWrapper(tree)
-                class _Finder(cst.CSTVisitor):
-                    METADATA_DEPENDENCIES = (PositionProvider,)
-                    def __init__(self, target_line):
-                        self.target_line = target_line
-                        self.name = None
-                    def visit_FunctionDef(self, node):
-                        pos = self.get_metadata(PositionProvider, node)
-                        if (pos.start.line - 1) == self.target_line:
-                            self.name = node.name.value
-
-                finder = _Finder(def_line)
-                wrapper.visit(finder)
-                func_name = finder.name
-
-                if func_name:
-                    import time
-                    from datetime import datetime
-                    
-                    max_files = int(os.getenv("MULTILSP_CALLERS_MAX_FILES", "2000"))
-                    min_callers = int(os.getenv("MULTILSP_MIN_CALLERS", "10"))
-                    start_time = time.time()
-                    last_progress = start_time
-                    checked = 0
-                    total_size = 0
-                    
-                    # First collect Python files, but don't read them yet
-                    python_files = []
-                    for dirpath, dirnames, filenames in os.walk(self.repo_path):
-                        for fn in filenames:
-                            if not fn.endswith('.py'):
-                                continue
-                            abs_p = os.path.join(dirpath, fn)
-                            python_files.append(abs_p)
-                            if len(python_files) >= max_files:
-                                break
-                        if len(python_files) >= max_files:
-                            break
-                    
-                    # Now process files one by one with progress tracking
-                    for abs_p in python_files:
-                        current_time = time.time()
-                        if current_time - last_progress >= 5:  # Show progress every 5 seconds
-                            elapsed = current_time - start_time
-                            print(f"Progress: {checked}/{len(python_files)} files checked in {elapsed:.1f}s, {len(callers)} callers found")
-                            last_progress = current_time
-                            
-                        try:
-                            # Quick size check before reading
-                            size = os.path.getsize(abs_p)
-                            if size > 1_000_000:  # Skip files > 1MB
-                                continue
-                            
-                            with open(abs_p, 'r', encoding='utf-8') as f:
-                                txt = f.read()
-                            total_size += len(txt)
-                            
-                            try:
-                                t = cst.parse_module(txt)
-                            except cst.ParserSyntaxError:
-                                continue
-                                
-                            # Visit calls with optimized visitor
-                            class _CallVisitor(cst.CSTVisitor):
-                                METADATA_DEPENDENCIES = (PositionProvider,)
-                                def __init__(self, target_name):
-                                    self.target_name = target_name
-                                    self.calls = []
-                                def visit_Call(self, node):
-                                    name = None
-                                    if isinstance(node.func, cst.Name):
-                                        name = node.func.value
-                                    elif isinstance(node.func, cst.Attribute):
-                                        name = node.func.attr.value
-                                    if name == self.target_name:
-                                        pos = self.get_metadata(PositionProvider, node)
-                                        self.calls.append((pos.start.line-1, pos.start.column))
-
-                            w = MetadataWrapper(t)
-                            v = _CallVisitor(func_name)
-                            w.visit(v)
-                            
-                            if v.calls:  # Only process if we found calls
-                                rel = os.path.relpath(abs_p, self.repo_path)
-                                for ln, col in v.calls:
-                                    item = {
-                                        "uri": Path(abs_p).as_uri(),
-                                        "absolutePath": abs_p,
-                                        "relativePath": rel,
-                                        "range": {"start": {"line": ln, "character": col}, "end": {"line": ln, "character": col}},
-                                    }
-                                    callers.append(item)
-                                    
-                                # Early exit if we found enough callers
-                                if len(callers) >= min_callers:
-                                    print(f"Found {len(callers)} callers, stopping early")
-                                    break
-                                    
-                        except Exception:
-                            pass
-                            
-                        checked += 1
-                        if checked >= max_files:
-                            break
-                            
-                    end_time = time.time()
-                    elapsed = end_time - start_time
-                    mb_processed = total_size / (1024 * 1024)
-                    print(f"Search complete: {checked} files ({mb_processed:.1f}MB) processed in {elapsed:.1f}s, found {len(callers)} callers")
-            except Exception:
-                pass
 
         return callers
 
@@ -303,7 +173,7 @@ if __name__ == "__main__":
     print("LSP process cmd:", repo.lsp.language_server.server.process_launch_info.cmd)
 
     # Start the language server and run queries inside the context manager
-    with repo.lsp.start_server():
+    with repo.lsp.start_server(): # could specified a target folder
         callers = repo.get_function_callers(test_path, 833, 4)
         with open("callers_test30.json", "w") as f:
             json.dump(callers, f, indent=2)

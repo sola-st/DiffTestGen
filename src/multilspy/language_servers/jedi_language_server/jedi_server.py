@@ -33,9 +33,10 @@ class JediServer(LanguageServer):
             "python",
         )
 
-    def _get_initialize_params(self, repository_absolute_path: str) -> InitializeParams:
+    def _get_initialize_params(self, repository_absolute_path: str, subfolder: str = None) -> InitializeParams:
         """
         Returns the initialize params for the Jedi Language Server.
+        If subfolder is provided, only that subfolder will be used as the workspace.
         """
         with open(os.path.join(os.path.dirname(__file__), "initialize_params.json"), "r") as f:
             d = json.load(f)
@@ -43,22 +44,26 @@ class JediServer(LanguageServer):
         del d["_description"]
 
         d["processId"] = os.getpid()
-        assert d["rootPath"] == "$rootPath"
-        d["rootPath"] = repository_absolute_path
 
-        assert d["rootUri"] == "$rootUri"
-        d["rootUri"] = pathlib.Path(repository_absolute_path).as_uri()
+        # Choose the effective workspace root
+        effective_path = None
+        if subfolder:
+            effective_path = os.path.join(repository_absolute_path, subfolder)
+        else:
+            effective_path = repository_absolute_path
 
-        assert d["workspaceFolders"][0]["uri"] == "$uri"
-        d["workspaceFolders"][0]["uri"] = pathlib.Path(repository_absolute_path).as_uri()
+        # Root path and workspace folder
+        d["rootPath"] = effective_path
+        d["rootUri"] = pathlib.Path(effective_path).as_uri()
 
-        assert d["workspaceFolders"][0]["name"] == "$name"
-        d["workspaceFolders"][0]["name"] = os.path.basename(repository_absolute_path)
+        d["workspaceFolders"][0]["uri"] = pathlib.Path(effective_path).as_uri()
+        d["workspaceFolders"][0]["name"] = os.path.basename(effective_path)
 
         return d
 
+
     @asynccontextmanager
-    async def start_server(self) -> AsyncIterator["JediServer"]:
+    async def start_server(self, target_folder=None) -> AsyncIterator["JediServer"]:
         """
         Starts the JEDI Language Server, waits for the server to be ready and yields the LanguageServer instance.
 
@@ -98,7 +103,7 @@ class JediServer(LanguageServer):
         async with super().start_server():
             self.logger.log("Starting jedi-language-server server process", logging.INFO)
             await self.server.start()
-            initialize_params = self._get_initialize_params(self.repository_root_path)
+            initialize_params = self._get_initialize_params(self.repository_root_path, target_folder)
 
             self.logger.log(
                 "Sending initialize request from LSP client to LSP server and awaiting response",

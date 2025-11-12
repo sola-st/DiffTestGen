@@ -98,6 +98,14 @@ class PullRequest:
         self.imports_new = []
         self.non_public_class_hover_text_new = {}
 
+        # for focuing on specified folder, not the entire project
+        self.target_folder = None
+        project_name = self.cloned_repo_manager.repo_name
+        if project_name == "marshmallow":
+            self.target_folder = "src"
+        elif project_name in ["scipy", "pandas"]:
+            self.target_folder = project_name
+
     def _pr_url_to_patch(self): 
         ''' 
         The target is to get the modified files from the patch.
@@ -254,7 +262,7 @@ class PullRequest:
         if Config.call_graph == True:
             # the server stays alive for the entire workspace
             server = ExtractCallerCallee(cloned_repo.repo.working_dir)
-            with server.lsp.start_server(): # start only once, automatic stop
+            with server.lsp.start_server(self.target_folder): # start only once, automatic stop, focus on only the given folder
                 self.helper_inner(cloned_repo, version, prompt_base, server)
         else:
             self.helper_inner(cloned_repo, version, prompt_base)
@@ -320,9 +328,9 @@ class PullRequest:
                             api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
                             if not exists(api_file): # write it to local for quick repetition
                                 # to build only once per version
-                                project_name = self.cloned_repo_manager.repo_name
+                                # project_name = self.cloned_repo_manager.repo_name
                                 # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
-                                BuildDocumentation(container_name, project_name, self.number).build()
+                                BuildDocumentation(container_name, self.cloned_repo_manager.repo_name, self.number).build()
                             
                             checked_parent_class = [] 
                             if version == "old":
@@ -621,7 +629,7 @@ class PullRequest:
                     # break # this gets the only one shortest
                     continue # this ends the current path, and goes for other paths
                 
-                callers = server.get_function_callers(curr_rel_file_path, curr_line, curr_col)
+                callers = server.get_function_callers(curr_rel_file_path, curr_line, curr_col) # TODO TODO TODO FOCUS
 
                 if not callers:
                     # No more callers, but no public function found in the path
