@@ -334,7 +334,7 @@ class PullRequest:
                             
                             checked_parent_class = [] 
                             if version == "old":
-                                # get public apis
+                                # get public apis: self.public_apis_old, self.full_names_old, self.abbr_names_old
                                 self.public_apis_old = get_apis(api_file)
 
                                 function_names_to_get_cg_old = []
@@ -370,6 +370,7 @@ class PullRequest:
                                 if function_names_to_get_cg_old:
                                     self.get_call_graph_info(server, modified_file, module_name, function_names_to_get_cg_old, version)
                             else: # new code version
+                                # self.public_apis_new, self.full_names_new, self.abbr_names_new
                                 self.public_apis_new = get_apis(api_file)
                                 self.public_apis_union = self.public_apis_old + self.public_apis_new
 
@@ -629,7 +630,7 @@ class PullRequest:
                     # break # this gets the only one shortest
                     continue # this ends the current path, and goes for other paths
                 
-                callers = server.get_function_callers(curr_rel_file_path, curr_line, curr_col) # TODO TODO TODO FOCUS
+                callers = server.get_function_callers(curr_rel_file_path, curr_line, curr_col)
 
                 if not callers:
                     # No more callers, but no public function found in the path

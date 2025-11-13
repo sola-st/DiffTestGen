@@ -214,7 +214,7 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             break
     return call_function, import_line, signature_docstring, parent_class, class_hover_text
 
-def is_public(server, file_path, module, parent_class, func_name, public_apis_list, check_parent_class, return_bool=False) -> str:
+def is_public(server, file_path, module, parent_class, func_name, public_apis_list_triple, check_parent_class, return_bool=False) -> str:
     # if the function is public, return its import line, if not, return "".
     import_line = ""
     class_hover_text_to_return = ""
@@ -232,15 +232,20 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
         else:
             module_candi = f"{module}.{func_name}"
 
+    public_apis_list, full_names, abbr_names = public_apis_list_triple
+
     if return_bool == True:
         if module_candi in public_apis_list: 
             return True
         else:
             return False
     
-    # pandas.core.indexes.base.Index	[py:class]	reference/api/pandas.Index.html#pandas.Index
-    # TODO TODO TODO
     if module_candi in public_apis_list: 
+        tmp = module_candi.removesuffix(f".{func_name}")
+        if tmp in full_names:
+            idx = full_names.index(tmp)
+            module = abbr_names[idx].removesuffix(f".{func_name}") # update_public_api_module
+
         if parent_class_name:
             if func_name.startswith("__"):
                 if func_name == "__init__": # here the parent class should absolutely exist
@@ -249,7 +254,8 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
                     # class_hover_text_to_return = parent_class
                 else: # other special methods
                     import_line = f"from {module} import {parent_class_name}" # import the class
-                    import_line += (f"\nMethod '{func_name}' is a special method of class '{module}'. Its behavior follows Python’s data model.\n"
+                    # TODO
+                    import_line += (f"\nMethod '{func_name}' is a special method of class '{module}'. Its behavior follows Python's official documentation.\n"
                             f"To use this special method, write code that triggers it naturally, "
                             f"e.g., for the '__add__' method, writing 'a + b' will automatically call '__add__'.\n")
 
