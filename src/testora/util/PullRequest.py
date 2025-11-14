@@ -495,7 +495,7 @@ class PullRequest:
                 for common in cg_common_in_both:
                     map_idx = old_cg_func_level_list.index(common)
                     sig_doc_common.append(old_sig_doc_func_level_list[map_idx])
-                    import_common.append(old_imports_func_level_list[idx])
+                    import_common.append(old_imports_func_level_list[map_idx])
                 
                 # unique in old
                 cg_unique_in_old = [x for x in old_cg_func_level_list if x not in new_cg_func_level_list]
@@ -504,7 +504,7 @@ class PullRequest:
                 for unique in cg_unique_in_old:
                     map_idx = old_cg_func_level_list.index(unique)
                     sig_doc_unique_in_old.append(old_sig_doc_func_level_list[map_idx])
-                    import_unique_in_old.append(old_imports_func_level_list[idx])
+                    import_unique_in_old.append(old_imports_func_level_list[map_idx])
 
                 # unique in new
                 cg_unique_in_new = [x for x in new_cg_func_level_list if x not in old_cg_func_level_list]
@@ -513,7 +513,7 @@ class PullRequest:
                 for unique in cg_unique_in_new:
                     map_idx = new_cg_func_level_list.index(unique)
                     sig_doc_unique_in_new.append(new_sig_doc_func_level_list[map_idx])
-                    import_unique_in_new.append(new_imports_func_level_list[idx])
+                    import_unique_in_new.append(new_imports_func_level_list[map_idx])
 
                 # union info
                 self.all_call_graph_paths[qualified_func]["common"].extend(cg_common_in_both)

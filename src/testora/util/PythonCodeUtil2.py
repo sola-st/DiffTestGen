@@ -238,7 +238,15 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
         if module_candi in public_apis_list: 
             return True
         else:
-            return False
+            # check whether the module is in the public api list, e.g., pandas 60183 changed some files not in the public apis
+            if not whether_module_is_public(public_apis_list, module):
+                # fall back to name conventions
+                if func_name.startswith("_"):
+                    return False
+                else:
+                    return True
+            else:
+                return False
     
     if module_candi in public_apis_list: 
         tmp = module_candi.removesuffix(f".{func_name}")
@@ -267,8 +275,16 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
                     class_hover_text_to_return = f"For class '{module}'\n{class_hover_text}:\n"
         else:
             import_line = f"from {module} import {func_name}" # import the function
+    else:
+        if not whether_module_is_public(public_apis_list, module):
+            # fall back to name conventions
+            if not func_name.startswith("_"):
+                import_line = f"from {module} import {func_name}" # import the function
         
     return import_line, module, class_hover_text_to_return
+
+def whether_module_is_public(public_apis_list, module):
+    return [api for api in public_apis_list if api.startswith(module)]
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """
