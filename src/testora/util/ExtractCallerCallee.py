@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import libcst as cst
 from libcst.metadata import MetadataWrapper, PositionProvider
 from pathlib import Path
@@ -92,7 +93,9 @@ class ExtractCallerCallee:
         # from PythonLanguageServer.py
         raw_result = self.lsp.request_hover(file_path, line, column)
         if type(raw_result) == dict and "contents" in raw_result:
-            return raw_result["contents"]["value"]
+            # replace multiple consecutive \n characters with a single \n
+            hover_text = re.sub(r'\n+', '\n', raw_result["contents"]["value"])
+            return hover_text
         else:
             return ""
         

@@ -673,7 +673,7 @@ class PullRequest:
                                 # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
                                 new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
                                 signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
-                                queue.append((next_func, caller["relativePath"], next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
+                            queue.append((next_func, caller["relativePath"], next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
 
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)
