@@ -55,5 +55,5 @@ class BuildDocumentation:
         # it will automatically create the 'apis' folder
         self.copy_file_from_container(
                 f"/home/{self.project_name}/{build_folder}/_build/html/objects.inv", f"apis/api_{self.container.name}_{self.pr_num}")
-        print(f"{self.container.name}: API file written done.")
+        # print(f"{self.container.name}: API file written done.")
 

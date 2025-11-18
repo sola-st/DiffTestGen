@@ -4,7 +4,7 @@ from unidiff import PatchSet
 from testora.execution.CoverageAnalyzer import set_to_ranges
 from testora.util.BuildDocumentation import BuildDocumentation
 from testora.util.ListPublicAPIsLocal import get_apis
-from testora.util.Logs import CallGraphEvent, append_event
+from testora.util.Logs import CallGraphEvent, Event, append_event
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
 from testora.util.PythonCodeUtil2 import (
@@ -331,7 +331,9 @@ class PullRequest:
                                 # to build only once per version
                                 # project_name = self.cloned_repo_manager.repo_name
                                 # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
+                                append_event(Event(pr_nb=self.number, message=f"Starting to bulid sphinx documentation ({version})."))
                                 BuildDocumentation(container_name, self.cloned_repo_manager.repo_name, self.number).build()
+                                append_event(Event(pr_nb=self.number, message=f"Done with sphinx bulid ({version})."))
                             
                             checked_parent_class = [] 
                             if version == "old":
@@ -605,6 +607,8 @@ class PullRequest:
                             common_recorded = True
 
     def get_call_graph_info(self, server, modified_file, module_name, function_names, version):
+        append_event(Event(pr_nb=self.number, message=f"Starting to explore call graph paths, only private relevant ({version})."))
+
         all_explored_paths = ""
         for func_info in function_names:
             func_name, start_line_0_based, start_col_0_based, parent_class = func_info
@@ -699,9 +703,7 @@ class PullRequest:
                                     signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
                             queue.append((next_func, next_rel_path, next_line, next_col, new_path, path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
                         else:
-                            all_explored_paths += f"Path: loop type 1--function attribute access or recursive function call, current function: {", ".join(call_function)}\n"
-                        
-            append_event(CallGraphEvent(pr_nb=self.number, message=f"Call graph, all explored paths ({version})", content=all_explored_paths))
+                            all_explored_paths += f"Path: loop type 1--function attribute access or recursive function call, current function: {', '.join(call_function)}\n"
             
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)
@@ -721,6 +723,8 @@ class PullRequest:
             #         self.signatures_docstrings_new.append([])
             #         self.imports_new.append([])
             #     print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
+
+        append_event(CallGraphEvent(pr_nb=self.number, message=f"Done with call graph exploration, all explored paths ({version})", content=all_explored_paths))
     
     def get_test_function_code(self, cloned_repo, version):
         code_context = ""
