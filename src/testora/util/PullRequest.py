@@ -375,7 +375,8 @@ class PullRequest:
                             else: # new code version
                                 # self.public_apis_new, self.full_names_new, self.abbr_names_new
                                 self.public_apis_new = get_apis(api_file)
-                                self.public_apis_union = self.public_apis_old + self.public_apis_new
+                                if Config.private_call_indentification == 2: # this only used for private checking in the generated code
+                                    self.public_apis_union = self.public_apis_old[0] + self.public_apis_new[0] 
 
                                 function_names_to_get_cg_new = []
                                 for func_name in function_names:
@@ -703,7 +704,7 @@ class PullRequest:
                                     signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
                             queue.append((next_func, next_rel_path, next_line, next_col, new_path, path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
                         else:
-                            all_explored_paths += f"Path: loop type 1--function attribute access or recursive function call, current function: {', '.join(call_function)}\n"
+                            all_explored_paths += f"Path: loop type 1--function attribute access or recursive function call, current function: {', '.join(map(str, call_function))}\n"
             
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)
