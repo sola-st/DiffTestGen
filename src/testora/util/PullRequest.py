@@ -613,15 +613,19 @@ class PullRequest:
 
             unique_entry_funcs = set()
             queue = deque()
-            # Each item: (current_func_name, file rel path, start_line, start_col, path_so_far, import_line, signature_so_far)
-            queue.append((func_name, modified_file.path, start_line_0_based, start_col_0_based, [func_name], "", ""))
+            # Each item: (current_func_name, file rel path, start_line, start_col, path_so_far, path_with_detials_so_far, import_line, signature_so_far)
+            queue.append((func_name, modified_file.path, start_line_0_based, start_col_0_based, 
+                        [func_name], [[func_name, start_line_0_based, start_col_0_based]], "", ""))
 
             public_apis_list = self.public_apis_old
             if version == "new":
                 public_apis_list = self.public_apis_new
 
             while queue:
-                curr_func, curr_rel_file_path, curr_line, curr_col, path, ref_import, signature_docstring = queue.popleft()
+                curr_func, curr_rel_file_path, curr_line, curr_col, path, path_detailed, ref_import, signature_docstring = queue.popleft()
+                if path_detailed[0] == "loop_early_stop": # normal element should be list, here whatever the string is, the type does not match
+                    continue
+
                 if signature_docstring and ref_import: 
                     func_level_call_graph_paths.append(path)
                     unique_entry_funcs.add(path[0])
@@ -658,22 +662,30 @@ class PullRequest:
                         else:
                             self.non_public_class_hover_text_new.update({module_endswith_class: class_hover_text})
                     
-                    if call_function:
+                    if call_function and call_function != [curr_func, curr_line, curr_col]: # to remove function attribute access and recursive function call
                         if call_function not in collected_funcs:
                             # deduplication, like Function A(range from line 100 to 140) calls func_b in line 110 and line 120, only check the callers of func A once.
                             collected_funcs.append(call_function)
+                            
+                            # to handle loops
+                            if call_function in path_detailed:
+                                path_detailed.insert(0, "loop_early_stop") # inifinite loop
+                                # we do not check more info, like 'new_path' in the else branch, because this will be an early stop
+                            else:
+                                path_detailed.insert(0, call_function)
 
-                            next_func, next_line, next_col = call_function
-                            new_path = [next_func] + path # here it starts from same function, and get a set of callers, it is ok to do deduplication.
-                            new_ref_imports_to_queue = ""
-                            signature_docstring_to_queue = ""
-                            if new_signature_docstring: # found the public function
-                                # * From file {caller['relativePath']}:\n
-                                # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
-                                # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
-                                new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
-                                signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
-                            queue.append((next_func, caller["relativePath"], next_line, next_col, new_path, new_ref_imports_to_queue, signature_docstring_to_queue))
+                                next_func, next_line, next_col = call_function
+                                new_path = [next_func] + path # here it starts from same function, and get a set of callers, it is ok to do deduplication.
+
+                                new_ref_imports_to_queue = ""
+                                signature_docstring_to_queue = ""
+                                if new_signature_docstring: # found the public function
+                                    # * From file {caller['relativePath']}:\n
+                                    # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
+                                    # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
+                                    new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
+                                    signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
+                            queue.append((next_func, caller["relativePath"], next_line, next_col, new_path, path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
 
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)
