@@ -42,7 +42,7 @@ from testora.util.ExtractExistingTests import ExtractExistingTests
 from testora.util.PrivateIdentification import has_private_accesses_or_fails_to_parse_api_lsp
 from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
-from testora.util.Logs import (CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
+from testora.util.Logs import (CallGraphEvent, CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
         ClassificationEvent, ErrorEvent, PREvent, SelectBehaviorEvent, TestExecutionEvent, append_event, 
         Event, ComparisonEvent, LLMEvent, get_logs_as_json, store_logs, reset_logs)
 from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
@@ -418,10 +418,10 @@ def generate_tests(pr, github_repo, changed_functions):
                         for cg in cg_paths:
                             cg_path_len['all'].append(len(cg)-1) # -1 to remove the index mark
             cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all'])
-            append_event(LLMEvent(pr_nb=pr.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
+            append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
 
     # print(info_public_and_private)
-    append_event(LLMEvent(pr_nb=pr.number, message=f"Call graph", content=info_public_and_private))
+    append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph", content=info_public_and_private))
     exit()
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True

@@ -4,6 +4,7 @@ from unidiff import PatchSet
 from testora.execution.CoverageAnalyzer import set_to_ranges
 from testora.util.BuildDocumentation import BuildDocumentation
 from testora.util.ListPublicAPIsLocal import get_apis
+from testora.util.Logs import CallGraphEvent, append_event
 from testora.util.PythonCodeUtil import equal_modulo_docstrings, extract_target_function_by_range, get_name_of_defined_function
 from testora import Config
 from testora.util.PythonCodeUtil2 import (
@@ -604,6 +605,7 @@ class PullRequest:
                             common_recorded = True
 
     def get_call_graph_info(self, server, modified_file, module_name, function_names, version):
+        all_explored_paths = ""
         for func_info in function_names:
             func_name, start_line_0_based, start_col_0_based, parent_class = func_info
             # try:
@@ -615,7 +617,7 @@ class PullRequest:
             queue = deque()
             # Each item: (current_func_name, file rel path, start_line, start_col, path_so_far, path_with_detials_so_far, import_line, signature_so_far)
             queue.append((func_name, modified_file.path, start_line_0_based, start_col_0_based, 
-                        [func_name], [[func_name, start_line_0_based, start_col_0_based]], "", ""))
+                        [func_name], [[func_name, modified_file.path, start_line_0_based, start_col_0_based]], "", ""))
 
             public_apis_list = self.public_apis_old
             if version == "new":
@@ -623,7 +625,8 @@ class PullRequest:
 
             while queue:
                 curr_func, curr_rel_file_path, curr_line, curr_col, path, path_detailed, ref_import, signature_docstring = queue.popleft()
-                if path_detailed[0] == "loop_early_stop": # normal element should be list, here whatever the string is, the type does not match
+                if path_detailed[0] == "loop type 2--multi-func in the loop": # normal element should be list, here whatever the string is, the type does not match
+                    all_explored_paths += "Path: " + ", ".join(map(str, path_detailed)) + "\n"
                     continue
 
                 if signature_docstring and ref_import: 
@@ -631,6 +634,7 @@ class PullRequest:
                     unique_entry_funcs.add(path[0])
                     func_level_imports.append(ref_import)
                     func_level_signatures.append(signature_docstring)
+                    all_explored_paths += "Path: " + ", ".join(map(str, path_detailed)) + "\n"
                     # break # this gets the only one shortest
                     continue # this ends the current path, and goes for other paths
                 
@@ -638,11 +642,14 @@ class PullRequest:
 
                 if not callers:
                     # No more callers, but no public function found in the path
+                    path_detailed.insert(0, "no_caller_no_public")
+                    all_explored_paths += "Path: " + ", ".join(map(str, path_detailed)) + "\n"
                     continue
                 
                 checked_parent_class = []
                 parent_class = None
-                collected_funcs = [] # for later deduplication
+                # add curr info here to remove function attribute access and recursive function call
+                collected_funcs = [[curr_func, curr_rel_file_path, curr_line, curr_col]] # for later deduplication
                 for caller in callers:
                     with open(caller["absolutePath"], "r") as f:
                         caller_file_content = f.read()
@@ -662,31 +669,40 @@ class PullRequest:
                         else:
                             self.non_public_class_hover_text_new.update({module_endswith_class: class_hover_text})
                     
-                    if call_function and call_function != [curr_func, curr_line, curr_col]: # to remove function attribute access and recursive function call
+                    if call_function: 
+                        '''
+                        # For looped calls, it mainly consists two types:
+                         * 1. function attribute access or recursive function call, like func_a calls func_a
+                         * 2. multiple functions in the loop, like func_a --> func_b --> func_c --> func_a --> ...
+                        '''
                         if call_function not in collected_funcs:
-                            # deduplication, like Function A(range from line 100 to 140) calls func_b in line 110 and line 120, only check the callers of func A once.
+                            # path level deduplication, deduplicate all the callers
+                            # like Function A(range from line 100 to 140) calls func_b in line 110 and line 120, only check the callers of func A once.
                             collected_funcs.append(call_function)
+                        
+                            next_func, next_rel_path, next_line, next_col = call_function
+                            new_path = [next_func] + path # here it starts from same function, and get a set of callers, it is ok to do deduplication.
+                            new_ref_imports_to_queue = ""
+                            signature_docstring_to_queue = ""
                             
-                            # to handle loops
+                            # to handle loops, inter-path
                             if call_function in path_detailed:
-                                path_detailed.insert(0, "loop_early_stop") # inifinite loop
+                                path_detailed.insert(0, "loop type 2--multi-func in the loop") # inifinite loop
                                 # we do not check more info, like 'new_path' in the else branch, because this will be an early stop
                             else:
                                 path_detailed.insert(0, call_function)
-
-                                next_func, next_line, next_col = call_function
-                                new_path = [next_func] + path # here it starts from same function, and get a set of callers, it is ok to do deduplication.
-
-                                new_ref_imports_to_queue = ""
-                                signature_docstring_to_queue = ""
                                 if new_signature_docstring: # found the public function
                                     # * From file {caller['relativePath']}:\n
                                     # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
                                     # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
                                     new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
                                     signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
-                            queue.append((next_func, caller["relativePath"], next_line, next_col, new_path, path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
-
+                            queue.append((next_func, next_rel_path, next_line, next_col, new_path, path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
+                        else:
+                            all_explored_paths += f"Path: loop type 1--function attribute access or recursive function call, current function: {", ".join(call_function)}\n"
+                        
+            append_event(CallGraphEvent(pr_nb=self.number, message=f"Call graph, all explored paths ({version})", content=all_explored_paths))
+            
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)
                 self.signatures_docstrings_old.append(func_level_signatures)

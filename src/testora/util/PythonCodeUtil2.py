@@ -184,7 +184,7 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             # current function has overlaps with the modified lines
             # the start and end lines are both included, and start at 1.
             call_function_name = func_node.name.value
-            call_function = [call_function_name, name_start_line_0base, name_start_col_0base] # languge server is 0-based
+            call_function = [call_function_name, relativePath, name_start_line_0base, name_start_col_0base] # languge server is 0-based
 
             # # option 1: return entire function code
             # module_with_node = cst.Module(body=[func_node])

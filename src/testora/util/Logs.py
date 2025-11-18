@@ -53,6 +53,9 @@ class SelectBehaviorEvent(Event):
 class LLMEvent(Event):
     content: str
 
+class CallGraphEvent(Event):
+    content: str
+
 
 class ErrorEvent(Event):
     details: str
