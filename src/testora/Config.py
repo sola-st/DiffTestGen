@@ -4,7 +4,7 @@
 # initial_globals = set(globals().keys())
 
 # analyze only PRs that have code changes in files in specific programming languages
-code_change_pl = "all"  # "all" or "python"
+code_change_pl = "python"  # "all" or "python"
 
 # analyze only PRs with a single parent
 single_parent_PRs_only = False

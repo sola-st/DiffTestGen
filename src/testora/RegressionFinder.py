@@ -410,14 +410,14 @@ def generate_tests(pr, github_repo, changed_functions):
 
         if pr.all_call_graph_paths:
             # record the length of call paths
-            cg_path_len['shortest_avg'] = sum(cg_path_len['shortest']) / len(cg_path_len['shortest'])
+            cg_path_len['shortest_avg'] = sum(cg_path_len['shortest']) / len(cg_path_len['shortest']) if cg_path_len['shortest'] else 0
 
             for func_name, cg_paths_with_label in pr.all_call_graph_paths.items():
                 for lable, cg_paths in cg_paths_with_label.items():
                     if cg_paths:
                         for cg in cg_paths:
                             cg_path_len['all'].append(len(cg)-1) # -1 to remove the index mark
-            cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all'])
+            cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
             append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
 
     # print(info_public_and_private)
