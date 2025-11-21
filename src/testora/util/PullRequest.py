@@ -687,24 +687,27 @@ class PullRequest:
                         
                             next_func, next_rel_path, next_line, next_col = call_function
                             new_path = [next_func] + path # here it starts from same function, and get a set of callers, it is ok to do deduplication.
+                            new_path_detailed = []
                             new_ref_imports_to_queue = ""
                             signature_docstring_to_queue = ""
                             
                             # to handle loops, inter-path
                             if call_function in path_detailed:
-                                path_detailed.insert(0, "loop type 2--multi-func in the loop") # inifinite loop
+                                new_path_detailed = ["loop type 2--multi-func in the loop"] + path_detailed # inifinite loop
                                 # we do not check more info, like 'new_path' in the else branch, because this will be an early stop
                             else:
-                                path_detailed.insert(0, call_function)
+                                new_path_detailed = [call_function] + path_detailed
                                 if new_signature_docstring: # found the public function
                                     # * From file {caller['relativePath']}:\n
                                     # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
                                     # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
                                     new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
                                     signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
-                            queue.append((next_func, next_rel_path, next_line, next_col, new_path, path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
+                            queue.append((next_func, next_rel_path, next_line, next_col, new_path, new_path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
                         else:
-                            all_explored_paths += f"Path: loop type 1--function attribute access or recursive function call, current function: {', '.join(map(str, call_function))}\n"
+                            path_str = ", ".join(map(str,  [call_function] + path_detailed))
+                            # two cases: 1. loop, 2. curr_func be called by the same caller function at different location
+                            all_explored_paths += f"Path: loop type 1--function attribute access or recursive function call. Deduplicate the same caller fucntion. {path_str}" + "\n"
             
             if version == "old":
                 self.call_graph_paths_old.append(func_level_call_graph_paths)
