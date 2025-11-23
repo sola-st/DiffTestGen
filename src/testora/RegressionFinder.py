@@ -433,7 +433,7 @@ def generate_tests(pr, github_repo, changed_functions):
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
         
         generated_tests, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff")
-        if type(generate_tests) == dict:
+        if type(generated_tests) == dict:
             empty_answer_full_diff = True
         else:
             all_tests.extend(generated_tests)
@@ -449,7 +449,7 @@ def generate_tests(pr, github_repo, changed_functions):
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         
         generated_tests, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff")
-        if type(generate_tests) == dict:
+        if type(generated_tests) == dict:
             empty_answer_filtered_diff = True
         else:
             all_tests.extend(generated_tests)
