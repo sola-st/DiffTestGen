@@ -202,16 +202,16 @@ def has_private_accesses_or_fails_to_parse(code):
     call_extractor = CallExtractor()
     tree.visit(call_extractor)
     for callee in call_extractor.callees:
-        if callee.startswith("_"):
-        # if callee.startswith("_") and not callee.starswith("__"):
+        # if callee.startswith("_"):
+        if callee.startswith("_") and not callee.starswith("__"):
             static_error_msg = f"The code snippet calls the function '{callee}', which is not part of the public API."
             return True, static_error_msg
 
     attribute_extractor = AttributeExtractor()
     tree.visit(attribute_extractor)
     for attribute in attribute_extractor.attributes:
-        if attribute.startswith("_"):
-        # if attribute.startswith("_") and not callee.starswith("__"):
+        # if attribute.startswith("_"):
+        if attribute.startswith("_") and not attribute.starswith("__"):
             static_error_msg = f"The code snippet accesses the attribute '{attribute}', which is not part of the public API."
             return True, static_error_msg
 

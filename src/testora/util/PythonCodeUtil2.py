@@ -269,10 +269,13 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
                     # class_hover_text_to_return = parent_class
                 else: # other special methods
                     import_line = f"from {module} import {parent_class_name}" # import the class
-                    # TODO
-                    import_line += (f"\nMethod '{func_name}' is a special method of class '{module}'. Its behavior follows Python's official documentation.\n"
-                            f"To use this special method, write code that triggers it naturally, "
-                            f"e.g., for the '__add__' method, writing 'a + b' will automatically call '__add__'.\n")
+                    import_line += (
+                        f"\nMethod '{func_name}' is a special method of the class '{module}'. "
+                        f"Its behavior follows Python's official documentation. "
+                        f"To use this special method, write code that triggers it naturally, "
+                        f"e.g., the expression 'a + b' automatically calls '__add__'. "
+                        f"If no natural operation makes sense for a given special method, it is also fine to call it directly.\n"
+                    )
 
             else: # normal function from a class
                 import_line = f"from {module} import {func_name}"
