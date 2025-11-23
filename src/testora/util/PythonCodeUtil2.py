@@ -211,12 +211,12 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
                 
                 signature_docstring = signature_docstring_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
 
-                # block start: the following three non-empty lines are for tmp check the length, this block can be removed without touching the functionality
-                signature_docstring = f"Function_signature_docstring_length: {len(signature_docstring)}\n" + signature_docstring
+            #     # block start: the following three non-empty lines are for tmp check the length, this block can be removed without touching the functionality
+            #     signature_docstring = f"Function_signature_docstring_length: {len(signature_docstring)}\n" + signature_docstring
 
-            if class_hover_text:
-                class_hover_text = f"Class_hovering_text_length: {len(class_hover_text)}\n" + class_hover_text
-            # block end
+            # if class_hover_text:
+            #     class_hover_text = f"Class_hovering_text_length: {len(class_hover_text)}\n" + class_hover_text
+            # # block end
 
             break
     return call_function, import_line, signature_docstring, parent_class, class_hover_text

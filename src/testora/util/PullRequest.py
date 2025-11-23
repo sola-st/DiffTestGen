@@ -673,7 +673,9 @@ class PullRequest:
                             self.non_public_class_hover_text_old.update({module_endswith_class: class_hover_text})
                         else:
                             self.non_public_class_hover_text_new.update({module_endswith_class: class_hover_text})
-                    
+                        
+                        append_event(Event(pr_nb=self.number, message=f"The hover text length of class - {module_endswith_class}: {len(class_hover_text)}."))
+
                     if call_function: 
                         '''
                         # For looped calls, it mainly consists two types:
@@ -698,6 +700,7 @@ class PullRequest:
                             else:
                                 new_path_detailed = [call_function] + path_detailed
                                 if new_signature_docstring: # found the public function
+                                    append_event(Event(pr_nb=self.number, message=f"The hover text length of caller function - {next_func}: {len(new_signature_docstring)}."))
                                     # * From file {caller['relativePath']}:\n
                                     # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
                                     # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
