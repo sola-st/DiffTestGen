@@ -420,9 +420,8 @@ def generate_tests(pr, github_repo, changed_functions):
             cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
             append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
 
-    # print(info_public_and_private)
-    append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph", content=info_public_and_private))
-    exit()
+    append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
+    # exit()
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
         prompt_full_diff = None

@@ -94,15 +94,22 @@ etc.
         # collect the available blocks until reaching len limit.
         if len(self.changed_function_block) > 0 and (current_len + len(self.changed_function_block) <= default_len_limit):
             template_prompt += f"\n{self.changed_function_block}"
-            append_event(Event(pr_nb=0, message="Added info about changed function body"))
+            current_len += len(self.changed_function_block)
+            append_event(Event(pr_nb=0, message=f"Added info about changed function body. Current prompt length: {current_len}."))
 
-        if len(self.call_graph_block) > 0 and (current_len + len(self.call_graph_block) <= default_len_limit):
-            template_prompt += f"\n{self.call_graph_block}"
-            append_event(Event(pr_nb=0, message="Added info about call graph"))
+        if len(self.call_graph_block) > 0:
+            if current_len + len(self.call_graph_block) <= default_len_limit:
+                template_prompt += f"\n{self.call_graph_block}"
+                current_len += len(self.call_graph_block)
+                append_event(Event(pr_nb=0, message=f"Added info about call graph. Current prompt length: {current_len}."))
+            # else:
+                # if "Method #" in 
+                # TODO use part of the call graph info, use more well-selected info 
 
         if len(self.test_function_block) > 0 and (current_len + len(self.test_function_block) <= default_len_limit):
             template_prompt += f"\n{self.test_function_block}"
-            append_event(Event(pr_nb=0, message="Added info about test function body"))
+            current_len += len(self.test_function_block)
+            append_event(Event(pr_nb=0, message=f"Added info about test function body. Current prompt length: {current_len}."))
 
         # template part 3
         template_prompt += template_postfix_str
