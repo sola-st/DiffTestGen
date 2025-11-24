@@ -27,6 +27,7 @@ docker exec -w /home/scipy scipy-dev1 pip install coverage
 docker exec -w /home/scipy scipy-dev1 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning
 docker exec -w /home/scipy scipy-dev1 apt update
 docker exec -w /home/scipy scipy-dev1 apt install -y gfortran gcc g++ make pkg-config libopenblas-dev liblapack-dev ninja-build
+docker exec -w /home/scipy scipy-dev1 pip install coverage==7.11.0
 echo "Done with first clone"
 
 echo "Creating second clone of scipy"
@@ -42,6 +43,7 @@ docker exec -w /home/scipy scipy-dev2 pip install coverage
 docker exec -w /home/scipy scipy-dev2 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning
 docker exec -w /home/scipy scipy-dev2 apt update
 docker exec -w /home/scipy scipy-dev2 apt install -y gfortran gcc g++ make pkg-config libopenblas-dev liblapack-dev ninja-build
+docker exec -w /home/scipy scipy-dev2 pip install coverage==7.11.0
 echo "Done with second clone"
 
 echo "Creating third clone of scipy"
@@ -57,6 +59,7 @@ docker exec -w /home/scipy scipy-dev3 pip install coverage
 docker exec -w /home/scipy scipy-dev3 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning
 docker exec -w /home/scipy scipy-dev3 apt update
 docker exec -w /home/scipy scipy-dev3 apt install -y gfortran gcc g++ make pkg-config libopenblas-dev liblapack-dev ninja-build
+docker exec -w /home/scipy scipy-dev3 pip install coverage==7.11.0
 echo "Done with third clone"
 
 cd ../../../Testora-diff-test-gen #4, change the folder name in all the marked lines to desired projects

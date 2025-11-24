@@ -21,7 +21,7 @@ echo "Building dev container for keras (first clone)"
 docker run -t -d --name keras-dev1 -v ${PWD}:/home/keras python:3.10
 docker exec -w /home/keras keras-dev1 pip install -r requirements.txt
 docker exec -w /home/keras keras-dev1 pip install -e ./
-docker exec -w /home/keras keras-dev1 pip install coverage
+docker exec -w /home/keras keras-dev1 pip install coverage==7.11.0
 echo "Done with first clone"
 
 echo "Creating second clone of keras"
@@ -32,7 +32,7 @@ echo "Building dev container for keras (second clone)"
 docker run -t -d --name keras-dev2 -v ${PWD}:/home/keras python:3.10
 docker exec -w /home/keras keras-dev2 pip install -r requirements.txt
 docker exec -w /home/keras keras-dev2 pip install -e ./
-docker exec -w /home/keras keras-dev2 pip install coverage
+docker exec -w /home/keras keras-dev2 pip install coverage==7.11.0
 echo "Done with second clone"
 
 echo "Creating third clone of keras"
@@ -43,7 +43,7 @@ echo "Building dev container for keras (third clone)"
 docker run -t -d --name keras-dev3 -v ${PWD}:/home/keras python:3.10
 docker exec -w /home/keras keras-dev3 pip install -r requirements.txt
 docker exec -w /home/keras keras-dev3 pip install -e ./
-docker exec -w /home/keras keras-dev3 pip install coverage
+docker exec -w /home/keras keras-dev3 pip install coverage==7.11.0
 echo "Done with third clone"
 
 cd ../../../Testora-diff-test-gen

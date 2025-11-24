@@ -22,6 +22,7 @@ docker run -t -d --name marshmallow-dev1 -v ${PWD}:/home/marshmallow python:3.10
 docker exec -w /home/marshmallow marshmallow-dev1 pip install -e '.[dev]'
 docker exec -w /home/marshmallow marshmallow-dev1 pip install coverage
 docker exec -w /home/marshmallow marshmallow-dev1 pip install sphinx autodocsumm sphinx_copybutton sphinx_issues sphinxext-opengraph furo sphinx-version-warning
+docker exec -w /home/marshmallow marshmallow-dev1 pip install coverage==7.11.0
 echo "Done with first clone"
 
 #####
@@ -35,6 +36,7 @@ docker exec -w /home/marshmallow marshmallow-dev2 pip install -e '.[dev]'
 docker exec -w /home/marshmallow marshmallow-dev2 pip install coverage
 docker exec -w /home/marshmallow marshmallow-dev2 pip install sphinx autodocsumm sphinx_copybutton sphinx_issues sphinxext-opengraph furo sphinx-version-warning
 
+docker exec -w /home/marshmallow marshmallow-dev2 pip install coverage==7.11.0
 echo "Done with second clone"
 
 echo "Creating third clone of marshmallow"
@@ -47,6 +49,7 @@ docker exec -w /home/marshmallow marshmallow-dev3 pip install -e '.[dev]'
 docker exec -w /home/marshmallow marshmallow-dev3 pip install coverage
 docker exec -w /home/marshmallow marshmallow-dev3 pip install sphinx autodocsumm sphinx_copybutton sphinx_issues sphinxext-opengraph furo sphinx-version-warning
 
+docker exec -w /home/marshmallow marshmallow-dev3 pip install coverage==7.11.0
 echo "Done with third clone"
 
 cd ../../../Testora-diff-test-gen
