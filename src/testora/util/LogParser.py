@@ -64,6 +64,7 @@ class PRResult:
         self.avg_old_diff_coverage = 0.0
         self.avg_new_diff_coverage = 0.0
         self.nb_different_behavior = 0
+        self.cg = None
         self.differentiating_tests = []
         self.classification_results = []
 
@@ -110,20 +111,23 @@ class PRResult:
                 self.title = entry["title"]
                 self.url = entry["url"]
 
-            if entry["message"].startswith("Ignoring") and self.nb_generated_tests == 0:
+            elif entry["message"].startswith("Ignoring") and self.nb_generated_tests == 0:
                 # Now we have multiple round, if the 1st round is not ignored, we mark it as checked.
                 self.ignored = True
                 self.ignored_reason = entry["message"]
 
-            for nb_test_generated_pattern in nb_test_generated_patterns:
-                nb_generated_tests_match = re.search(
-                    nb_test_generated_pattern, entry["message"])
-                if nb_generated_tests_match:
-                    self.nb_generated_tests += int(
-                        nb_generated_tests_match.group(1))
+            elif entry["message"].startswith("Call graph ("):
+                content = entry["content"]
+                self.cg = entry["message"]
+                if "For each affected public function" in content:
+                    self.cg += ", public"
+                if "For each affected non-public function" in content:
+                    self.cg += ", private"
+                if "special method" in content:
+                    self.cg += ", special"
 
             # include all the error tests (even been fixed later)
-            if entry["message"].startswith("Test execution"):
+            elif entry["message"].startswith("Test execution"):
                 self.nb_test_executions += 1
                 if "Traceback (most recent call last)" in entry["output"]:
                     self.nb_test_failures += 1
@@ -132,17 +136,22 @@ class PRResult:
                         self.nb_test_fixed += 1
 
 
-            if entry["message"] == "Pre-classification":
+            elif entry["message"] == "Pre-classification":
                 diff_test = DifferentiatingTest(
                     entry["test_code"],
                     entry["old_output"],
                     entry["new_output"])
                 self.differentiating_tests.append(diff_test)
 
-            if entry["message"].startswith("Different outputs"):
+                update_time_taken(entry)
+                phase = "classification"
+                classification_start_time = parse_time_stamp(
+                    entry["timestamp"])
+
+            elif entry["message"].startswith("Different outputs"):
                 self.nb_different_behavior += 1
 
-            if entry["message"].startswith("Diff coverage, #"):
+            elif entry["message"].startswith("Diff coverage, #"):
                 diff_cov = entry["details"].split("\n")[0]
                 old_coverage_results, new_coverage_results = diff_cov.split(", ")
 
@@ -155,23 +164,23 @@ class PRResult:
 
             # keep track of phase we're in and update time taken for each phase
             # TODO maybe also for newly added phases
-            if entry["message"].startswith("Querying"):
+            elif entry["message"].startswith("Querying"):
                 if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
                     update_time_taken(entry)
                     phase = "test_refinement"
                     test_refinemement_start_time = parse_time_stamp(
                         entry["timestamp"])
-            if entry["message"].startswith("Compiling"):
+            elif entry["message"].startswith("Compiling"):
                 update_time_taken(entry)
                 phase = "test_exec"
                 test_exec_start_time = parse_time_stamp(entry["timestamp"])
-            if entry["message"] == "Pre-classification":
-                update_time_taken(entry)
-                phase = "classification"
-                classification_start_time = parse_time_stamp(
-                    entry["timestamp"])
+            # elif entry["message"] == "Pre-classification":
+            #     update_time_taken(entry)
+            #     phase = "classification"
+            #     classification_start_time = parse_time_stamp(
+            #         entry["timestamp"])
 
-            if entry["message"] == "Token usage":
+            elif entry["message"] == "Token usage":
                 pattern = r"prompt=(\d+), completion=(\d+)"
                 match = re.search(pattern, entry["content"])
                 input_tokens = int(match.group(1))
@@ -192,6 +201,14 @@ class PRResult:
                 elif phase == "classification":
                     self.input_tokens_classification += input_tokens
                     self.output_tokens_classification += output_tokens
+            
+            else:
+                for nb_test_generated_pattern in nb_test_generated_patterns:
+                    nb_generated_tests_match = re.search(
+                        nb_test_generated_pattern, entry["message"])
+                    if nb_generated_tests_match:
+                        self.nb_generated_tests += int(
+                            nb_generated_tests_match.group(1))
 
         update_time_taken(self.entries[-1])
 
@@ -271,7 +288,7 @@ class PRResult:
         if s == "ignored":
             return self.ignored_reason
         elif s == "checked":
-            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs" # (N fail(s) to 1 fix)
+            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs, {self.cg}" # (N fail(s) to 1 fix)
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
         else:
