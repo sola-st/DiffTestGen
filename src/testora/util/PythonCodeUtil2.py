@@ -192,7 +192,7 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
 
             # # option 2: return the signature
             current_module = relativePath.replace("src/", "", 1).replace(".py", "").replace("/", ".")
-            import_line, __, class_hover_text = is_public(server, relativePath, current_module, parent_class, call_function_name, public_apis_list, check_parent_class)
+            import_line, adjusted_module, class_hover_text = is_public(server, relativePath, current_module, parent_class, call_function_name, public_apis_list, check_parent_class)
             if import_line:
                 # option 1: using cst to get signature and docstrings
                 # signature = get_function_signature(func_node)
@@ -208,21 +208,17 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
                         ```
                     hovered docsting (not exactly the same as the docstring in functions)
                 '''
-                
                 signature_docstring = signature_docstring_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
-
-            #     # block start: the following three non-empty lines are for tmp check the length, this block can be removed without touching the functionality
-            #     signature_docstring = f"Function_signature_docstring_length: {len(signature_docstring)}\n" + signature_docstring
-
-            # if class_hover_text:
-            #     class_hover_text = f"Class_hovering_text_length: {len(class_hover_text)}\n" + class_hover_text
-            # # block end
-
             break
-    return call_function, import_line, signature_docstring, parent_class, class_hover_text
+    return call_function, import_line, signature_docstring, parent_class, adjusted_module, class_hover_text
 
-def is_public(server, file_path, module, parent_class, func_name, public_apis_list_triple, check_parent_class, return_bool=False) -> str:
-    # if the function is public, return its import line, if not, return "".
+def is_public(server, file_path, module, parent_class, func_name, public_apis_list_triple, check_parent_class, return_bool=False):
+    '''
+    Consider three categories of functions/methods:
+     * public
+     * private
+     * special methods
+    '''
     import_line = ""
     class_hover_text_to_return = ""
 
@@ -241,20 +237,22 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
 
     public_apis_list, full_names, abbr_names = public_apis_list_triple
 
-    if return_bool == True:
+    # 1: return_bool only used when identify the private functions in the generated code
+    if return_bool == True: 
         if module_candi in public_apis_list: 
             return True
         else:
             # check whether the module is in the public api list, e.g., pandas 60183 changed some files not in the public apis
             if not whether_module_is_public(public_apis_list, module):
                 # fall back to name conventions
-                if func_name.startswith("_"):
+                if func_name.startswith("_") and not func_name.startswith("__"): 
                     return False
                 else:
                     return True
             else:
                 return False
     
+    # 2: for the general changed function and caller function check 
     if module_candi in public_apis_list: 
         tmp = module_candi.removesuffix(f".{func_name}")
         if tmp in full_names:
@@ -263,33 +261,23 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
 
         if parent_class_name:
             if func_name.startswith("__"):
-                if func_name == "__init__": # here the parent class should absolutely exist
-                    import_line = f"from {module} import {parent_class_name}" # import the class
-                    import_line += f"\nRefer to the above given '__init__' function of class '{parent_class_name}' to initialize it.\n"
-                    # class_hover_text_to_return = parent_class
-                else: # other special methods
-                    import_line = f"from {module} import {parent_class_name}" # import the class
-                    import_line += (
-                        f"\nMethod '{func_name}' is a special method of the class '{module}'. "
-                        f"Its behavior follows Python's official documentation. "
-                        f"To use this special method, write code that triggers it naturally, "
-                        f"e.g., the expression 'a + b' automatically calls '__add__'. "
-                        f"If no natural operation makes sense for a given special method, it is also fine to call it directly.\n"
-                    )
-
+                import_line = f"from {module} import {parent_class_name}\n" # with this only, we do not separate the __init__ and other special methods
             else: # normal function from a class
                 import_line = f"from {module} import {func_name}"
-                if check_parent_class == True:
-                    class_hover_text_tmp = server.get_hover_text(file_path, class_name_start_line_0base, class_name_start_col_0base)
-                    class_hover_text = class_hover_text_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
-                    class_hover_text_to_return = f"For class '{module}'\n{class_hover_text}:\n"
         else:
             import_line = f"from {module} import {func_name}" # import the function
     else:
         if not whether_module_is_public(public_apis_list, module):
             # fall back to name conventions
-            if not func_name.startswith("_"):
+            if func_name.startswith("__") and parent_class_name:
+                import_line = f"from {module} import {parent_class_name}"
+            elif not func_name.startswith("_"):
                 import_line = f"from {module} import {func_name}" # import the function
+    
+    if import_line and check_parent_class == True:
+        class_hover_text_tmp = server.get_hover_text(file_path, class_name_start_line_0base, class_name_start_col_0base)
+        class_hover_text = class_hover_text_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
+        class_hover_text_to_return = f"For class '{module}'\n{class_hover_text}:\n"
         
     return import_line, module, class_hover_text_to_return
 

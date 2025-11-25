@@ -318,10 +318,7 @@ def generate_tests(pr, github_repo, changed_functions):
     filtered_diff_len_nonequal_fit = False
 
     call_graph_info_str = ""
-    call_graph_info_str_prefix = (
-        "For each affected non-public function, the following lists the available methods to access it, if any. "
-        "Each method specifies which function to call, along with its signature and docstring (if available), to guide how it should be used.\n\n"
-    ) # to make sure provide only available info to the prompt
+    to_add_special_method_intro = False
     if Config.call_graph == True:
         # from the perspective of recording the call path length
         cg_path_len = {
@@ -331,10 +328,10 @@ def generate_tests(pr, github_repo, changed_functions):
             'all_avg': 0
         }
 
-        # from the perspective of forming the call graph info str
+        # 0: overall: from the perspective of forming the call graph info str
         info_public_and_private = ""
 
-        # for public functions
+        # 1: for public functions
         import_lines_info = ""
         for label, import_lines in pr.public_func_imports.items():
             import_lines_info_sub = ""
@@ -351,12 +348,23 @@ def generate_tests(pr, github_repo, changed_functions):
                 import_lines_info += f"{import_lines_info_sub}\n"
             
         if import_lines_info:
-            info_public_and_private = f"For each affected public function, the following lists the available ways to access it.\n\n{import_lines_info}\n\n"
+            info_public_and_private = (f"For each affected public function, the following lists the available ways to access it. "
+                f"Refer to the class information below and the given changed function body above to check how to initialize the relevant classes and to check how to access the function, if any.\n"
+            )
+            if "is a special method of the class" in import_lines_info:
+                to_add_special_method_intro = True
+                
+            info_public_and_private += f"\n{import_lines_info}\n\n"
 
-        # for private functions
+        # 2: for private functions
         # form the info about call graph
         # each of them are a triple list: pr_level[function_level[path level]]
         call_graph_info_str_funcs = ""
+        call_graph_info_str_prefix = (
+            "For each affected non-public function, the following lists the available ways to access it, if any. "
+            "Each way specifies which function to call, along with its signature and docstring (if available), to guide how it should be used. "
+            "Refer to the class information below to check how to initialize the relevant classes, if any.\n\n"
+        ) # to make sure provide only available info to the prompt
 
         for func_name, cg_path_func_level in pr.call_graph_paths.items():
             call_graph_info_str_function_level = ""
@@ -373,7 +381,10 @@ def generate_tests(pr, github_repo, changed_functions):
                             * provide the entire call graph path to the prompt
                             * provide only the entry function (Prefer)
                             '''
-                            call_graph_info_str_sub += f"Method #{i}: by calling function '{cg[0]}'\n"
+                            if cg[0].startswith("__"):
+                                call_graph_info_str_sub += f"Method #{i}: by triggering special method '{cg[0]}' of the following imported class\n"
+                            else:
+                                call_graph_info_str_sub += f"Method #{i}: by calling function '{cg[0]}'\n"
                             if imports:
                                 call_graph_info_str_sub += f"{imports}" # import info endswith "\n", refer to PullRequest.py
                             if sig_doc:
@@ -399,25 +410,44 @@ def generate_tests(pr, github_repo, changed_functions):
                     call_graph_info_str_funcs += call_graph_info_str_function_level
         
         if call_graph_info_str_funcs:
+            if "by triggering special method" in call_graph_info_str_funcs:
+                to_add_special_method_intro = True
+
             call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
             info_public_and_private += call_graph_info_str
 
-            if pr.class_hover_texts:
-                info_public_and_private += f"\nThe following shows the __init__ function signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
-                # add the relevant class hover texts
-                # for module_endswith_class, hover_text in pr.class_hover_texts.items():
-                info_public_and_private += "\n".join(pr.class_hover_texts)
+        # 3: all relevant classes
+        if pr.class_hover_texts:
+            info_public_and_private += f"\nThe following shows the __init__ function signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
+            # add the relevant class hover texts
+            # for module_endswith_class, hover_text in pr.class_hover_texts.items():
+            info_public_and_private += "\n".join(pr.class_hover_texts)
+
+        # 4: special method intro
+        if to_add_special_method_intro == True:
+            special_method_intro = (
+                f"The following lists the avaliable ways to access the affected functions. "
+                f"If any access way mentions a special method, its behavior follows Python's official documentation. "
+                f"To use the special method, write code that triggers it naturally, "
+                f"e.g., the expression 'a + b' automatically calls '__add__'. "
+                f"If no natural operation makes sense for a given special method, it is also fine to call it directly.\n"
+            ) # add only once, and add only if the special method is consider as the entry function
+            info_public_and_private = f"{special_method_intro}\n{info_public_and_private}"
 
         if pr.all_call_graph_paths:
             # record the length of call paths
-            cg_path_len['shortest_avg'] = sum(cg_path_len['shortest']) / len(cg_path_len['shortest']) if cg_path_len['shortest'] else 0
+            # cg_path_len['shortest_avg'] = sum(cg_path_len['shortest']) / len(cg_path_len['shortest']) if cg_path_len['shortest'] else 0
+            value = sum(cg_path_len['shortest']) / len(cg_path_len['shortest']) if cg_path_len['shortest'] else 0
+            cg_path_len['shortest_avg'] = round(value, 3) if value != 0 else 0
 
             for func_name, cg_paths_with_label in pr.all_call_graph_paths.items():
                 for lable, cg_paths in cg_paths_with_label.items():
                     if cg_paths:
                         for cg in cg_paths:
                             cg_path_len['all'].append(len(cg)-1) # -1 to remove the index mark
-            cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
+            # cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
+            value = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
+            cg_path_len['all_avg'] = round(value, 3) if value != 0 else 0
             append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
 
     append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
