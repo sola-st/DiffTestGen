@@ -354,7 +354,7 @@ def generate_tests(pr, github_repo, changed_functions):
             if "is a special method of the class" in import_lines_info:
                 to_add_special_method_intro = True
                 
-            info_public_and_private += f"\n{import_lines_info}\n\n"
+            info_public_and_private += f"\n{import_lines_info}\n"
 
         # 2: for private functions
         # form the info about call graph
@@ -414,11 +414,11 @@ def generate_tests(pr, github_repo, changed_functions):
                 to_add_special_method_intro = True
 
             call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
-            info_public_and_private += call_graph_info_str
+            info_public_and_private += f"{call_graph_info_str}\n"
 
         # 3: all relevant classes
         if pr.class_hover_texts:
-            info_public_and_private += f"\nThe following shows the __init__ function signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
+            info_public_and_private += f"The following shows the __init__ function signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
             # add the relevant class hover texts
             # for module_endswith_class, hover_text in pr.class_hover_texts.items():
             info_public_and_private += "\n".join(pr.class_hover_texts)

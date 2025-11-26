@@ -363,9 +363,9 @@ class PullRequest:
                                     self.changed_function_qualified_names_old.append(fully_qulified_name)
                                     if import_line: # public and special methods
                                         if function_name.startswith("__"):
-                                            self.public_func_imports_old.add(f"Method '{fully_qulified_name}' is a special method of the class '{adjusted_module}'. To access it: {import_line}")
+                                            self.public_func_imports_old.add(f"* To trigger changed method '{fully_qulified_name}', which is a special method of the class '{adjusted_module}', access the class with: {import_line}")
                                         else:
-                                            self.public_func_imports_old.add(f"To access changed function '{fully_qulified_name}': {import_line}")
+                                            self.public_func_imports_old.add(f"* To access changed function '{fully_qulified_name}': {import_line}")
                                     else:
                                         self.changed_function_qualified_names_old_non_public.append(fully_qulified_name)
                                         function_names_to_get_cg_old.append(func_name)
@@ -401,9 +401,9 @@ class PullRequest:
                                     self.changed_function_qualified_names_new.append(fully_qulified_name)
                                     if import_line: # public
                                         if function_name.startswith("__"):
-                                            self.public_func_imports_new.add(f"Method '{fully_qulified_name}' is a special method of the class '{adjusted_module}'. To access it: {import_line}")
+                                            self.public_func_imports_new.add(f"* To trigger changed method '{fully_qulified_name}', which is a special method of the class '{adjusted_module}', access the class with: {import_line}")
                                         else:
-                                            self.public_func_imports_new.add(f"To access changed function '{fully_qulified_name}': {import_line}")
+                                            self.public_func_imports_new.add(f"* To access changed function '{fully_qulified_name}': {import_line}")
                                     else:
                                         self.changed_function_qualified_names_new_no_public.append(fully_qulified_name)
                                         function_names_to_get_cg_new.append(func_name)

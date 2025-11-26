@@ -261,7 +261,7 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
 
         if parent_class_name:
             if func_name.startswith("__"):
-                import_line = f"from {module} import {parent_class_name}\n" # with this only, we do not separate the __init__ and other special methods
+                import_line = f"from {module} import {parent_class_name}" # with this only, we do not separate the __init__ and other special methods
             else: # normal function from a class
                 import_line = f"from {module} import {func_name}"
         else:
@@ -277,7 +277,7 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
     if import_line and check_parent_class == True:
         class_hover_text_tmp = server.get_hover_text(file_path, class_name_start_line_0base, class_name_start_col_0base)
         class_hover_text = class_hover_text_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
-        class_hover_text_to_return = f"For class '{module}'\n{class_hover_text}:\n"
+        class_hover_text_to_return = f"#### For class '{module}'\n{class_hover_text}:\n"
         
     return import_line, module, class_hover_text_to_return
 
