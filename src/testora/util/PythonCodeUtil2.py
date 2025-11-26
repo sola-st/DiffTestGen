@@ -465,26 +465,28 @@ def mark_to_cover_code_stmt(uncovered_info:list, file_path_to_code:dict): # list
 def mark_code_stmt(covered_info:dict, union_uncovered_info:dict, file_path_to_code:dict): 
     code_with_mark = ""
 
+    all_path_with_code = file_path_to_code.keys()
     for file_path, uncovered_stmt_nums in union_uncovered_info.items():
         covered_stmt_set = covered_info[file_path] 
         still_uncovered_stmt_nums = uncovered_stmt_nums - covered_stmt_set
-        code_list = file_path_to_code[file_path]
-        code_block = []
-        for code in code_list:
-            for code_line in code.splitlines(): # every code line starts with its line number
-                num_mark, ori_line = code_line.split("> ", 1)
-                if int(num_mark.replace("<", "")) in still_uncovered_stmt_nums:
-                    # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
-                    # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
-                    code_block.append(f"{ori_line} # TO_COVER")
-                elif int(num_mark.replace("<", "")) in covered_stmt_set:
-                    code_block.append(f"{ori_line} # COVERED")
-                else:
-                    code_block.append(ori_line)
+        if file_path in all_path_with_code:
+            code_list = file_path_to_code[file_path]
+            code_block = []
+            for code in code_list:
+                for code_line in code.splitlines(): # every code line starts with its line number
+                    num_mark, ori_line = code_line.split("> ", 1)
+                    if int(num_mark.replace("<", "")) in still_uncovered_stmt_nums:
+                        # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
+                        # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
+                        code_block.append(f"{ori_line} # TO_COVER")
+                    elif int(num_mark.replace("<", "")) in covered_stmt_set:
+                        code_block.append(f"{ori_line} # COVERED")
+                    else:
+                        code_block.append(ori_line)
 
-            code_with_mark += f"The following are the affected functions from file <{file_path}>:\n"
-            code_with_mark += "\n".join(code_block)
-            code_with_mark += "\n"
+                code_with_mark += f"The following are the affected functions from file <{file_path}>:\n"
+                code_with_mark += "\n".join(code_block)
+                code_with_mark += "\n"
                 
     return code_with_mark
 
