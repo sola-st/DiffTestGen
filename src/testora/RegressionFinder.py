@@ -798,6 +798,10 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     new_executions_to_flaky = []
     flaky_indices = []
 
+    # to separate the test genration and classification phase, here we store the breakpoint data.
+    old_executions_differ_relevant = []
+    new_executions_differ_relevant = []
+
     # step 1: iter-through to get "both failed" and the xxx_to_flaky executions
     for i, (old_execution, new_execution, old_covered, new_covered) in enumerate(
             zip(old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new)):
@@ -830,10 +834,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
             append_event(ComparisonEvent(pr_nb=pr.number,
                     message=f"Different outputs\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
                     test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
-
-    # to separate the test genration and classification phase, here we store the breakpoint data.
-    old_executions_differ_relevant = []
-    new_executions_differ_relevant = []
+            
+            simplified_old_execution = simplify_test_execution(old_execution)
+            simplified_new_execution = simplify_test_execution(new_execution)
+            old_executions_differ_relevant.append(simplified_old_execution)
+            new_executions_differ_relevant.append(simplified_new_execution)
     
     # step 2: to handle the xxx_to_flaky executions
     # double-check differences by re-executing the tests
@@ -879,8 +884,8 @@ def check_pr(github_repo, cloned_repo_manager, pr):
             * new_excution (the same as above)
             '''
             
-            simplified_old_execution = simplify_test_execution(old_execution)
-            simplified_new_execution = simplify_test_execution(new_execution)
+            simplified_old_execution = simplify_test_execution(old_executions[idx])
+            simplified_new_execution = simplify_test_execution(new_executions[idx])
             old_executions_differ_relevant.append(simplified_old_execution)
             new_executions_differ_relevant.append(simplified_new_execution)
 
