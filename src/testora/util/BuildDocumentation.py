@@ -37,17 +37,11 @@ class BuildDocumentation:
          * -D 'extensions=[]':                      overrides all extensions → safest for speed and avoiding missing imports
         '''
         build_command = f"sphinx-build -b html -d {build_folder}/_build/doctrees -j auto -D \"extensions=[]\" {build_folder}/ {build_folder}/_build/html"
-        # if self.project_name == "pandas":
-        #     build_command = (
-        #         'sh -c "sphinx-build -b html -d doc/source/_build/doctrees -j auto '
-        #         '-D extensions=sphinx.ext.intersphinx,sphinx.ext.autodoc,sphinx.ext.autosummary,numpydoc '
-        #         '-D nbsphinx_execute=never '
-        #         'doc/source doc/source/_build/html"'
-        #     ) 
         if self.project_name == "scipy":
             build_command = (
-                f"bash -c 'source /root/conda/etc/profile.d/conda.sh"
-                f" && source /root/conda/etc/profile.d/mamba.sh && mamba activate scipy-dev"
+                "bash -c '"
+                "source /root/conda/etc/profile.d/conda.sh"
+                " && conda activate scipy-dev"
                 f" && {build_command}'"
             )
         self.container.exec_run(build_command, workdir=working_dir)
