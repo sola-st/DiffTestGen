@@ -65,6 +65,7 @@ class PRResult:
         self.avg_new_diff_coverage = 0.0
         self.nb_different_behavior = 0
         self.cg = None
+        self.some_changes_at_fun_level = None
         self.differentiating_tests = []
         self.classification_results = []
 
@@ -164,12 +165,18 @@ class PRResult:
 
             # keep track of phase we're in and update time taken for each phase
             # TODO maybe also for newly added phases
-            elif entry["message"].startswith("Querying"):
+            elif entry["message"].startswith("Querying") or entry["message"].startswith("Cached result for querying"):
+                # to show whether the approach detects the changed function (not always all the changes at the function-level)
+                if not self.some_changes_at_fun_level:
+                    if "The diff affects the following functions: .\n" in entry["content"]: # no changes atthe function-level
+                        self.some_changes_at_fun_level = "No func-level changes"
+                    else:
+                        self.some_changes_at_fun_level = "Partial/all changes at the func-level"
+                        
                 if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
                     update_time_taken(entry)
                     phase = "test_refinement"
-                    test_refinemement_start_time = parse_time_stamp(
-                        entry["timestamp"])
+                    test_refinemement_start_time = parse_time_stamp(entry["timestamp"])
             elif entry["message"].startswith("Compiling"):
                 update_time_taken(entry)
                 phase = "test_exec"
@@ -288,7 +295,7 @@ class PRResult:
         if s == "ignored":
             return self.ignored_reason
         elif s == "checked":
-            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs, {self.cg}" # (N fail(s) to 1 fix)
+            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs, {self.cg}, {self.some_changes_at_fun_level}" # (N fail(s) to 1 fix)
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
         else:
