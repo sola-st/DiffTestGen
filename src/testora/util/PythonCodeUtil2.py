@@ -174,6 +174,7 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
     signature_docstring = None
     parent_class = None
     class_hover_text = None
+    adjusted_module = None
 
     for func in collector.functions:
         func_node, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
