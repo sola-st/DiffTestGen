@@ -743,19 +743,24 @@ class PullRequest:
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     file_content = f.read()
                 patch_ranges = []
-                if version == "old":
-                    patch_ranges = self.old_file_path_to_change_hunks[modified_file.path]
-                else:
-                    patch_ranges = self.new_file_path_to_change_hunks[modified_file.path]
-
-                test_functions_code, test_file_imports = get_test_function_names_code_imports(file_content, patch_ranges)
+                try:
+                    # The PR-modified files are not always in the full diff between old and new commits, e.g.,scipy 21954
+                    if version == "old":
+                        patch_ranges = self.old_file_path_to_change_hunks[modified_file.path]
+                    else:
+                        patch_ranges = self.new_file_path_to_change_hunks[modified_file.path]
+                except:
+                    pass
                 
-                if test_functions_code:
-                    code_context += f"The following are and the modified test functions from file <{modified_file.path}>:\n"
-                    code_context += "Here starts with the import statements of this test file, refer to them if needed.\n"
-                    code_context += "\n".join(test_file_imports)
-                    code_context += "\n\n".join(test_functions_code)
-                    code_context += "\n"
+                if patch_ranges:
+                    test_functions_code, test_file_imports = get_test_function_names_code_imports(file_content, patch_ranges)
+                    
+                    if test_functions_code:
+                        code_context += f"The following are and the modified test functions from file <{modified_file.path}>:\n"
+                        code_context += "Here starts with the import statements of this test file, refer to them if needed.\n"
+                        code_context += "\n".join(test_file_imports)
+                        code_context += "\n\n".join(test_functions_code)
+                        code_context += "\n"
 
         if version == "old":
             self.old_test_function_code = code_context
