@@ -107,6 +107,11 @@ class PullRequest:
         elif project_name in ["scipy", "pandas"]:
             self.target_folder = project_name
 
+        # for private functions, update the following three:
+        self.all_call_graph_paths = {}
+        self.all_signatures_docstrings = {}
+        self.all_imports = {}
+
     def _pr_url_to_patch(self): 
         ''' 
         The target is to get the modified files from the patch.
@@ -450,11 +455,6 @@ class PullRequest:
             "old": list(unique_in_old),
             "new": list(unique_in_new)
         }
-
-        # for private functions, update the following three:
-        self.all_call_graph_paths = {}
-        self.all_signatures_docstrings = {}
-        self.all_imports = {}
         
         non_checked_new_indices = list(range(len(self.changed_function_qualified_names_new_no_public)))
         for qualified_func, old_cg_func_level_list, old_sig_doc_func_level_list, old_imports_func_level_list in \
