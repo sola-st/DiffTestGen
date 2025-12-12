@@ -275,7 +275,7 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
             elif not func_name.startswith("_"):
                 import_line = f"from {module} import {func_name}" # import the function
     
-    if import_line and check_parent_class == True:
+    if import_line and check_parent_class == True and parent_class:
         class_hover_text_tmp = server.get_hover_text(file_path, class_name_start_line_0base, class_name_start_col_0base)
         class_hover_text = class_hover_text_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
         class_hover_text_to_return = f"#### For class '{module}'\n{class_hover_text}:\n"

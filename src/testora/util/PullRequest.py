@@ -615,6 +615,10 @@ class PullRequest:
         append_event(Event(pr_nb=self.number, message=f"Starting to explore call graph paths, only private relevant ({version})."))
 
         all_explored_paths = ""
+        public_apis_list = self.public_apis_old
+        if version == "new":
+            public_apis_list = self.public_apis_new
+        
         for func_info in function_names:
             func_name, start_line_0_based, start_col_0_based, parent_class = func_info
             # try:
@@ -627,10 +631,6 @@ class PullRequest:
             # Each item: (current_func_name, file rel path, start_line, start_col, path_so_far, path_with_detials_so_far, import_line, signature_so_far)
             queue.append((func_name, modified_file.path, start_line_0_based, start_col_0_based, 
                         [func_name], [[func_name, modified_file.path, start_line_0_based, start_col_0_based]], "", ""))
-
-            public_apis_list = self.public_apis_old
-            if version == "new":
-                public_apis_list = self.public_apis_new
 
             while queue:
                 curr_func, curr_rel_file_path, curr_line, curr_col, path, path_detailed, ref_import, signature_docstring = queue.popleft()
