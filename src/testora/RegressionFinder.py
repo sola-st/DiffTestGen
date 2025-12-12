@@ -339,11 +339,11 @@ def generate_tests(pr, github_repo, changed_functions):
                 info = "\n".join(import_lines)
                 # here the old and new labeled info exists only when some functions/classes have been affected in only one version, there is no confusing info.
                 if label == "common":
-                    import_lines_info_sub = f"The following infomation is avaliable for both the old and the new versions of code:\n{info}"
+                    import_lines_info_sub = f"The following information is available for both the old and the new versions of code:\n{info}"
                 elif label == "old":
-                    import_lines_info_sub = f"The following infomation is avaliable only for the old code version:\n{info}" 
+                    import_lines_info_sub = f"The following information is available only for the old code version:\n{info}" 
                 else:
-                    import_lines_info_sub = f"The following infomation is avaliable only for the new code version:\n{info}"
+                    import_lines_info_sub = f"The following information is available only for the new code version:\n{info}"
                 
                 import_lines_info += f"{import_lines_info_sub}\n"
             
@@ -392,16 +392,16 @@ def generate_tests(pr, github_repo, changed_functions):
                         
                         if call_graph_info_str_sub:
                             if label == "common":
-                                call_graph_info_str_sub = f"The following infomation is avaliable for both the old and the new versions of code:\n{call_graph_info_str_sub}"
+                                call_graph_info_str_sub = f"The following information is available for both the old and the new versions of code:\n{call_graph_info_str_sub}"
                                 # if common info exists for a changed function, only provide it to avoid any confusion from the one-version-info
                                 # option 1: get all the information, but only privide common to prompts
                                 call_graph_info_str_function_level += call_graph_info_str_sub
                                 break 
                                 # option 2: get common_info and stop in PullRequest.py get_union_call_graph
                             elif label == "old":
-                                call_graph_info_str_sub = f"The following infomation is avaliable only for the old code version:\n{call_graph_info_str_sub}" 
+                                call_graph_info_str_sub = f"The following information is available only for the old code version:\n{call_graph_info_str_sub}" 
                             else:
-                                call_graph_info_str_sub = f"The following infomation is avaliable only for the new code version:\n{call_graph_info_str_sub}"
+                                call_graph_info_str_sub = f"The following information is available only for the new code version:\n{call_graph_info_str_sub}"
                             
                             call_graph_info_str_function_level += call_graph_info_str_sub
 
@@ -426,7 +426,7 @@ def generate_tests(pr, github_repo, changed_functions):
         # 4: special method intro
         if to_add_special_method_intro == True:
             special_method_intro = (
-                f"The following lists the avaliable ways to access the affected functions. "
+                f"The following lists the available ways to access the affected functions. "
                 f"If any access way mentions a special method, its behavior follows Python's official documentation. "
                 f"To use the special method, write code that triggers it naturally, "
                 f"e.g., the expression 'a + b' automatically calls '__add__'. "
@@ -878,7 +878,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
         elif Config.phase_selection == "test_generation":
             '''
-            store the breakpoint infomation for later continuing work:
+            store the breakpoint information for later continuing work:
             * changed_functions
             * old_excution (from the tests still show the output difference at this point)
             * new_excution (the same as above)
