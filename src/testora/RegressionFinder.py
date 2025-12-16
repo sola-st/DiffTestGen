@@ -576,6 +576,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
 
 def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff):
     static_err_fixed_tests = []
+    test_msg_pairs_full_diff = None
+    test_msg_pairs_filtered_diff = None
 
     if code_and_err_msgs_full_diff:
         # it will not change with the same PR. the initial round already checked the len. -> len(pr.full_diff.split("\n")) <= 200:
@@ -584,11 +586,11 @@ def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_a
         generated_test, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", do_name_reformatting=False)
         static_err_fixed_tests.extend(generated_test)
 
-        for detail in test_msg_pairs_full_diff:
-            test_idx, test_code, static_info = detail
-            # based on the given check list, (refined list-based)
-            append_event(LLMEvent(pr_nb=pr.number, 
-                    message=f"Failed to fix test #{test_idx} (full_diff). Static error: {static_info}", content=test_code))
+        # for detail in test_msg_pairs_full_diff:
+        #     test_idx, test_code, static_info = detail
+        #     # based on the given check list, (refined list-based)
+        #     append_event(LLMEvent(pr_nb=pr.number, 
+        #             message=f"Failed to fix test #{test_idx} (full_diff). Static error: {static_info}", content=test_code))
 
     if code_and_err_msgs_filtered_diff:
         prompt_filtered_diff = ParseErrorPrivateCallFixingPrompt(github_repo.name, changed_functions, pr.filtered_diff, 
@@ -596,12 +598,12 @@ def refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_a
         generated_test, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", do_name_reformatting=False)
         static_err_fixed_tests.extend(generated_test)
 
-        for detail in test_msg_pairs_filtered_diff:
-            test_idx, test_code, static_info = detail
-            append_event(LLMEvent(pr_nb=pr.number, 
-                    message=f"Failed to fix test #{test_idx} (filtered_diff). Static error: {static_info}", content=test_code))
+        # for detail in test_msg_pairs_filtered_diff:
+        #     test_idx, test_code, static_info = detail
+        #     append_event(LLMEvent(pr_nb=pr.number, 
+        #             message=f"Failed to fix test #{test_idx} (filtered_diff). Static error: {static_info}", content=test_code))
     
-    return static_err_fixed_tests
+    return static_err_fixed_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff
 
 def validate_output_difference(cloned_repo_manager, pr, old_executions, new_executions):
     difference_found_list = []
@@ -940,35 +942,43 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
     # inner feedback about parse error and 'private' calls
     if Config.fix_static_error == True and round == 0:
-        code_and_err_msgs_full_diff = ""
-        code_and_err_msgs_filtered_diff = ""
-        # TODO to totally clear?
-        # test_idx_full_diff = []
-        # test_idx_filtered_diff = []
+        inner_round = 0
+        while test_msg_pairs_full_diff or test_msg_pairs_filtered_diff:
+            if inner_round >= Config.error_feedback_max: 
+                append_event(Event(pr_nb=pr.number, 
+                message=f"Static error feedback ends after inner round {inner_round}. Max attempt ({Config.error_feedback_max}) reaches. #Round {round}."))
+                        
+            inner_round += 1
+            code_and_err_msgs_full_diff = ""
+            code_and_err_msgs_filtered_diff = ""
 
-        for pair in test_msg_pairs_full_diff:
-            test_idx, test_code, static_error_msg = pair
-            code_and_err_msgs_full_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
-            # test_idx_full_diff.append(test_idx)
+            for pair in test_msg_pairs_full_diff:
+                test_idx, test_code, static_error_msg = pair
+                code_and_err_msgs_full_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
+                # test_idx_full_diff.append(test_idx)
 
-        for pair in test_msg_pairs_filtered_diff:
-            test_idx, test_code, static_error_msg = pair
-            code_and_err_msgs_filtered_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
-            # test_idx_filtered_diff.append(test_idx)
+            for pair in test_msg_pairs_filtered_diff:
+                test_idx, test_code, static_error_msg = pair
+                code_and_err_msgs_filtered_diff += f"{test_code}\n\nStatic analyis results: {static_error_msg}\n\n"
+                # test_idx_filtered_diff.append(test_idx)
 
-        # ** Single -- PromptV2**
-        if test_msg_pairs_full_diff or test_msg_pairs_filtered_diff:
-            static_err_fixed_tests_may_dup = refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
-            # go through to update the tests
-            append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends."))
-            # # the indices does not match
-            # for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests_may_dup):
-            #     generated_tests.insert(test_idx, test)
-            generated_tests.extend(static_err_fixed_tests_may_dup)
+            # ** Single -- PromptV2**
+            if test_msg_pairs_full_diff or test_msg_pairs_filtered_diff:
+                static_err_fixed_tests_may_dup, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff = \
+                        refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
+                # go through to update the tests
+                append_event(Event(pr_nb=pr.number, 
+                        message=f"Static error feedback fixed {len(static_err_fixed_tests_may_dup)} tests. #Round {round}. #Inner round {inner_round}"))
+                # # the indices does not match
+                # for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests_may_dup):
+                #     generated_tests.insert(test_idx, test)
+                if static_err_fixed_tests_may_dup:
+                    generated_tests.extend(static_err_fixed_tests_may_dup)
+                    # overall dedup, to remove the duplicates in remianing generated tests and static_err_fixed_tests_may_dup
+                    generated_tests = de_dup_tests_with_name(generated_tests)
 
-            # overall dedup, to remove the duplicates in remianing generated tests and static_err_fixed_tests_may_dup
-            generated_tests = de_dup_tests_with_name(generated_tests)
-    
+        append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after #Inner round {inner_round}. #Round {round}."))
+      
     if not generated_tests:
         # if after the static error fix, there is still no generated tests, do not need to run the following
         append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (after static fix) were generated. #Round {round}"))

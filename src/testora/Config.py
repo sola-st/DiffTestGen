@@ -56,7 +56,7 @@ context_version = 2 # available from 1 to 8 (with 2 and 3 direct to the same imp
 phase_selection = "test_generation" # valid values: "test_generation", "all"
 
 use_error_feedback = True # runtime rror
-error_feedback_max = 5
+error_feedback_max = 5 # for both static and runtime fix
 
 fix_static_error = False
 
