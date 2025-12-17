@@ -303,30 +303,11 @@ def remove_tests_with_private_call(tests, pr):
     return result, test_msg_pairs
 
 
-def generate_tests(pr, github_repo, changed_functions):
-    # prepare context used by one or more prompts
-    # full_diff is already computed (pr.full_diff) when the pull request is instantiated
-    pr.get_filtered_diff() # this adds filtered_diff info to pr.filtered_diff 
-
-    all_tests = []
-    test_msg_pairs_full_diff = []
-    test_msg_pairs_filtered_diff = []
-    empty_answer_full_diff = False
-    empty_answer_filtered_diff = False
-
-    full_diff_len_fit = False
-    filtered_diff_len_nonequal_fit = False
-
+def prepare_call_info(pr):
     call_graph_info_str = ""
     to_add_special_method_intro = False
     if Config.call_graph == True:
-        # from the perspective of recording the call path length
-        cg_path_len = {
-            'shortest': [],
-            'shortest_avg': 0,
-            'all': [],
-            'all_avg': 0
-        }
+        
 
         # 0: overall: from the perspective of forming the call graph info str
         info_public_and_private = ""
@@ -366,16 +347,17 @@ def generate_tests(pr, github_repo, changed_functions):
             "Refer to the class information below to check how to initialize the relevant classes, if any.\n\n"
         ) # to make sure provide only available info to the prompt
 
-        for func_name, cg_path_func_level in pr.call_graph_paths.items():
+
+
+        for func_name, cg_path_func_level in pr.call_graph_paths_k.items():
             call_graph_info_str_function_level = ""
             if cg_path_func_level:
                 for label, cg_paths in cg_path_func_level.items():
                     call_graph_info_str_sub = ""
                     if cg_paths:
                         for i, cg in enumerate(cg_paths):
-                            cg_path_len['shortest'].append(len(cg))
-                            sig_doc = pr.signatures_docstrings[func_name][label][i]
-                            imports = pr.imports[func_name][label][i]
+                            sig_doc = pr.signatures_docstrings_k[func_name][label][i]
+                            imports = pr.imports_k[func_name][label][i]
                             '''
                             two options:
                             * provide the entire call graph path to the prompt
@@ -434,24 +416,25 @@ def generate_tests(pr, github_repo, changed_functions):
             ) # add only once, and add only if the special method is consider as the entry function
             info_public_and_private = f"{special_method_intro}\n{info_public_and_private}"
 
-        if pr.all_call_graph_paths:
-            # record the length of call paths
-            # cg_path_len['shortest_avg'] = sum(cg_path_len['shortest']) / len(cg_path_len['shortest']) if cg_path_len['shortest'] else 0
-            value = sum(cg_path_len['shortest']) / len(cg_path_len['shortest']) if cg_path_len['shortest'] else 0
-            cg_path_len['shortest_avg'] = round(value, 3) if value != 0 else 0
-
-            for func_name, cg_paths_with_label in pr.all_call_graph_paths.items():
-                for lable, cg_paths in cg_paths_with_label.items():
-                    if cg_paths:
-                        for cg in cg_paths:
-                            cg_path_len['all'].append(len(cg)-1) # -1 to remove the index mark
-            # cg_path_len['all_avg'] = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
-            value = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
-            cg_path_len['all_avg'] = round(value, 3) if value != 0 else 0
-            append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
-
     append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
-    # exit()
+    exit()
+    
+def generate_tests(pr, github_repo, changed_functions):
+    # prepare context used by one or more prompts
+    # full_diff is already computed (pr.full_diff) when the pull request is instantiated
+    pr.get_filtered_diff() # this adds filtered_diff info to pr.filtered_diff 
+
+    all_tests = []
+    test_msg_pairs_full_diff = []
+    test_msg_pairs_filtered_diff = []
+    empty_answer_full_diff = False
+    empty_answer_filtered_diff = False
+
+    full_diff_len_fit = False
+    filtered_diff_len_nonequal_fit = False
+
+    info_public_and_private = prepare_call_info(pr)
+    
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True
         prompt_full_diff = None

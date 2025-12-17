@@ -1,3 +1,5 @@
+import copy
+import json
 import requests
 from unidiff import PatchSet
 # import urllib.request
@@ -83,7 +85,7 @@ class PullRequest:
         self.public_class_hover_text_new = {}
 
         # for private changed functions
-        # to 'return'
+        # to 'return' # shortests
         self.call_graph_paths = {}
         self.signatures_docstrings = {}
         self.imports = {}
@@ -111,6 +113,11 @@ class PullRequest:
         self.all_call_graph_paths = {}
         self.all_signatures_docstrings = {}
         self.all_imports = {}
+
+        # for the selected top k entries for each single changed private functions
+        self.call_graph_paths_k = {}
+        self.signatures_docstrings_k = {}
+        self.imports_k = {}
 
     def _pr_url_to_patch(self): 
         ''' 
@@ -608,8 +615,82 @@ class PullRequest:
                         if label == "common":
                             common_recorded = True
 
-        # deduplicate between all the puvlic changed function needed classes and the path relevant classes
+        # deduplicate between all the public changed function needed classes and the path relevant classes
         self.class_hover_texts.update(public_hover.values())
+
+        self.record_all_and_shortest_call_paths()
+        self.get_top_k_shortest_across_different_entries()
+
+    def record_all_and_shortest_call_paths(self):
+        # from the perspective of recording the call path length
+        cg_path_len = {
+            'shortest': [],
+            'shortest_avg': 0,
+            'all': [],
+            'all_avg': 0
+        }
+
+        # **** for shortest entries
+        for func_name, cg_path_func_level in self.call_graph_paths.items():
+            if cg_path_func_level:
+                for label, cg_paths in cg_path_func_level.items():
+                    if cg_paths:
+                        for cg in cg_paths:
+                            cg_path_len['shortest'].append(len(cg))
+        
+        value = sum(cg_path_len['shortest']) / len(cg_path_len['shortest']) if cg_path_len['shortest'] else 0
+        cg_path_len['shortest_avg'] = round(value, 3) if value != 0 else 0
+
+        # **** for all entries
+        for func_name, cg_paths_with_label in self.all_call_graph_paths.items():
+            for lable, cg_paths in cg_paths_with_label.items():
+                if cg_paths:
+                    for cg in cg_paths:
+                        cg_path_len['all'].append(len(cg)-1) # -1 to remove the index mark
+            
+        value = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
+        cg_path_len['all_avg'] = round(value, 3) if value != 0 else 0
+        append_event(CallGraphEvent(pr_nb=self.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
+
+    def get_top_k_shortest_across_different_entries(self):
+        # get top k entry for each changed private function
+
+        # starts with the same as shortests
+        self.call_graph_paths_k = copy.deepcopy(self.call_graph_paths)
+        self.signatures_docstrings_k = copy.deepcopy(self.signatures_docstrings)
+        self.imports_k = copy.deepcopy(self.imports)
+
+        # check to keep only top k
+        # !! refer to unchanged call_graph_paths, and update call_graph_paths_k
+        for func_name, cg_path_func_level in self.call_graph_paths.items():
+            if cg_path_func_level:
+                all_three_types_cg_paths = [] 
+                for label, cg_paths in cg_path_func_level.items():
+                    if cg_paths:
+                        for cg in cg_paths:
+                            all_three_types_cg_paths.append(len(cg)) # all the entries for the current func_name
+
+                if len(all_three_types_cg_paths) > Config.top_k_entries:
+                    # get the shortest k accross different entry fynctions (inner layer of shortest)
+                    sorted_path_len = sorted(enumerate(all_three_types_cg_paths), key=lambda x: (x[1], x[0]))
+                    top_k = sorted_path_len[:Config.top_k_entries]
+                    top_k_indices = [index for index, value in top_k]
+
+                    # go throught the paths again to get the desired ones
+                    for label, cg_paths in cg_path_func_level.items():
+                        if cg_paths:
+                            for i, cg in enumerate(cg_paths):
+                                if i not in top_k_indices:
+                                    sig_doc = self.signatures_docstrings[func_name][label][i]
+                                    im = self.imports[func_name][label][i]
+                                    # delete it from the call_graph_paths_k
+                                    self.call_graph_paths_k[func_name][label].remove(cg)
+                                    self.signatures_docstrings_k[func_name][label].remove(sig_doc)
+                                    self.imports_k[func_name][label].remove(im)
+
+                        # update top_k_indices: remove the idx from the current label to avoid idx out of range
+                        idx_delta = len(cg_paths) 
+                        top_k_indices = [(idx - idx_delta) for idx in top_k_indices if idx >= idx_delta]
 
     def get_call_graph_info(self, server, modified_file, function_names, version):
         append_event(Event(pr_nb=self.number, message=f"Starting to explore call graph paths, only private relevant ({version})."))

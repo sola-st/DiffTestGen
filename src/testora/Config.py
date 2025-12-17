@@ -70,6 +70,8 @@ call_graph = True
 
 private_call_indentification = 1 # 1 with "_", 2 with lsp + API
 
+top_k_entries = 5
+
 # # KEEP THIS AT THE END: log the current configuration
 # current_globals = set(globals().keys())
 # config_parameters = current_globals - initial_globals
