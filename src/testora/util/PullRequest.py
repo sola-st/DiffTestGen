@@ -434,6 +434,9 @@ class PullRequest:
         if version == "new" and (self.call_graph_paths_old or self.call_graph_paths_new or self.public_func_imports_old or self.public_func_imports_new):
             self.get_union_call_graph()
             self.get_shortest_path_each_entry()
+            self.record_all_and_shortest_call_paths()
+            self.get_top_k_shortest_across_different_entries()
+            self.update_class_hover_text()
 
         if version == "old":
             self.old_context = code_context
@@ -555,12 +558,6 @@ class PullRequest:
                 }})
 
     def get_shortest_path_each_entry(self):
-        # for public and non-public, get the uinon of dicts
-        # if two items get the same key, the later one will overwrite the former one. Here should has no duplicated keys.
-        public_hover = self.public_class_hover_text_old | self.public_class_hover_text_new 
-        nonpublic_hover = self.non_public_class_hover_text_old | self.non_public_class_hover_text_new
-
-        all_path_relevant_classes = nonpublic_hover.keys()
         for func_name, cg_path_func_level in self.all_call_graph_paths.items():
             if cg_path_func_level:
                 self.call_graph_paths.update(
@@ -582,7 +579,6 @@ class PullRequest:
                         "new": []
                     }})
 
-                common_recorded = False
                 for label, cg_paths in cg_path_func_level.items(): # label could be common, old, and new
                     if cg_paths:
                         entry_func_to_paths = {}
@@ -604,22 +600,6 @@ class PullRequest:
                             self.call_graph_paths[func_name][label].append(shortest_path)
                             self.signatures_docstrings[func_name][label].append(sig_doc)
                             self.imports[func_name][label].append(imports)
-
-                            if common_recorded == False: # only provides the info related to both versions, to avoid confusion
-                                # align with the prompt info preparation part in file RegressionFinder.py. function 'generate_tests'
-                                module_endswith_class = imports.split(" import ")[0].split("from ")[1]
-                                if module_endswith_class in all_path_relevant_classes:
-                                    # self.class_hover_texts.update({module_endswith_class, self.class_hover_texts_all[module_endswith_class]})
-                                    self.class_hover_texts.add(nonpublic_hover[module_endswith_class])
-                        
-                        if label == "common":
-                            common_recorded = True
-
-        # deduplicate between all the public changed function needed classes and the path relevant classes
-        self.class_hover_texts.update(public_hover.values())
-
-        self.record_all_and_shortest_call_paths()
-        self.get_top_k_shortest_across_different_entries()
 
     def record_all_and_shortest_call_paths(self):
         # from the perspective of recording the call path length
@@ -691,6 +671,32 @@ class PullRequest:
                         # update top_k_indices: remove the idx from the current label to avoid idx out of range
                         idx_delta = len(cg_paths) 
                         top_k_indices = [(idx - idx_delta) for idx in top_k_indices if idx >= idx_delta]
+
+    def update_class_hover_text(self):
+        # for public and non-public, get the uinon of dicts
+        # if two items get the same key, the later one will overwrite the former one. Here should has no duplicated keys.
+        public_hover = self.public_class_hover_text_old | self.public_class_hover_text_new 
+        nonpublic_hover = self.non_public_class_hover_text_old | self.non_public_class_hover_text_new
+
+        all_path_relevant_classes = nonpublic_hover.keys()
+        # update class hover text to only the related ones
+        for func_name, ims in self.imports_k.items():
+            common_recorded = False
+            for label, import_lines in ims:
+                if import_lines:
+                    for imline in import_lines:
+                        if common_recorded == False: # provides only the info related to both versions if possible, to avoid confusion
+                            # align with the prompt info preparation part in file RegressionFinder.py. function 'generate_tests'
+                            module_endswith_class = imline.split(" import ")[0].split("from ")[1]
+                            if module_endswith_class in all_path_relevant_classes:
+                                # self.class_hover_texts.update({module_endswith_class, self.class_hover_texts_all[module_endswith_class]})
+                                self.class_hover_texts.add(nonpublic_hover[module_endswith_class])
+                        
+                    if label == "common":
+                        common_recorded = True
+
+        # deduplicate between all the public changed function needed classes and the path relevant classes
+        self.class_hover_texts.update(public_hover.values())
 
     def get_call_graph_info(self, server, modified_file, function_names, version):
         append_event(Event(pr_nb=self.number, message=f"Starting to explore call graph paths, only private relevant ({version})."))
@@ -804,16 +810,6 @@ class PullRequest:
                 self.call_graph_paths_new.append(func_level_call_graph_paths)
                 self.signatures_docstrings_new.append(func_level_signatures)
                 self.imports_new.append(func_level_imports)
-            # except Exception as e:
-            #     if version == "old":
-            #         self.call_graph_paths_old.append([]) # add empty to map it back when combine with changed functions (roughly, RegressionFinder line 310)
-            #         self.signatures_docstrings_old.append([])
-            #         self.imports_old.append([])
-            #     else:
-            #         self.call_graph_paths_new.append([])
-            #         self.signatures_docstrings_new.append([])
-            #         self.imports_new.append([])
-            #     print(f"* [{version}] Get caller failed: {(modified_file.path, func_name, start_line_0_based, start_col_0_based)}")
 
         append_event(CallGraphEvent(pr_nb=self.number, message=f"Done with call graph exploration, all explored paths ({version})", content=all_explored_paths))
     
