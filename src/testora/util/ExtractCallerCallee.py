@@ -95,7 +95,7 @@ class ExtractCallerCallee:
         if type(raw_result) == dict and "contents" in raw_result:
             # replace multiple consecutive \n characters with a single \n
             hover_text = re.sub(r'\n+', '\n', raw_result["contents"]["value"])
-            return hover_text
+            return f"{hover_text[:2000]}..." # size limit to 2000 characters
         else:
             return ""
         

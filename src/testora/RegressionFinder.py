@@ -417,7 +417,7 @@ def prepare_call_info(pr):
             info_public_and_private = f"{special_method_intro}\n{info_public_and_private}"
 
     append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
-    exit()
+    # exit()
     
 def generate_tests(pr, github_repo, changed_functions):
     # prepare context used by one or more prompts
