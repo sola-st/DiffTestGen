@@ -223,28 +223,48 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
     import_line = ""
     class_hover_text_to_return = ""
 
-    module_candi = f"{module}.{func_name}"
-
+    # default
+    target_fullqua_name_to_find_in_api = f"{module}.{func_name}" 
+    target_base_module = module
+    target_fullqua_name_to_find_in_api_abbr = ""
+    target_base_module_abbr = ""
+    
+    # check more accurate module, parent class
     parent_class_name = None
     class_name_start_line_0base = None
     class_name_start_col_0base = None
     if parent_class:
         parent_class_name, class_name_start_line_0base, class_name_start_col_0base = parent_class
-        module = f"{module}.{parent_class_name}" # accurate module
-        if func_name.startswith("__"): # special methods
-            module_candi = module
-        else:
-            module_candi = f"{module}.{func_name}"
+        long_class_end_module = f"{module}.{parent_class_name}" # accurate module
 
+        if func_name.startswith("__"):
+            target_fullqua_name_to_find_in_api = module
+            # target_base_module = module
+        else:
+            target_fullqua_name_to_find_in_api = f"{long_class_end_module}.{func_name}"
+            target_base_module = long_class_end_module
+
+
+    # check whether abbr. nodule name exist
     public_apis_list, full_names, abbr_names = public_apis_list_triple
+    if target_base_module in full_names:
+        idx = full_names.index(target_base_module)
+        target_base_module_abbr = abbr_names[idx].removesuffix(f".{func_name}") # update_public_api_module
+        if func_name.startswith("__"):
+            target_fullqua_name_to_find_in_api_abbr = target_base_module_abbr
+        else:
+            target_fullqua_name_to_find_in_api_abbr = f"{target_base_module_abbr}.{func_name}"
+
+    # now we have 'target_fullqua_name_to_find_in_api' and 'target_fullqua_name_to_find_in_api_abbr'
+    # to check whether they are in the public api list
 
     # 1: return_bool only used when identify the private functions in the generated code
     if return_bool == True: 
-        if module_candi in public_apis_list: 
+        if target_fullqua_name_to_find_in_api in public_apis_list or target_fullqua_name_to_find_in_api_abbr in public_apis_list: 
             return True
         else:
             # check whether the module is in the public api list, e.g., pandas 60183 changed some files not in the public apis
-            if not whether_module_is_public(public_apis_list, module):
+            if whether_module_is_public(public_apis_list, [target_base_module, target_base_module_abbr]) == False:
                 # fall back to name conventions
                 if func_name.startswith("_") and not func_name.startswith("__"): 
                     return False
@@ -254,36 +274,38 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
                 return False
     
     # 2: for the general changed function and caller function check 
-    if module_candi in public_apis_list: 
-        tmp = module_candi.removesuffix(f".{func_name}")
-        if tmp in full_names:
-            idx = full_names.index(tmp)
-            module = abbr_names[idx].removesuffix(f".{func_name}") # update_public_api_module
-
+    module_to_import = target_base_module_abbr if target_base_module_abbr else target_base_module 
+    if target_fullqua_name_to_find_in_api in public_apis_list or target_fullqua_name_to_find_in_api_abbr in public_apis_list:
         if parent_class_name:
             if func_name.startswith("__"):
-                import_line = f"from {module} import {parent_class_name}" # with this only, we do not separate the __init__ and other special methods
+                import_line = f"from {module_to_import} import {parent_class_name}" # with this only, we do not separate the __init__ and other special methods
             else: # normal function from a class
-                import_line = f"from {module} import {func_name}"
+                import_line = f"from {module_to_import} import {func_name}"
         else:
-            import_line = f"from {module} import {func_name}" # import the function
+            import_line = f"from {module_to_import} import {func_name}" # import the function
     else:
-        if not whether_module_is_public(public_apis_list, module):
+        if whether_module_is_public(public_apis_list, [[target_base_module, target_base_module_abbr]]) == False:
             # fall back to name conventions
             if func_name.startswith("__") and parent_class_name:
-                import_line = f"from {module} import {parent_class_name}"
+                import_line = f"from {module_to_import} import {parent_class_name}"
             elif not func_name.startswith("_"):
-                import_line = f"from {module} import {func_name}" # import the function
+                import_line = f"from {module_to_import} import {func_name}" # import the function
     
     if import_line and check_parent_class == True and parent_class:
         class_hover_text_tmp = server.get_hover_text(file_path, class_name_start_line_0base, class_name_start_col_0base)
         class_hover_text = class_hover_text_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
-        class_hover_text_to_return = f"#### For class '{module}'\n{class_hover_text}:\n"
+        class_hover_text_to_return = f"#### For class '{module_to_import}'\n{class_hover_text}:\n"
         
-    return import_line, module, class_hover_text_to_return
+    return import_line, module_to_import, class_hover_text_to_return
 
-def whether_module_is_public(public_apis_list, module):
-    return [api for api in public_apis_list if api.startswith(module)]
+def whether_module_is_public(public_apis_list, modules):
+    in_public_list = False
+    for module in modules:
+        found = [api for api in public_apis_list if api.startswith(module)]
+        if found:
+            in_public_list = True
+            break
+    return in_public_list
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """
