@@ -220,8 +220,8 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
      * private
      * special methods
     '''
-    import_line = ""
-    class_hover_text_to_return = ""
+    if return_bool == True and func_name.startswith("__"):
+        return False # do not allow to explicitly call special methods.
 
     # default
     target_fullqua_name_to_find_in_api = f"{module}.{func_name}" 
@@ -266,7 +266,7 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
             # check whether the module is in the public api list, e.g., pandas 60183 changed some files not in the public apis
             if whether_module_is_public(public_apis_list, [target_base_module, target_base_module_abbr]) == False:
                 # fall back to name conventions
-                if func_name.startswith("_") and not func_name.startswith("__"): 
+                if func_name.startswith("_"): 
                     return False
                 else:
                     return True
@@ -274,6 +274,9 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
                 return False
     
     # 2: for the general changed function and caller function check 
+    import_line = ""
+    class_hover_text_to_return = ""
+
     module_to_import = target_base_module_abbr if target_base_module_abbr else target_base_module 
     if target_fullqua_name_to_find_in_api in public_apis_list or target_fullqua_name_to_find_in_api_abbr in public_apis_list:
         if parent_class_name:
