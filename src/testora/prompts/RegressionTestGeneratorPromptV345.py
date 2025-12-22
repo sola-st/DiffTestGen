@@ -102,9 +102,6 @@ etc.
                 template_prompt += f"\n{self.call_graph_block}"
                 current_len += len(self.call_graph_block)
                 append_event(Event(pr_nb=0, message=f"Added info about call graph. Current prompt length: {current_len}."))
-            # else:
-                # if "Method #" in 
-                # TODO use part of the call graph info, use more well-selected info 
 
         if len(self.test_function_block) > 0 and (current_len + len(self.test_function_block) <= default_len_limit):
             template_prompt += f"\n{self.test_function_block}"
