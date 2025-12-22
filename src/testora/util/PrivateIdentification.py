@@ -1,4 +1,5 @@
 import io
+from os.path import join
 import docker
 import tarfile
 import libcst as cst
@@ -81,13 +82,13 @@ def write_test_code_into_repo(container, test_code, file_in_container):
 def clear_test_code_in_repo(container, file_in_container):
     container.exec_run(f"rm -rf {file_in_container}")
 
-def get_callee_function_module(callee_file, check_range):
+def get_callee_function_parent_class(callee_file, check_range):
     with open(callee_file, "r", encoding="utf-8") as f:
         code = f.read()
     try:
         tree = cst.parse_module(code)
     except cst.ParserSyntaxError:
-        return None, None, None
+        return None
 
     wrapper = MetadataWrapper(tree)
 
@@ -95,7 +96,6 @@ def get_callee_function_module(callee_file, check_range):
     collector = CallerFunctionCollector() # this is used here to track callee functions, they work similar
     wrapper.visit(collector)
 
-    callee_module = None
     parent_class = None
 
     # Match the function by patch range
@@ -107,7 +107,7 @@ def get_callee_function_module(callee_file, check_range):
         if set(list(range(start_line, end_line+1))).intersection(set(list(check_range))):
             return parent_class
             
-    return callee_module, parent_class           
+    return parent_class           
 
 def has_private_accesses_or_fails_to_parse_api_lsp(codes: list, pr):
     '''
@@ -155,8 +155,8 @@ def has_private_accesses_or_fails_to_parse_api_lsp(codes: list, pr):
         with post_server.lsp.start_server():
             # the lsp will incrementally check the newly added test code file
             for i, test in enumerate(codes):
-                test_file_rel_path = test_file_rel_path.replace(".py", f"_{i}.py")
-                has, static_error_msg = private_identification_helper(test, pre_server, post_server, test_file_rel_path, pr.public_apis_union)
+                indexed_file_path = test_file_rel_path.replace(".py", f"_{i}.py")
+                has, static_error_msg = private_identification_helper(test, pre_server, post_server, indexed_file_path, pr.public_apis_union)
                 if has == False:
                     result.append(test)
                 else:
@@ -171,6 +171,7 @@ def has_private_accesses_or_fails_to_parse_api_lsp(codes: list, pr):
     return result, test_msg_pairs
 
 def private_identification_helper(code, pre_server, post_server, test_file_rel_path, public_apis_union):
+    has_error = False
     static_error_msg = None
     try:
         tree = cst.parse_module(code)
@@ -180,17 +181,32 @@ def private_identification_helper(code, pre_server, post_server, test_file_rel_p
 
     pre_callees = pre_server.get_callee_definitions(test_file_rel_path, tree)
     post_callees = post_server.get_callee_definitions(test_file_rel_path, tree)
-    callees = pre_callees + post_callees # if a call in a single version or both verson is private, consider with error message
+    # callees = pre_callees + post_callees 
+    # if a call in a single version or both verson is private, consider with error message
+    private_callees_old = check_callees(pre_callees, pre_server.repo_path, public_apis_union)
+    private_callees_new = check_callees(post_callees, post_server.repo_path, public_apis_union)
+    private_callees = list(set(private_callees_old + private_callees_new))
+    
+    if private_callees:
+        has_error = True 
+        private_callees_str = ", ".join(private_callees)
+        static_error_msg = f"The code snippet accesses the following function(s)/attribute(s), which is not part of the public API: {private_callees_str}."
+
+    return has_error, static_error_msg
+
+def check_callees(callees, container_repo_path, public_apis_union):
+    private_callees = [] # to mention all called private functions
 
     for callee in callees: # includes callee functions and attributes
         if not callee["callee_name"].startswith("_"): # may be public
             range_starts_at1 = range(callee["line"]+1, callee["line"]+2) # +1 to start at 1, +1 to be a right-open range
-            module, parent_class = get_callee_function_module(callee["relative"], range_starts_at1)
+            module = callee["relative"].replace("src/", "", 1).replace(".py", "").replace("/", ".")
+            parent_class = get_callee_function_parent_class(join(container_repo_path, callee["relative"]), range_starts_at1)
             if is_public(None, None, module, parent_class, callee["callee_name"], public_apis_union, None, return_bool=True) == False: 
                 # private function and protected attribution = not in api list + startswith "_"
-                static_error_msg = f"The code snippet accesses function/attribute '{callee}', which is not part of the public API."
-                return True, static_error_msg
+                private_callees.append(callee)
+                    
+                    # return True, static_error_msg # if there is one private function, does not goes for checking other callees.
+    return private_callees # to mention all called private functions
             # else: # not in the public api list, but also not startswith "_" --> consider as public
         # else: # consider as private
-
-    return False, static_error_msg

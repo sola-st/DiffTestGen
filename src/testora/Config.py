@@ -68,7 +68,7 @@ use_existing_tests = "pr-modified"
 
 call_graph = True
 
-private_call_indentification = 1 # 1 with "_", 2 with lsp + API
+private_call_indentification = 2 # 1 with "_", 2 with lsp + API
 
 top_k_entries = 5
 

@@ -68,7 +68,7 @@ class ExtractCalleesInTestCode:
             except:
                 pass
 
-            for d in defs:
+            for d in defs: # defs should only have one def if exist
                 absolute = d.get("absolutePath")
                 if absolute == str(full_path):
                     # the callee from the test code, we do not care whether a function from test code is private or not

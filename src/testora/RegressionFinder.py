@@ -962,6 +962,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     generated_tests = de_dup_tests_with_name(generated_tests)
 
         append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after #Inner round {inner_round}. #Round {round}."))
+        # exit()
       
     if not generated_tests:
         # if after the static error fix, there is still no generated tests, do not need to run the following
