@@ -305,18 +305,37 @@ def remove_tests_with_private_call(tests, pr):
 
 def prepare_call_info(pr):
     call_graph_info_str = ""
-    to_add_special_method_intro = False
+    # to_add_special_method_intro = False
     if Config.call_graph == True:
-        
-
         # 0: overall: from the perspective of forming the call graph info str
         info_public_and_private = ""
+        offical_special_method_guidelines = {}
+
+        # for special methods
+        offical_special_methods_file = "src/testora/util/special_methods.txt"
+        with open(offical_special_methods_file, "r") as f:
+            offical_special_methods_tmp = f.readlines()
+            offical_special_method_guidelines = [{methods.split("\t")[0]: methods} for methods in offical_special_methods_tmp if methods.startswith("__")]
 
         # 1: for public functions
         import_lines_info = ""
         for label, import_lines in pr.public_func_imports.items():
             import_lines_info_sub = ""
             if import_lines:
+                # add hints for special method entry functions.
+                for idx, imline in enumerate(import_lines):
+                    if "is a special method of the class" in imline:
+                        # Example: To trigger changed method '{fully_qulified_name}' ...
+                        # From file PullRequest.py
+                        fully_qulaified_name = re.search(r"To trigger changed method '([^']+)', which is a special method of the class", imline)
+                        special_method = fully_qulaified_name.rsplit(".", 1)[1]
+                        try: # ideally should always exists, no errors
+                            special_method_explaination = offical_special_method_guidelines[special_method]
+                            # update imline
+                            import_lines[idx] = f"{imline}\nHints: {special_method_explaination}.\n"
+                        except:
+                            append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {fully_qulaified_name}"))
+
                 info = "\n".join(import_lines)
                 # here the old and new labeled info exists only when some functions/classes have been affected in only one version, there is no confusing info.
                 if label == "common":
@@ -332,8 +351,8 @@ def prepare_call_info(pr):
             info_public_and_private = (f"For each affected public function, the following lists the available ways to access it. "
                 f"Refer to the class information below and the given changed function body above to check how to initialize the relevant classes and to check how to access the function, if any.\n"
             )
-            if "is a special method of the class" in import_lines_info:
-                to_add_special_method_intro = True
+            # if "is a special method of the class" in import_lines_info:
+            #     to_add_special_method_intro = True
                 
             info_public_and_private += f"\n{import_lines_info}\n"
 
@@ -346,8 +365,6 @@ def prepare_call_info(pr):
             "Each way specifies which function to call, along with its signature and docstring (if available), to guide how it should be used. "
             "Refer to the class information below to check how to initialize the relevant classes, if any.\n\n"
         ) # to make sure provide only available info to the prompt
-
-
 
         for func_name, cg_path_func_level in pr.call_graph_paths_k.items():
             call_graph_info_str_function_level = ""
@@ -363,8 +380,13 @@ def prepare_call_info(pr):
                             * provide the entire call graph path to the prompt
                             * provide only the entry function (Prefer)
                             '''
-                            if cg[0].startswith("__"):
+                            if cg[0].startswith("__") and cg[0].endswith("__"):
+                                special_method_explaination = offical_special_method_guidelines[cg[0]]
                                 call_graph_info_str_sub += f"Method #{i}: by triggering special method '{cg[0]}' of the following imported class\n"
+                                try: # ideally should always exists
+                                    call_graph_info_str_sub +=  f"Hints: {special_method_explaination}.\n"
+                                except:
+                                    append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {cg[0]}"))
                             else:
                                 call_graph_info_str_sub += f"Method #{i}: by calling function '{cg[0]}'\n"
                             if imports:
@@ -392,8 +414,8 @@ def prepare_call_info(pr):
                     call_graph_info_str_funcs += call_graph_info_str_function_level
         
         if call_graph_info_str_funcs:
-            if "by triggering special method" in call_graph_info_str_funcs:
-                to_add_special_method_intro = True
+            # if "by triggering special method" in call_graph_info_str_funcs:
+            #     to_add_special_method_intro = True
 
             call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
             info_public_and_private += f"{call_graph_info_str}\n"
@@ -406,16 +428,16 @@ def prepare_call_info(pr):
             # for module_endswith_class, hover_text in pr.class_hover_texts.items():
             info_public_and_private += "\n".join(pr.class_hover_texts)
 
-        # 4: special method intro
-        if to_add_special_method_intro == True:
-            special_method_intro = (
-                f"The following lists the available ways to access the affected functions. "
-                f"If any access way mentions a special method, its behavior follows Python's official documentation. "
-                f"To use the special method, write code that triggers it naturally, "
-                f"e.g., the expression 'a + b' automatically calls '__add__'. "
-                f"If no natural operation makes sense for a given special method, it is also fine to call it directly.\n"
-            ) # add only once, and add only if the special method is consider as the entry function
-            info_public_and_private = f"{special_method_intro}\n{info_public_and_private}"
+        # # 4: special method intro
+        # if to_add_special_method_intro == True:
+        #     special_method_intro = (
+        #         f"The following lists the available ways to access the affected functions. "
+        #         f"If any access way mentions a special method, its behavior follows Python's official documentation. "
+        #         f"To use the special method, write code that triggers it naturally, "
+        #         f"e.g., the expression 'a + b' automatically calls '__add__'. "
+        #         f"If no natural operation makes sense for a given special method, it is also fine to call it directly.\n"
+        #     ) # add only once, and add only if the special method is consider as the entry function
+        #     info_public_and_private = f"{special_method_intro}\n{info_public_and_private}"
 
     append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
     # exit()

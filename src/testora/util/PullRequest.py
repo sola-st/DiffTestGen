@@ -374,7 +374,7 @@ class PullRequest:
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_old.append(fully_qulified_name)
                                     if import_line: # public and special methods
-                                        if function_name.startswith("__"):
+                                        if function_name.startswith("__") and function_name.endswith("__"):
                                             self.public_func_imports_old.add(f"* To trigger changed method '{fully_qulified_name}', which is a special method of the class '{adjusted_module}', access the class with: {import_line}")
                                         else:
                                             self.public_func_imports_old.add(f"* To access changed function '{fully_qulified_name}': {import_line}")
@@ -414,7 +414,7 @@ class PullRequest:
                                     fully_qulified_name = f"{adjusted_module}.{function_name}"
                                     self.changed_function_qualified_names_new.append(fully_qulified_name)
                                     if import_line: # public
-                                        if function_name.startswith("__"):
+                                        if function_name.startswith("__") and function_name.endswith("__"):
                                             self.public_func_imports_new.add(f"* To trigger changed method '{fully_qulified_name}', which is a special method of the class '{adjusted_module}', access the class with: {import_line}")
                                         else:
                                             self.public_func_imports_new.add(f"* To access changed function '{fully_qulified_name}': {import_line}")
