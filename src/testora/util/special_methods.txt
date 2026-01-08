@@ -1,100 +1,142 @@
-__new__
-__init__
-__del__
-__copy__
-__deepcopy__
-__repr__
-__str__
-__bytes__
-__format__
-__hash__
-__bool__
-__add__
-__sub__
-__mul__
-__matmul__
-__truediv__
-__floordiv__
-__mod__
-__divmod__
-__pow__
-__radd__
-__rsub__
-__rmul__
-__rmatmul__
-__rtruediv__
-__rfloordiv__
-__rmod__
-__rdivmod__
-__rpow__
-__iadd__
-__isub__
-__imul__
-__imatmul__
-__itruediv__
-__ifloordiv__
-__imod__
-__ipow__
-__neg__
-__pos__
-__abs__
-__invert__
-__and__
-__or__
-__xor__
-__lshift__
-__rshift__
-__rand__
-__ror__
-__rxor__
-__rlshift__
-__rrshift__
-__iand__
-__ior__
-__ixor__
-__ilshift__
-__irshift__
-__eq__
-__ne__
-__lt__
-__le__
-__gt__
-__ge__
-__len__
-__contains__
-__getitem__
-__setitem__
-__delitem__
-__iter__
-__next__
-__reversed__
-__call__
-__getattr__
-__getattribute__
-__setattr__
-__delattr__
-__dir__
-__get__
-__set__
-__delete__
-__enter__
-__exit__
-__aiter__
-__anext__
-__await__
-__aenter__
-__aexit__
-__instancecheck__
-__subclasscheck__
-__class_getitem__
-__init_subclass__
-__mro_entries__
-__prepare__
-__getstate__
-__setstate__
-__reduce__
-__reduce_ex__
-__slots__
-__doc__
-__module__
-__annotations__
+Object creation & lifecycle
+__new__        Called to create a new instance before __init__. Override when subclassing immutable types or controlling instance creation; must return an instance.
+__init__       Initializes an already-created instance. Use it to set instance attributes; it must not return anything.
+__del__        Called when an object is about to be destroyed by the garbage collector. Use sparingly for releasing external resources; execution timing is not guaranteed.
+__copy__       Defines behavior for shallow copies via copy.copy(). Return a new instance with shared references.
+__deepcopy__   Defines behavior for deep copies via copy.deepcopy(). Should recursively copy contained objects.
+
+Representation & formatting
+__repr__       Official string representation, ideally unambiguous and useful for debugging. Should return valid Python code when possible.
+__str__        Informal, human-readable string used by print() and str(). Falls back to __repr__ if not defined.
+__bytes__      Defines conversion to bytes via bytes(obj). Commonly used for binary serialization.
+__format__     Handles format(obj, spec) and f-strings with format specifiers. Customize advanced formatting behavior.
+
+Numeric conversion & truthiness
+__round__      Called by round(obj[, ndigits]). Return a rounded version of the object.
+__float__      Converts object to float via float(obj). Should return a float.
+__hash__       Returns an integer hash value used by dict and set. Must be consistent with __eq__.
+__bool__       Determines truth value via bool(obj). Return True or False; if missing, __len__ is used.
+
+Arithmetic operators
+__add__        Implements self + other.
+__sub__        Implements self - other.
+__mul__        Implements self * other.
+__matmul__     Implements self @ other (matrix multiplication).
+__truediv__    Implements self / other.
+__floordiv__   Implements self // other.
+__mod__        Implements self % other.
+__divmod__     Implements divmod(self, other).
+__pow__        Implements pow(self, other[, mod]).
+
+Reflected arithmetic (right-hand side)
+__radd__       Called for other + self if other’s __add__ fails.
+__rsub__       Called for other - self.
+__rmul__       Called for other * self.
+__rmatmul__    Called for other @ self.
+__rtruediv__   Called for other / self.
+__rfloordiv__  Called for other // self.
+__rmod__       Called for other % self.
+__rdivmod__    Called for divmod(other, self).
+__rpow__       Called for pow(other, self).
+
+In-place arithmetic
+__iadd__       Implements self += other; may mutate and return self.
+__isub__       Implements self -= other.
+__imul__       Implements self *= other.
+__imatmul__    Implements self @= other.
+__itruediv__   Implements self /= other.
+__ifloordiv__  Implements self //= other.
+__imod__       Implements self %= other.
+__ipow__       Implements self **= other.
+
+Unary numeric operators
+__neg__        Implements -self.
+__pos__        Implements +self.
+__abs__        Implements abs(self).
+__invert__     Implements ~self (bitwise inversion).
+
+Bitwise operators
+__and__        Implements self & other.
+__or__         Implements self | other.
+__xor__        Implements self ^ other.
+__lshift__     Implements self << other.
+__rshift__     Implements self >> other.
+
+Reflected bitwise
+__rand__       Implements other & self.
+__ror__        Implements other | self.
+__rxor__       Implements other ^ self.
+__rlshift__    Implements other << self.
+__rrshift__    Implements other >> self.
+
+In-place bitwise
+__iand__       Implements self &= other.
+__ior__        Implements self |= other.
+__ixor__       Implements self ^= other.
+__ilshift__    Implements self <<= other.
+__irshift__    Implements self >>= other.
+
+Comparisons
+__eq__         Implements self == other.
+__ne__         Implements self != other.
+__lt__         Implements self < other.
+__le__         Implements self <= other.
+__gt__         Implements self > other.
+__ge__         Implements self >= other.
+
+Container & iteration protocol
+__len__        Returns number of items; used by len() and truth testing.
+__contains__   Implements membership test: item in self.
+__getitem__    Access element via self[key].
+__setitem__    Assign element via self[key] = value.
+__delitem__    Delete element via del self[key].
+__iter__       Returns an iterator for iteration.
+__next__       Returns next item from iterator; raises StopIteration when done.
+__reversed__   Returns reverse iterator used by reversed().
+
+Callable objects
+__call__       Allows instances to be called like functions: obj(...).
+
+Attribute access
+__getattr__       Called when attribute lookup fails. Use for dynamic attributes.
+__getattribute__ Always called for attribute access. Override carefully to avoid recursion.
+__setattr__      Called on attribute assignment.
+__delattr__      Called on attribute deletion.
+__dir__          Controls output of dir(obj).
+
+Descriptor protocol
+__get__        Defines attribute access via descriptors.
+__set__        Defines attribute assignment via descriptors.
+__delete__     Defines attribute deletion via descriptors.
+
+Context managers
+__enter__      Called at start of with-block; returns context object.
+__exit__       Called at end of with-block; handles cleanup and exceptions.
+
+Async protocols
+__aiter__      Returns async iterator.
+__anext__      Returns next async item; raises StopAsyncIteration.
+__await__      Makes object awaitable.
+__aenter__     Async version of __enter__.
+__aexit__      Async version of __exit__.
+
+Type & class mechanics
+__instancecheck__   Customizes isinstance(obj, cls).
+__subclasscheck__  Customizes issubclass(sub, cls).
+__class_getitem__  Enables generic subscription: Class[T].
+__init_subclass__  Automatically called when subclass is defined.
+__mro_entries__    Customizes MRO entries for multiple inheritance.
+__prepare__        Defines class namespace before class body execution.
+
+Pickling / serialization
+__getstate__   Returns object state for pickling.
+__setstate__   Restores object state during unpickling.
+__reduce__    Low-level control over pickling behavior.
+__reduce_ex__ Extended version of __reduce__ with protocol support.
+
+Special attributes (not methods, but part of data model)
+__slots__         Declares fixed attributes to save memory.
+__doc__           Holds class or object documentation string.
+__module__        Name of module where object is defined.
+__annotations__   Stores type annotations.
+
