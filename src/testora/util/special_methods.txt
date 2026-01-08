@@ -1,3 +1,4 @@
+From https://docs.python.org/3/reference/datamodel.html#special-methods
 Object creation & lifecycle
 __new__        Called to create a new instance before __init__. Override when subclassing immutable types or controlling instance creation; must return an instance.
 __init__       Initializes an already-created instance. Use it to set instance attributes; it must not return anything.
