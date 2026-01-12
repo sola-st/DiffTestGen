@@ -691,40 +691,61 @@ def classify_regression(project_name, pr, changed_functions, docstrings, old_exe
                            temperature=Config.classification_temp,
                            no_cache=no_cache,
                            nb_samples=nb_samples)
-    append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+    append_event(LLMEvent(pr_nb=pr.number,
+                          message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
     assert (nb_samples == len(raw_answer))
 
     all_results = []
     for raw_answer_sample in raw_answer:
-        is_relevant_change, is_deterministic, is_public, is_legal, is_surprising, correct_output = prompt.parse_answer(
-            [raw_answer_sample])
+        attempts_left = 3
+        while attempts_left > 0:
+            try:
+                classification_result = prompt.parse_answer([raw_answer_sample])
+                break
+            except TestoraException as e:
+                attempts_left -= 1
+                append_event(Event(pr_nb=pr.number,
+                                   message=f"Error parsing classification answer: {e}"))
+                if attempts_left == 0:
+                    raise e
         append_event(ClassificationEvent(pr_nb=pr.number,
                                          message="Classification",
-                                         is_relevant_change=is_relevant_change,
-                                         is_deterministic=is_deterministic,
-                                         is_public=is_public,
-                                         is_legal=is_legal,
-                                         is_surprising=is_surprising,
-                                         correct_output=correct_output,
-                                         old_is_crash=is_crash(old_execution.output),
+                                         test_code=old_execution.code,
+                                         old_output=old_execution.output,
+                                         new_output=new_execution.output,
+                                         classification=classification_result.classification, # type: ignore
+                                         classification_explanation=classification_result.classification_explanation, # type: ignore
+                                         old_is_crash=is_crash(
+                                             old_execution.output),
                                          new_is_crash=is_crash(new_execution.output)))
-        result = is_relevant_change and is_deterministic and is_public and is_legal and is_surprising
+        result = classification_result.classification == Classification.REGRESSION # type: ignore
         all_results.append(result)
     return all_results
 
 
 def select_expected_behavior(project_name, pr, old_execution, new_execution, docstrings):
     """Ask LLM which of two possible outputs is the expected behavior."""
-    prompt = SelectExpectedBehaviorPrompt(
-        project_name, old_execution.code, old_execution.output, new_execution.output, docstrings)
-    raw_answer = llm.query(prompt, temperature=Config.classification_temp)
-    append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
-    expected_behavior = prompt.parse_answer(raw_answer)
-    append_event(SelectBehaviorEvent(pr_nb=pr.number,
-                                     message="Selected expected behavior",
-                                     expected_output=expected_behavior))
-    return expected_behavior
 
+    attempts_left = 3
+    while attempts_left > 0:
+        try:
+            prompt = SelectExpectedBehaviorPrompt(
+            project_name, old_execution.code, old_execution.output, new_execution.output, docstrings)
+            raw_answer = llm.query(prompt, temperature=Config.classification_temp)
+            append_event(LLMEvent(pr_nb=pr.number,
+                                message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+            expected_behavior = prompt.parse_answer(raw_answer)
+            append_event(SelectBehaviorEvent(pr_nb=pr.number,
+                                                message="Selected expected behavior",
+                                                expected_output=expected_behavior))
+            return expected_behavior
+
+        except TestoraException as e:
+            attempts_left -= 1
+            append_event(Event(pr_nb=pr.number,
+                               message=f"Error selecting expected behavior: {e}"))
+            if attempts_left == 0:
+                raise e
 
 def check_pr(github_repo, cloned_repo_manager, pr):
     # ignore if too few or too many files changed

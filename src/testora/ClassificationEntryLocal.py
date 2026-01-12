@@ -16,7 +16,7 @@ config_versions = [
         
 results_folder = join("data", "results")
 breakpoints_data_folder = join(results_folder, "breakpoint", model_version, f"iter_{iteration}")
-classification_folder = join(results_folder, "breakpoint", model_version, f"iter_{iteration}")
+classification_folder = join(results_folder, "classification", model_version, f"iter_{iteration}")
 
 with open(".target_project", "r") as f:
     target_project = f.read().strip()
@@ -24,15 +24,17 @@ with open(".target_project", "r") as f:
 for config in config_versions:
     version_id = '_'.join(map(str, config))
     # config = config + [iteration, model_version]
-    breakpoint_files = listdir(join(breakpoints_data_folder, f"bp_{version_id}"))
+    version_folder = join(breakpoints_data_folder, f"bp_{version_id}", target_project)
+    breakpoint_files = listdir(version_folder)
     for b_file in breakpoint_files:
         pr_num = b_file.split("_", 2)[1]
         # print(pr_num)
         subprocess.run(["python", "-m", "testora.RegressionClassifier", 
-                "--project", target_project, "--pr", pr_num])
+                "--project", target_project, "--pr", pr_num, "--breakpoint_file", join(version_folder, b_file)])
+        break
     
     # move the classification data to a desired foler
-    classification_cur_version = join(classification_folder, f"classification_{version_id}")
+    classification_cur_version = join(classification_folder, f"cf_{version_id}")
     makedirs(classification_cur_version, exist_ok=True)
     # store the log results
     # no iter info, to separate local and db, but also good to have, becasuse the log file prefix are different.

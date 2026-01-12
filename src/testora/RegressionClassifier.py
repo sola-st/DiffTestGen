@@ -3,19 +3,19 @@ import json
 import time
 from testora.RegressionFinder import check_if_present_in_main, classify_regression, get_repo, reduce_test, select_expected_behavior
 from testora.evaluation import EvalTaskManager
+from testora.execution.TestExecution import TestExecution
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
 from testora.util.Logs import ErrorEvent, Event, PREvent, append_event, get_logs_as_json, reset_logs, start_logging, store_logs
 from testora.util.PullRequest import PullRequest
-from os.path import join, exists
 
 
-def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr):
+def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, breakpoint_file):
     '''Record changed functions and test executions to restart/continue the classification phase.'''
 
-    changed_functions, old_executions_differ_relevant, new_executions_differ_relevant = get_stored_info(github_repo.name, pr.number)
+    changed_functions, old_executions_differ_relevant, new_executions_differ_relevant = get_stored_info(breakpoint_file)
     if changed_functions:
-        for (old_execution, new_execution) in zip(old_executions_differ_relevant, new_executions_differ_relevant):
+        for old_execution, new_execution in zip(old_executions_differ_relevant, new_executions_differ_relevant):
             '''The following are exactly the remaining steps from RegressionFinder.'''
 
             # if difference found, reduce the test while still observing a difference
@@ -42,7 +42,7 @@ def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr):
         append_event(Event(pr_nb=pr.number, message="No tests expose differences from the previous phase."))
 
 
-def check_single_pr(project, pr_nb):
+def check_single_pr(project, pr_nb, breakpoint_file):
     # reproduce the cloned_repo_manager, git_repo, and pr
     start = time.time()
     github_repo, cloned_repo_manager = get_repo(project)
@@ -54,7 +54,7 @@ def check_single_pr(project, pr_nb):
                          message="Starting to Reduce and Classify Tests",
                          title=pr.github_pr.title, url=pr.github_pr.html_url))
 
-    reduce_and_classify_tests(github_repo, cloned_repo_manager, pr)
+    reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, breakpoint_file)
 
     append_event(PREvent(pr_nb=pr_nb,
                          message="Done with Reduction and Classification",
@@ -82,46 +82,34 @@ def fetch_and_check_prs():
 
     print("No more tasks to work on")
 
-def get_stored_info(repo_name, pr_num):
-    # 1. for single pr mode, make sure the same as it is in RegressionFinder
-    # data_storage_folder = join("data", "results", "breakpoint_data", "iter1") 
-    # 2. TODO manage the storage on the DB
+def get_stored_info(breakpoint_file):
+    with open(breakpoint_file, "r") as f:
+        loaded_data = json.load(f)
+    changed_functions = loaded_data["changed_functions"] # a list of fully qualified function names
+    # Make TestExecution available in eval scope
+    old_executions_differ_relevant = eval(loaded_data["old_executions_differ_relevant"], {"TestExecution": TestExecution}) # a list of TestExecution objects.
+    new_executions_differ_relevant = eval(loaded_data["new_executions_differ_relevant"], {"TestExecution": TestExecution})
 
-    # data_file = join(data_storage_folder, f"{repo_name}_{pr_num}_breakpoint_data.json")
-    if exists(f"{repo_name}_{pr_num}_breakpoint_data.json"):
-        with open(f"{repo_name}_{pr_num}_breakpoint_data.json", "r") as f:
-            loaded_data = json.load(f)
-        changed_functions = loaded_data["changed_functions"] # a list of fully qualified function names
-        old_executions_differ_relevant = eval(loaded_data["old_executions_differ_relevant"]) # a list of TestExecution objects.
-        new_executions_differ_relevant = eval(loaded_data["new_executions_differ_relevant"])
-
-        return changed_functions, old_executions_differ_relevant, new_executions_differ_relevant
-    return None, None, None
+    return changed_functions, old_executions_differ_relevant, new_executions_differ_relevant
     
 def main():
     parser = argparse.ArgumentParser(description="Testora's reduction and classification entry point")
-    parser.add_argument("--db", action="store_true", help="Run on PRs fetched from the database")
     parser.add_argument("--project", type=str,
                         help="Project to analyze",
                         choices=["keras", "marshmallow", "pandas", "scipy"])
     parser.add_argument("--pr", type=int, help="PR number to analyze")
+    parser.add_argument("--breakpoint_file", type=str, help="The parent folder of breakpoint files")
     args = parser.parse_args()
 
     start_logging()
-    if args.db:
-        if args.project or args.pr:
-            raise ValueError("When using --db, cannot use --project and --pr")
-        EvalTaskManager.initialize()
-        fetch_and_check_prs()
-    else:
-        '''
-        let the first version of continuing classification phase work in this branch.
-        Take care of the 'data_storage_folder' in function get_stored_info.
-        '''
-        if not args.project or not args.pr:
-            raise ValueError("Must specify --project and --pr")
-        check_single_pr(args.project, args.pr)
-        store_logs()
+    '''
+    let the first version of continuing classification phase work in this branch.
+    Take care of the 'data_storage_folder' in function get_stored_info.
+    '''
+    if not args.project or not args.pr:
+        raise ValueError("Must specify --project and --pr")
+    check_single_pr(args.project, args.pr, args.breakpoint_file)
+    store_logs()
 
 
 if __name__ == "__main__":

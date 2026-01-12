@@ -108,7 +108,7 @@ for iteration in range(max_iteration):
         subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config_with_iter}", f"--prs={pr_list}"])
         
         # store the breakpoint data seperately
-        bp_data_cur_version = join(breakpoints_data_folder, f"bp_{version_id}")
+        bp_data_cur_version = join(breakpoints_data_folder, f"bp_{version_id}", target_project)
         makedirs(bp_data_cur_version, exist_ok=True)
         for f in os.listdir('.'):
             if isfile(f) and f.endswith("_breakpoint_data.json"):
