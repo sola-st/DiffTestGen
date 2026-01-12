@@ -456,7 +456,9 @@ def generate_tests(pr, github_repo, changed_functions):
     full_diff_len_fit = False
     filtered_diff_len_nonequal_fit = False
 
-    info_public_and_private = prepare_call_info(pr)
+    info_public_and_private = ""
+    if Config.initial_test_generation_prompt_version == 5:
+        info_public_and_private = prepare_call_info(pr)
     
     if len(pr.full_diff.split("\n")) <= 200:
         full_diff_len_fit = True

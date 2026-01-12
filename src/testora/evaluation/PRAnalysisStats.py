@@ -4,7 +4,7 @@ import glob
 from os import makedirs
 from os.path import join, exists
 from statistics import mean
-from testora.util.LogParser import PRResult, parse_log_files, parse_time_stamp, pr_results_as_dict
+from testora.util.LogParser import parse_log_files
 from testora.util.Logs import List
 import matplotlib.pyplot as plt
 
@@ -17,6 +17,7 @@ project_to_pr_range = {
 }
 
 base_dir = "data/results_03_2025"
+# !! Func 'avg_money_per_PR' below -- OpenAI pricing as of Jan 12, 2026, Gpt-5-mini
 
 
 @dataclass
@@ -150,9 +151,14 @@ def avg_tokens_per_PR(input_token_costs, output_token_costs):
 
 
 def avg_money_per_PR(input_token_costs, output_token_costs):
-    # OpenAI pricing as of Feb 17, 2025
-    input_dollars_1m = 0.15
-    output_dollars_1m = 0.6
+    # # OpenAI pricing as of Feb 17, 2025
+    # input_dollars_1m = 0.15
+    # output_dollars_1m = 0.6
+
+    # OpenAI pricing as of Jan 12, 2026, Gpt-5-mini
+    input_dollars_1m = 0.25 # 
+    # what about cached input??
+    output_dollars_1m = 2
 
     total_input_tokens = sum(input_token_costs.test_gen) + \
         sum(input_token_costs.test_refinement) + \

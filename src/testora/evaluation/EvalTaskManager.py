@@ -166,7 +166,16 @@ def show_status():
     def inner(connection, cursor):
         def count_per_project(query):
             project_to_count = Counter()
-            cursor.execute(query)
+            # *** Self added, to get the the results from 2026 only ***
+            year = 2026
+            start = f"{year}-01-01 00:00:00"
+            end   = f"{year+1}-01-01 00:00:00"
+
+            cursor.execute(query, (start, end))
+            # And the following queries with: AND timestamp >= %s AND timestamp < %s
+            # *** ***
+
+            # cursor.execute(query)
             rows = cursor.fetchall()
             for row in rows:
                 project_to_count[row[0]] = row[1]
@@ -175,27 +184,28 @@ def show_status():
         count_all = f"""
             SELECT project, COUNT(*) AS total_count
             FROM {table_name}
+            WHERE timestamp >= %s AND timestamp < %s
             GROUP BY project;"""
         project_to_count_all = count_per_project(count_all)
 
         count_assigned = f"""
             SELECT project, COUNT(*) AS assigned_count
             FROM {table_name}
-            WHERE worker IS NOT NULL AND result IS NULL
+            WHERE worker IS NOT NULL AND result IS NULL AND timestamp >= %s AND timestamp < %s
             GROUP BY project;"""
         project_to_count_assigned = count_per_project(count_assigned)
 
         count_unassigned = f"""
             SELECT project, COUNT(*) AS unassigned_count
             FROM {table_name}
-            WHERE result IS NULL AND worker IS NULL
+            WHERE result IS NULL AND worker IS NULL AND timestamp >= %s AND timestamp < %s
             GROUP BY project;"""
         project_to_count_unassigned = count_per_project(count_unassigned)
 
         count_done = f"""
             SELECT project, COUNT(*) AS done_count
             FROM {table_name}
-            WHERE result IS NOT NULL
+            WHERE result IS NOT NULL AND timestamp >= %s AND timestamp < %s
             GROUP BY project;"""
         project_to_count_done = count_per_project(count_done)
 
@@ -238,8 +248,8 @@ def fetch_results(is_classification, fetch_single_project=False):
             print(f"Fetching results for {project}")
             done_prs_and_timestamps_query = (
                 f"SELECT pr, timestamp FROM {table_name} "
-                f"WHERE project = %s AND result IS NOT NULL"
-            )
+                f"WHERE project = %s AND result IS NOT NULL AND timestamp LIKE '%2026-%'"
+            ) # f"WHERE project = %s AND result IS NOT NULL"
             cursor.execute(done_prs_and_timestamps_query, (project,))
             done_prs_and_timestamps = [[str(row[0]), str(row[1])]
                                        for row in cursor.fetchall()]
@@ -292,7 +302,7 @@ def remove_unfinished_for_project(project):
         delete_query = (
             f"DELETE FROM {table_name} "
             f"WHERE project = %s AND result IS NULL"
-        )
+        ) # f"WHERE project = %s AND timestamp LIKE '%2026-%'"
         cursor.execute(delete_query, (project,))
 
     connect_and_do(inner)

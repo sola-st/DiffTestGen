@@ -173,7 +173,14 @@ class PRResult:
                     else:
                         self.some_changes_at_fun_level = "Partial/all changes at the func-level"
                         
-                if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
+                # if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
+                
+                if ("has an undefined reference" in entry["content"] and "Fix it" in entry["content"]) or \
+                        "lists the Python code and its runtime errors, fix the errors." in entry["content"] or \
+                        "to refine the given code to ensure that" in entry["content"]:
+                    # to include static feedback and runtime error feedback time
+                    # static: to refine the given code to ensure that
+                    # runtime: The following lists the Python code and its runtime errors, fix the errors.
                     update_time_taken(entry)
                     phase = "test_refinement"
                     test_refinemement_start_time = parse_time_stamp(entry["timestamp"])
