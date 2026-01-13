@@ -60,7 +60,7 @@ class PullRequest:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
         
-        if Config.call_graph == True:
+        if Config.call_graph == True and Config.initial_test_generation_prompt_version == 5:
             self._prepae_to_use_call_graph()
 
     def _prepae_to_use_call_graph(self):
@@ -272,7 +272,7 @@ class PullRequest:
     
     def get_helper(self, cloned_repo, version, prompt_base):
         # update changed_functions for old or new version
-        if Config.call_graph == True:
+        if Config.call_graph == True and Config.initial_test_generation_prompt_version == 5:
             # the server stays alive for the entire workspace
             server = ExtractCallerCallee(cloned_repo.repo.working_dir)
             with server.lsp.start_server(self.target_folder): # start only once, automatic stop, focus on only the given folder
@@ -433,7 +433,8 @@ class PullRequest:
                     code_context += "\n\n".join(functions_code)
                     code_context += "\n"
 
-        if version == "new" and (self.call_graph_paths_old or self.call_graph_paths_new or self.public_func_imports_old or self.public_func_imports_new):
+        if Config.call_graph == True and Config.initial_test_generation_prompt_version == 5 and version == "new" \
+                and (self.call_graph_paths_old or self.call_graph_paths_new or self.public_func_imports_old or self.public_func_imports_new):
             self.get_union_call_graph()
             self.get_shortest_path_each_entry()
             self.record_all_and_shortest_call_paths()

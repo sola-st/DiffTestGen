@@ -110,8 +110,6 @@ def merge_tests_and_execute(test_executions, docker_executor, version) -> List[s
 
     merged_code = merge_programs([test.code for test in test_executions])
     append_event(ErrorEvent(pr_nb=-1, message="Merged code", details=merged_code))
-    # TODO: in case we ever revive this code, use the coverage report provided here
-    # TODO: H: check when this works and if the new changes makes sense.
     merged_outputs, coverage_report = docker_executor.execute_python_code(merged_code, version=version)
     append_event(ErrorEvent(pr_nb=-1, message="Merged output", details=merged_outputs))
     merged_outputs = clean_output(merged_outputs)
@@ -328,7 +326,7 @@ def prepare_call_info(pr):
                         # Example: To trigger changed method '{fully_qulified_name}' ...
                         # From file PullRequest.py
                         fully_qulaified_name = re.search(r"To trigger changed method '([^']+)', which is a special method of the class", imline)
-                        special_method = fully_qulaified_name.rsplit(".", 1)[1]
+                        special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
                         try: # ideally should always exists, no errors
                             special_method_explaination = offical_special_method_guidelines[special_method]
                             # update imline

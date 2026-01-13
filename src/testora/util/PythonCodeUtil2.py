@@ -287,7 +287,7 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
         else:
             import_line = f"from {module_to_import} import {func_name}" # import the function
     else:
-        if whether_module_is_public(public_apis_list, [[target_base_module, target_base_module_abbr]]) == False:
+        if whether_module_is_public(public_apis_list, [target_base_module, target_base_module_abbr]) == False:
             # fall back to name conventions
             if func_name.startswith("__") and func_name.endswith("__") and parent_class_name:
                 import_line = f"from {module_to_import} import {parent_class_name}"
