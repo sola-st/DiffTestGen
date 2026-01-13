@@ -186,6 +186,7 @@ def private_identification_helper(code, pre_server, post_server, test_file_rel_p
     private_callees_old = check_callees(pre_callees, pre_server.repo_path, public_apis_union)
     private_callees_new = check_callees(post_callees, post_server.repo_path, public_apis_union)
     private_callees = list(set(private_callees_old + private_callees_new))
+    # private_callees = list({tuple(sorted(d.items())): d for d in (private_callees_old + private_callees_new)}.values()) # for dict
     
     if private_callees:
         has_error = True 
@@ -204,7 +205,7 @@ def check_callees(callees, container_repo_path, public_apis_union):
             parent_class = get_callee_function_parent_class(join(container_repo_path, callee["relative"]), range_starts_at1)
             if is_public(None, None, module, parent_class, callee["callee_name"], public_apis_union, None, return_bool=True) == False: 
                 # private function and protected attribution = not in api list + startswith "_"
-                private_callees.append(callee)
+                private_callees.append(callee["callee_name"])
                     
                     # return True, static_error_msg # if there is one private function, does not goes for checking other callees.
     return private_callees # to mention all called private functions
