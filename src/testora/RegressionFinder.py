@@ -470,9 +470,11 @@ def generate_tests(pr, github_repo, changed_functions):
         
         generated_tests, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff")
         if type(generated_tests) == dict:
-            empty_answer_full_diff = True
+            empty_answer_full_diff = True # module outputs nothing
         else:
             all_tests.extend(generated_tests)
+    else:
+        append_event(Event(pr_nb=pr.number, message=f"Full diff is too long. #Round {round}"))
 
     if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
         filtered_diff_len_nonequal_fit = True
@@ -489,6 +491,8 @@ def generate_tests(pr, github_repo, changed_functions):
             empty_answer_filtered_diff = True
         else:
             all_tests.extend(generated_tests)
+    else:
+        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is too long. #Round {round}"))
     
     # also return the bool values to not check multiple times in the feedback rounds
     return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
@@ -793,21 +797,25 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     # "none": do not make any extra effort about developer-written tests,
     # "pr-modified": use the PR-modified tests, 
     # "all": use PR-modified tests + local tests
-    if Config.use_existing_tests == "all":
-        cloned_repo = cloned_repo_manager.get_cloned_repo(pr.post_commit)
-        container_name = cloned_repo.container_name
-        project_name = cloned_repo_manager.repo_name
+    # if Config.use_existing_tests == "all":
+    #     cloned_repo = cloned_repo_manager.get_cloned_repo(pr.post_commit)
+    #     container_name = cloned_repo.container_name
+    #     project_name = cloned_repo_manager.repo_name
         
-        ExtractExistingTests(pr.modified_test_python_files, changed_functions, container_name, project_name).main()
-        # TODO also consider the potential pyx issue
-        return
+    #     ExtractExistingTests(pr.modified_test_python_files, changed_functions, container_name, project_name).main()
+    #     # TODO also consider the potential pyx issue
+    #     return
 
     # generate tests via LLM
     generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
             empty_answer_full_diff, empty_answer_filtered_diff = generate_tests(pr, github_repo, changed_functions)
     
-    if generated_tests:
-        if empty_answer_full_diff == True or empty_answer_filtered_diff == True:
+    if not generated_tests:
+        if empty_answer_full_diff == True or empty_answer_filtered_diff == True: # module outputs nothing
+            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round {round}"))
+            return 
+        
+        if not test_msg_pairs_full_diff or not test_msg_pairs_filtered_diff:
             append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round {round}"))
             return 
     
@@ -1005,8 +1013,9 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     generated_tests.extend(static_err_fixed_tests_may_dup)
                     # overall dedup, to remove the duplicates in remianing generated tests and static_err_fixed_tests_may_dup
                     generated_tests = de_dup_tests_with_name(generated_tests)
-
-        append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after #Inner round {inner_round}. #Round {round}."))
+        
+        if inner_round != 0:
+            append_event(Event(pr_nb=pr.number, message=f"Static error feedback ends after #Inner round {inner_round}. #Round {round}."))
         # exit()
       
     if not generated_tests:
