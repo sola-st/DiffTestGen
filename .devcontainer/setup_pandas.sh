@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Set COMMIT_DATE to get latest commit until a specific date (format: YYYY-MM-DD)
+# Can be overridden by passing a different date as first argument
+# Default: 2025-08-01
+COMMIT_DATE="${1:-2025-08-01}"
+
 echo "Creating directory for clones"
 cd ..
 sudo mkdir clones
@@ -17,15 +22,22 @@ cd clone1
 echo "Creating first clone of pandas"
 git clone https://github.com/pandas-dev/pandas.git
 cd pandas
+
+if [ -n "$COMMIT_DATE" ]; then
+  echo "Checking out latest commit until $COMMIT_DATE"
+  COMMIT_HASH=$(git log --all --until="$COMMIT_DATE" -1 --format=%H)
+  if [ -z "$COMMIT_HASH" ]; then
+    echo "Error: No commits found before $COMMIT_DATE"
+    exit 1
+  fi
+  echo "Found commit: $COMMIT_HASH"
+  git checkout "$COMMIT_HASH"
+fi
+
 echo "Building dev container for pandas (first clone)"
 docker build -t pandas-dev .
-# docker build --build-arg PYTHON_VERSION=3.10 -t pandas-dev . # TODO still 3.11
 docker run -t -d --name pandas-dev1 -v ${PWD}:/home/pandas pandas-dev
-# stick on cython version to make sure sphinx build works, otherwise, it always get the lastest 
-# cython~=3.0.5 is from pandas requirement file, sphinx ask for no new than 3.1.0, here we will get 3.0.12
-docker exec pandas-dev1 python -m pip install "cython~=3.0.5" --force-reinstall 
 docker exec pandas-dev1 python -m pip install -ve . --no-build-isolation --config-settings editable-verbose=true
-# docker exec pandas-dev2 cython --version
 docker exec pandas-dev1 python -m pip install sphinx-version-warning coverage==7.11.0
 echo "Done with first clone"
 
@@ -35,7 +47,6 @@ cp -r clone1 clone2
 cd clone2/pandas
 echo "Building dev container for pandas (second clone)"
 docker run -t -d --name pandas-dev2 -v ${PWD}:/home/pandas pandas-dev
-docker exec pandas-dev2 python -m pip install "cython~=3.0.5" --force-reinstall 
 docker exec pandas-dev2 python -m pip install -ve . --no-build-isolation --config-settings editable-verbose=true
 docker exec pandas-dev2 python -m pip install sphinx-version-warning coverage==7.11.0
 echo "Done with second clone"
@@ -46,7 +57,6 @@ cp -r clone1 clone3
 cd clone3/pandas
 echo "Building dev container for pandas (third clone)"
 docker run -t -d --name pandas-dev3 -v ${PWD}:/home/pandas pandas-dev
-docker exec pandas-dev3 python -m pip install "cython~=3.0.5" --force-reinstall 
 docker exec pandas-dev3 python -m pip install -ve . --no-build-isolation --config-settings editable-verbose=true
 docker exec pandas-dev3 python -m pip install sphinx-version-warning coverage==7.11.0
 echo "Done with third clone"
