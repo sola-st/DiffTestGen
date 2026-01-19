@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 from os.path import join, exists
 from os import listdir
@@ -5,7 +6,7 @@ from chacho.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest
 from testora.RegressionFinder import execute_tests_on_commit, get_repo, simplify_test_execution, validate_output_difference
 from testora.execution.TestExecution import TestExecution
 from testora.prompts.RuntimeErrorsFixingPrompt import extract_error_type
-from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, append_event
+from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, append_event, reset_logs, start_logging, events
 
 class RunChaCoTests():
     def __init__(self, github_repo, cloned_repo_manager, pr):
@@ -144,7 +145,6 @@ def get_generated_tests(project, pr_nb):
     
 def main(project, pr_nb):
     generated_tests = get_generated_tests(project, pr_nb)
-    
     if not generated_tests:
         append_event(Event(pr_nb=pr_nb, message=f"Ignoring because no tests were recorded."))
         return 
@@ -164,15 +164,35 @@ def main(project, pr_nb):
     append_event(PREvent(pr_nb=pr_nb,
                          message="Done with PR",
                          title=pr.github_pr.title, url=pr.github_pr.html_url))
-    
+
+def store_pr_log(pr):
+    global last_file_stored_to
+    timestamp = datetime.now().isoformat()
+    event_dicts = [evt.dict() for evt in events]
+    out_file = f"logs_{pr}_{timestamp}.json"
+    json.dump(event_dicts, open(out_file, "w"), indent=2)
+    last_file_stored_to = out_file
+
+
 if __name__=="__main__":
     with open(".target_project", "r") as f:
         target_project = f.read().strip()
 
-    pr_file = join("data", "meta", f"chaco_{target_project}_unique_46.txt")
+    pr_meta = {
+        "pandas": 29,
+        "scipy": 46
+    }
+    # pr_meta = {
+    #     "pandas": 45,
+    #     "scipy": 50
+    # }
+    pr_file = join("data", "meta", f"chaco_{target_project}_unique_{pr_meta[target_project]}.txt")
 
     with open(pr_file, "r") as f:
         prs = f.readlines()
-    pr_list = [int(pr) for pr in prs][1:2]
+    pr_list = [int(pr) for pr in prs]
     for pr in pr_list:
+        reset_logs()
+        start_logging()
         main(target_project, pr)
+        store_pr_log(pr)
