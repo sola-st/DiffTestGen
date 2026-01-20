@@ -15,7 +15,8 @@ pr_meta = {
     "pandas": 45,
     "scipy": 50
 }
-pr_file = join("data", "meta", f"chaco_{target_project}_unique_{pr_meta[target_project]}.txt")
+# pr_file = join("data", "meta", f"chaco_{target_project}_unique_{pr_meta[target_project]}.txt")
+pr_file = join("data", "meta", f"chaco_{target_project}_{pr_meta[target_project]}.txt")
 
 with open(pr_file, "r") as f:
     prs = f.readlines()
