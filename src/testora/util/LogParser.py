@@ -107,7 +107,7 @@ class PRResult:
             elif phase == "classification":
                 self.time_taken_classification += time_taken
 
-        for entry in self.entries:
+        for i, entry in enumerate(self.entries):
             if entry["message"].startswith("Starting to check PR"):
                 self.title = entry["title"]
                 self.url = entry["url"]
@@ -115,7 +115,10 @@ class PRResult:
             elif entry["message"].startswith("Ignoring") and self.nb_generated_tests == 0:
                 # Now we have multiple round, if the 1st round is not ignored, we mark it as checked.
                 self.ignored = True
-                self.ignored_reason = entry["message"]
+                if "diff is too long" in self.entries[i-1]["message"]:
+                    self.ignored_reason = "Diff is too long"
+                else:
+                    self.ignored_reason = entry["message"]
 
             elif entry["message"].startswith("Call graph ("):
                 content = entry["content"]
