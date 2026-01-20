@@ -1,4 +1,4 @@
-from datetime import datetime
+import argparse
 import json
 from os.path import join, exists
 from os import listdir
@@ -6,7 +6,7 @@ from chacho.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest
 from testora.RegressionFinder import execute_tests_on_commit, get_repo, simplify_test_execution, validate_output_difference
 from testora.execution.TestExecution import TestExecution
 from testora.prompts.RuntimeErrorsFixingPrompt import extract_error_type
-from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, append_event, reset_logs, start_logging, events
+from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, append_event, start_logging, store_logs
 
 class RunChaCoTests():
     def __init__(self, github_repo, cloned_repo_manager, pr):
@@ -143,56 +143,39 @@ def get_generated_tests(project, pr_nb):
     
     return generated_tests
     
-def main(project, pr_nb):
-    generated_tests = get_generated_tests(project, pr_nb)
+def main():
+    parser = argparse.ArgumentParser(description="ChaCo's entry point")
+    parser.add_argument("--project", type=str, help="Project to analyze", choices=["pandas", "scipy"])
+    parser.add_argument("--pr_nb", type=int, help="PR number to analyze")
+    args = parser.parse_args()
+
+    if not args.project or not args.pr_nb:
+        raise ValueError("Must specify --project and --pr_nb")
+    
+    start_logging()
+
+    generated_tests = get_generated_tests(args.project, args.pr_nb)
     if not generated_tests:
-        append_event(Event(pr_nb=pr_nb, message=f"Ignoring because no tests were recorded."))
+        append_event(Event(pr_nb=args.pr_nb, message=f"Ignoring because no tests were recorded."))
         return 
     
-    github_repo, cloned_repo_manager = get_repo(project)
-    github_pr = github_repo.get_pull(pr_nb)
+    github_repo, cloned_repo_manager = get_repo(args.project)
+    github_pr = github_repo.get_pull(args.pr_nb)
     pr = ChaCoCustomizedPullRequest(github_pr, github_repo, cloned_repo_manager)
 
     # check the PR
-    append_event(PREvent(pr_nb=pr_nb,
+    append_event(PREvent(pr_nb=args.pr_nb,
                          message="Starting to check PR",
                          title=pr.github_pr.title, url=pr.github_pr.html_url))
 
     runner = RunChaCoTests(github_repo, cloned_repo_manager, pr, )
     runner.run_tests(generated_tests)
 
-    append_event(PREvent(pr_nb=pr_nb,
+    append_event(PREvent(pr_nb=args.pr_nb,
                          message="Done with PR",
                          title=pr.github_pr.title, url=pr.github_pr.html_url))
-
-def store_pr_log(pr):
-    global last_file_stored_to
-    timestamp = datetime.now().isoformat()
-    event_dicts = [evt.dict() for evt in events]
-    out_file = f"logs_{pr}_{timestamp}.json"
-    json.dump(event_dicts, open(out_file, "w"), indent=2)
-    last_file_stored_to = out_file
+    store_logs()
 
 
 if __name__=="__main__":
-    with open(".target_project", "r") as f:
-        target_project = f.read().strip()
-
-    pr_meta = {
-        "pandas": 29,
-        "scipy": 46
-    }
-    # pr_meta = {
-    #     "pandas": 45,
-    #     "scipy": 50
-    # }
-    pr_file = join("data", "meta", f"chaco_{target_project}_unique_{pr_meta[target_project]}.txt")
-
-    with open(pr_file, "r") as f:
-        prs = f.readlines()
-    pr_list = [int(pr) for pr in prs]
-    for pr in pr_list:
-        reset_logs()
-        start_logging()
-        main(target_project, pr)
-        store_pr_log(pr)
+    main()
