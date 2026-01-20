@@ -867,52 +867,53 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     
     # step 2: to handle the xxx_to_flaky executions
     # double-check differences by re-executing the tests
-    flaky_change_found_list = validate_output_difference(cloned_repo_manager, pr, old_executions_to_flaky, new_executions_to_flaky)
-    for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
-        if flaky_change_found == False: # flaky test gets the same output as before
-            append_event(ComparisonEvent(pr_nb=pr.number, 
-                    message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
+    if old_executions_to_flaky:
+        flaky_change_found_list = validate_output_difference(cloned_repo_manager, pr, old_executions_to_flaky, new_executions_to_flaky)
+        for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
+            if flaky_change_found == False: # flaky test gets the same output as before
+                append_event(ComparisonEvent(pr_nb=pr.number, 
+                        message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
+                        test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
+                continue
+
+            append_event(ComparisonEvent(pr_nb=pr.number,
+                    message=f"Different outputs\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                     test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
-            continue
 
-        append_event(ComparisonEvent(pr_nb=pr.number,
-                message=f"Different outputs\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
-                test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
+            if Config.phase_selection == "all": # run the entire workflow, including test genration and classification. 
+                # if difference found, reduce the test while still observing a difference
+                old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
+                assert old_execution.output != new_execution.output
 
-        if Config.phase_selection == "all": # run the entire workflow, including test genration and classification. 
-            # if difference found, reduce the test while still observing a difference
-            old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
-            assert old_execution.output != new_execution.output
+                # check if new output is still present in head of current main branch
+                if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
+                    append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
 
-            # check if new output is still present in head of current main branch
-            if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
-                append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
+                # find docstrings
+                cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
+                docstrings = retrieve_relevant_docstrings(cloned_repo_of_new_commit, new_execution.code)
 
-            # find docstrings
-            cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
-            docstrings = retrieve_relevant_docstrings(cloned_repo_of_new_commit, new_execution.code)
+                # if difference found, classify regression
+                assert old_execution.code == new_execution.code
+                is_regression_bug = classify_regression(
+                    github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
 
-            # if difference found, classify regression
-            assert old_execution.code == new_execution.code
-            is_regression_bug = classify_regression(
-                github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
+                # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
+                if is_regression_bug:
+                    select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
 
-            # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
-            if is_regression_bug:
-                select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
-
-        elif Config.phase_selection == "test_generation":
-            '''
-            store the breakpoint information for later continuing work:
-            * changed_functions
-            * old_excution (from the tests still show the output difference at this point)
-            * new_excution (the same as above)
-            '''
-            
-            simplified_old_execution = simplify_test_execution(old_executions[idx])
-            simplified_new_execution = simplify_test_execution(new_executions[idx])
-            old_executions_differ_relevant.append(simplified_old_execution)
-            new_executions_differ_relevant.append(simplified_new_execution)
+            elif Config.phase_selection == "test_generation":
+                '''
+                store the breakpoint information for later continuing work:
+                * changed_functions
+                * old_excution (from the tests still show the output difference at this point)
+                * new_excution (the same as above)
+                '''
+                
+                simplified_old_execution = simplify_test_execution(old_executions[idx])
+                simplified_new_execution = simplify_test_execution(new_executions[idx])
+                old_executions_differ_relevant.append(simplified_old_execution)
+                new_executions_differ_relevant.append(simplified_new_execution)
 
     # When need to further classify the different outputs, read the test info from stored files.
     # organize and write the breakpoint data to a local/db file

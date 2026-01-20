@@ -100,22 +100,23 @@ class RunChaCoTests():
         
         # step 2: to handle the xxx_to_flaky executions
         # double-check differences by re-executing the tests
-        flaky_change_found_list = validate_output_difference(self.cloned_repo_manager, self.pr, old_executions_to_flaky, new_executions_to_flaky)
-        for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
-            if flaky_change_found == False: # flaky test gets the same output as before
-                append_event(ComparisonEvent(pr_nb=self.pr.number, 
-                        message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
-                        test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
-                continue
+        if old_executions_to_flaky:
+            flaky_change_found_list = validate_output_difference(self.cloned_repo_manager, self.pr, old_executions_to_flaky, new_executions_to_flaky)
+            for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
+                if flaky_change_found == False: # flaky test gets the same output as before
+                    append_event(ComparisonEvent(pr_nb=self.pr.number, 
+                            message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
+                            test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
+                    continue
 
-            append_event(ComparisonEvent(pr_nb=self.pr.number,
-                    message=f"Different outputs\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
-                    test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
-            
-            simplified_old_execution = simplify_test_execution(old_executions[idx])
-            simplified_new_execution = simplify_test_execution(new_executions[idx])
-            old_executions_differ_relevant.append(simplified_old_execution)
-            new_executions_differ_relevant.append(simplified_new_execution)
+                append_event(ComparisonEvent(pr_nb=self.pr.number,
+                        message=f"Different outputs\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
+                        test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
+                
+                simplified_old_execution = simplify_test_execution(old_executions[idx])
+                simplified_new_execution = simplify_test_execution(new_executions[idx])
+                old_executions_differ_relevant.append(simplified_old_execution)
+                new_executions_differ_relevant.append(simplified_new_execution)
 
         # When need to further classify the different outputs, read the test info from stored files.
         # organize and write the breakpoint data to a local/db file
