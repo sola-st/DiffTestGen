@@ -65,10 +65,13 @@ class OpenAIGPT:
                                               content=f"Will try again in 1 second"))
                         time.sleep(1)
                         continue
-
+                    
+                    content = f"prompt={completion.usage.prompt_tokens}, completion={completion.usage.completion_tokens}"
+                    if hasattr(completion.usage, 'prompt_tokens_details') and hasattr(completion.usage.prompt_tokens_details, 'cached_tokens'):
+                        content += f", cached={completion.usage.prompt_tokens_details.cached_tokens}"
                     append_event(LLMEvent(pr_nb=-1,
                                           message=f"Token usage",
-                                          content=f"prompt={completion.usage.prompt_tokens}, completion={completion.usage.completion_tokens}"))
+                                          content=content))
 
                     answers = []
                     for choice in completion.choices:

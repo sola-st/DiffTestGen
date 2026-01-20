@@ -492,7 +492,7 @@ def generate_tests(pr, github_repo, changed_functions):
         else:
             all_tests.extend(generated_tests)
     else:
-        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is too long. #Round 0"))
+        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is the same as full diff or it is too long. #Round 0"))
     
     # also return the bool values to not check multiple times in the feedback rounds
     return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
