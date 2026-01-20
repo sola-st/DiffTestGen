@@ -254,13 +254,16 @@ class PullRequest:
             pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
             # update self.changed_function_qualified_names_old
             self.changed_function_qualified_names_old_non_public = []
-            self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
-
+            too_many = self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
+            if too_many:
+                return "too many"
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         # update self.changed_function_qualified_names_new
         self.changed_function_qualified_names_new = []
         self.changed_function_qualified_names_new_no_public = []
-        self.get_helper(post_commit_cloned_repo, "new", prompt_base)
+        too_many = self.get_helper(post_commit_cloned_repo, "new", prompt_base)
+        if too_many:
+            return "too many"
 
         # get test function code
         if Config.use_existing_tests == "pr-modified":
@@ -276,9 +279,11 @@ class PullRequest:
             # the server stays alive for the entire workspace
             server = ExtractCallerCallee(cloned_repo.repo.working_dir)
             with server.lsp.start_server(self.target_folder): # start only once, automatic stop, focus on only the given folder
-                self.helper_inner(cloned_repo, version, prompt_base, server)
+                too_many = self.helper_inner(cloned_repo, version, prompt_base, server)
+                if too_many:
+                    return "too many"
         else:
-            self.helper_inner(cloned_repo, version, prompt_base)
+            too_many = self.helper_inner(cloned_repo, version, prompt_base)
 
     def helper_inner(self, cloned_repo, version, prompt_base, server=None):
         code_context = ""
@@ -333,6 +338,10 @@ class PullRequest:
                         code_context_with_line_num_str += "\n"
 
                 if function_names:
+                    if len(function_names) > 10:
+                        append_event(Event(pr_nb=self.number, message=f"Too many changed functions ({len(function_names)})."))
+                        return "too many"
+                        
                     if type(function_names[0]) == tuple: # our approach
                         if Config.call_graph == True:
                             # to build documentation

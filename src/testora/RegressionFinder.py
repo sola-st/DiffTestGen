@@ -474,7 +474,7 @@ def generate_tests(pr, github_repo, changed_functions):
         else:
             all_tests.extend(generated_tests)
     else:
-        append_event(Event(pr_nb=pr.number, message=f"Full diff is too long. #Round {round}"))
+        append_event(Event(pr_nb=pr.number, message=f"Full diff is too long. #Round 0"))
 
     if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
         filtered_diff_len_nonequal_fit = True
@@ -492,7 +492,7 @@ def generate_tests(pr, github_repo, changed_functions):
         else:
             all_tests.extend(generated_tests)
     else:
-        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is too long. #Round {round}"))
+        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is too long. #Round 0"))
     
     # also return the bool values to not check multiple times in the feedback rounds
     return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
@@ -760,7 +760,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     if nb_modified_code_files == 0:
         append_event(Event(pr_nb=pr.github_pr.number, message="Ignoring because no non-test code files were modified"))
         return
-    if nb_modified_code_files > 5:
+    if nb_modified_code_files > 3:
         append_event(Event(pr_nb=pr.number, message="Ignoring because too many non-test code files were modified"))
         return
 
@@ -790,21 +790,9 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         this function will also return the callers and callees of the changed functions 
     '''
     changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
-    # return
-    # note: the initial round do not have converage info.
-
-    # existing developer-written tests
-    # "none": do not make any extra effort about developer-written tests,
-    # "pr-modified": use the PR-modified tests, 
-    # "all": use PR-modified tests + local tests
-    # if Config.use_existing_tests == "all":
-    #     cloned_repo = cloned_repo_manager.get_cloned_repo(pr.post_commit)
-    #     container_name = cloned_repo.container_name
-    #     project_name = cloned_repo_manager.repo_name
-        
-    #     ExtractExistingTests(pr.modified_test_python_files, changed_functions, container_name, project_name).main()
-    #     # TODO also consider the potential pyx issue
-    #     return
+    if changed_functions == "too many":
+        append_event(Event(pr_nb=pr.number, message="Ignoring because too many changed functions"))
+        return
 
     # generate tests via LLM
     generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
@@ -812,11 +800,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     
     if not generated_tests:
         if empty_answer_full_diff == True or empty_answer_filtered_diff == True: # module outputs nothing
-            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round {round}"))
+            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round 0"))
             return 
         
         if not test_msg_pairs_full_diff or not test_msg_pairs_filtered_diff:
-            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round {round}"))
+            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer - no static error) were generated. #Round 0"))
             return 
     
     old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
