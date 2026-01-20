@@ -2,7 +2,7 @@ import argparse
 import json
 from os.path import join, exists
 from os import listdir
-from chacho.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest
+from chaco.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest
 from testora.RegressionFinder import execute_tests_on_commit, get_repo, simplify_test_execution, validate_output_difference
 from testora.execution.TestExecution import TestExecution
 from testora.prompts.RuntimeErrorsFixingPrompt import extract_error_type

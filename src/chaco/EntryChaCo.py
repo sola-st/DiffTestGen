@@ -22,7 +22,7 @@ with open(pr_file, "r") as f:
     prs = f.readlines()
 pr_list = [int(pr) for pr in prs]
 for pr_num in pr_list:
-    subprocess.run(["python", "-m", "chacho.RunChaCoTests", "--project", target_project, "--pr_nb", f"{pr_num}"])
+    subprocess.run(["python", "-m", "chaco.RunChaCoTests", "--project", target_project, "--pr_nb", f"{pr_num}"])
     
 # store the breakpoint data seperately
 bp_data_cur_version = join("data", "results", "breakpoint", "bp_chaco", target_project)
