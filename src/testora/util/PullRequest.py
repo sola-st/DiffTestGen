@@ -445,29 +445,30 @@ class PullRequest:
                             self.changed_function_qualified_names_new.append(f"{module_name}.{func_name}")
 
                 else: # no changed functions
-                    container_name = cloned_repo.container_name
-                    # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
-                    api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
-                    if not exists(api_file): # write it to local for quick repetition
-                        # to build only once per version
-                        # project_name = self.cloned_repo_manager.repo_name
-                        # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
-                        append_event(Event(pr_nb=self.number, message=f"Starting to bulid sphinx documentation ({version})."))
-                        BuildDocumentation(container_name, self.cloned_repo_manager.repo_name, self.number).build()
-                        append_event(Event(pr_nb=self.number, message=f"Done with sphinx bulid ({version})."))
-                    
-                    if version == "old":
-                        # get public apis: self.public_apis_old, self.full_names_old, self.abbr_names_old
-                        self.public_apis_old = get_apis(api_file)
-                    else:
-                        self.public_apis_new = get_apis(api_file)
-                        if Config.private_call_indentification == 2: # this only used for private checking in the generated code
-                            if self.public_apis_old:
-                                self.public_apis_union = (self.public_apis_old[0] + self.public_apis_new[0], 
-                                                        self.public_apis_old[1] + self.public_apis_new[1], 
-                                                        self.public_apis_old[2] + self.public_apis_new[2]) 
-                            else:
-                                self.public_apis_union = self.public_apis_new
+                    if Config.call_graph == True:
+                        container_name = cloned_repo.container_name
+                        # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
+                        api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
+                        if not exists(api_file): # write it to local for quick repetition
+                            # to build only once per version
+                            # project_name = self.cloned_repo_manager.repo_name
+                            # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
+                            append_event(Event(pr_nb=self.number, message=f"Starting to bulid sphinx documentation ({version})."))
+                            BuildDocumentation(container_name, self.cloned_repo_manager.repo_name, self.number).build()
+                            append_event(Event(pr_nb=self.number, message=f"Done with sphinx bulid ({version})."))
+                        
+                        if version == "old":
+                            # get public apis: self.public_apis_old, self.full_names_old, self.abbr_names_old
+                            self.public_apis_old = get_apis(api_file)
+                        else:
+                            self.public_apis_new = get_apis(api_file)
+                            if Config.private_call_indentification == 2: # this only used for private checking in the generated code
+                                if self.public_apis_old:
+                                    self.public_apis_union = (self.public_apis_old[0] + self.public_apis_new[0], 
+                                                            self.public_apis_old[1] + self.public_apis_new[1], 
+                                                            self.public_apis_old[2] + self.public_apis_new[2]) 
+                                else:
+                                    self.public_apis_union = self.public_apis_new
 
                 if functions_code:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
