@@ -61,9 +61,13 @@ class PullRequest:
             self._compute_modified_test_python_files()
         
         if Config.call_graph == True and Config.initial_test_generation_prompt_version == 5:
-            self._prepae_to_use_call_graph()
+            # earlier check whether we should compute the call graph
+            if len(self.full_diff.split("\n")) <= 200 or len(self.filtered_diff.split("\n")) <= 200:
+                self._prepare_to_use_call_graph()
+            else:
+                Config.call_graph == False #  do not compute call graph
 
-    def _prepae_to_use_call_graph(self):
+    def _prepare_to_use_call_graph(self):
         self.public_apis_union = [] # for identifying the private functions in the generated tests
         self.public_apis_old = [] 
         self.public_apis_new = []

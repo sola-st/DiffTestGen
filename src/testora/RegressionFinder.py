@@ -235,8 +235,12 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
     # clean tests
     generated_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests, pr)
 
+    postfix = ""
+    if test_msg_pairs:
+        postfix = "To fix."
+        
     append_event(Event(pr_nb=pr.number,
-            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
+            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. {postfix} #Round {round})"))
     
     name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
@@ -448,17 +452,16 @@ def generate_tests(pr, github_repo, changed_functions):
     all_tests = []
     test_msg_pairs_full_diff = []
     test_msg_pairs_filtered_diff = []
-    empty_answer_full_diff = False
-    empty_answer_filtered_diff = False
 
     full_diff_len_fit = False
     filtered_diff_len_nonequal_fit = False
 
     info_public_and_private = ""
-    if Config.initial_test_generation_prompt_version == 5:
-        info_public_and_private = prepare_call_info(pr)
     
     if len(pr.full_diff.split("\n")) <= 200:
+        if Config.call_graph == True: 
+            info_public_and_private = prepare_call_info(pr)
+
         full_diff_len_fit = True
         prompt_full_diff = None
         # full diff with GPT4, 5
@@ -469,14 +472,15 @@ def generate_tests(pr, github_repo, changed_functions):
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, pr.old_context, pr.new_context)
         
         generated_tests, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff")
-        if type(generated_tests) == dict:
-            empty_answer_full_diff = True # module outputs nothing
-        else:
+        if type(generated_tests) != dict:
             all_tests.extend(generated_tests)
     else:
         append_event(Event(pr_nb=pr.number, message=f"Full diff is too long. #Round 0"))
 
     if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
+        if Config.call_graph == True and not info_public_and_private: 
+            info_public_and_private = prepare_call_info(pr)
+            
         filtered_diff_len_nonequal_fit = True
         prompt_filtered_diff = None
         # filtered diff with GPT4
@@ -487,16 +491,13 @@ def generate_tests(pr, github_repo, changed_functions):
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, pr.old_context, pr.new_context)
         
         generated_tests, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff")
-        if type(generated_tests) == dict:
-            empty_answer_filtered_diff = True
-        else:
+        if type(generated_tests) != dict: # if it is a dict, empty_answer_filtered_diff = True
             all_tests.extend(generated_tests)
     else:
         append_event(Event(pr_nb=pr.number, message=f"Filtered diff is the same as full diff or it is too long. #Round 0"))
     
     # also return the bool values to not check multiple times in the feedback rounds
-    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
-        empty_answer_full_diff, empty_answer_filtered_diff
+    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit
 
 
 def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len_fit, filtered_diff_len_nonequal_fit,
@@ -796,15 +797,11 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
     # generate tests via LLM
     generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
-            empty_answer_full_diff, empty_answer_filtered_diff = generate_tests(pr, github_repo, changed_functions)
+            = generate_tests(pr, github_repo, changed_functions)
     
     if not generated_tests:
-        if empty_answer_full_diff == True or empty_answer_filtered_diff == True: # module outputs nothing
-            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer) were generated. #Round 0"))
-            return 
-        
-        if not test_msg_pairs_full_diff or not test_msg_pairs_filtered_diff:
-            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer - no static error) were generated. #Round 0"))
+        if not test_msg_pairs_full_diff and not test_msg_pairs_filtered_diff:
+            append_event(Event(pr_nb=pr.number, message=f"Ignoring because no tests (empty raw answer + no static error) were generated. #Round 0"))
             return 
     
     old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
@@ -965,7 +962,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             return None, None, None, None
 
     # inner feedback about parse error and 'private' calls
-    if Config.fix_static_error == True and round == 0:
+    if Config.fix_static_error == True:
         inner_round = 0
         while test_msg_pairs_full_diff or test_msg_pairs_filtered_diff:
             if inner_round >= Config.error_feedback_max: 

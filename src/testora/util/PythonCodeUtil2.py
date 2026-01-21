@@ -271,7 +271,7 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
                 else:
                     return True
             else:
-                return False
+                return True
     
     # 2: for the general changed function and caller function check 
     import_line = ""
