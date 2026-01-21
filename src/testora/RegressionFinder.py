@@ -416,9 +416,6 @@ def prepare_call_info(pr):
                     call_graph_info_str_funcs += call_graph_info_str_function_level
         
         if call_graph_info_str_funcs:
-            # if "by triggering special method" in call_graph_info_str_funcs:
-            #     to_add_special_method_intro = True
-
             call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
             info_public_and_private += f"{call_graph_info_str}\n"
 
@@ -429,17 +426,6 @@ def prepare_call_info(pr):
             # add the relevant class hover texts
             # for module_endswith_class, hover_text in pr.class_hover_texts.items():
             info_public_and_private += "\n".join(pr.class_hover_texts)
-
-        # # 4: special method intro
-        # if to_add_special_method_intro == True:
-        #     special_method_intro = (
-        #         f"The following lists the available ways to access the affected functions. "
-        #         f"If any access way mentions a special method, its behavior follows Python's official documentation. "
-        #         f"To use the special method, write code that triggers it naturally, "
-        #         f"e.g., the expression 'a + b' automatically calls '__add__'. "
-        #         f"If no natural operation makes sense for a given special method, it is also fine to call it directly.\n"
-        #     ) # add only once, and add only if the special method is consider as the entry function
-        #     info_public_and_private = f"{special_method_intro}\n{info_public_and_private}"
 
     append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
     # exit()
@@ -1043,11 +1029,11 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     execute_tests_on_commit(cloned_repo_manager, pr, old_executions_cur_round, pr.pre_commit, "old")
     execute_tests_on_commit(cloned_repo_manager, pr, new_executions_cur_round, pr.post_commit, "new")
 
-    # early stop for PRs with no executable modified lines
-    if ("(0/0)" in old_executions_cur_round[0].coverage_percentage) and ("(0/0)" in new_executions_cur_round[0].coverage_percentage):
-        append_event(Event(pr_nb=pr.number, message="Ignoring because no executable modified code lines/statements."))
-        # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
-        return None, None, None, None
+    # # early stop for PRs with no executable modified lines
+    # if ("(0/0)" in old_executions_cur_round[0].coverage_percentage) and ("(0/0)" in new_executions_cur_round[0].coverage_percentage):
+    #     append_event(Event(pr_nb=pr.number, message="Ignoring because no executable modified code lines/statements."))
+    #     # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
+    #     return None, None, None, None
 
     if Config.use_error_feedback == True: # runtime error, inner loop
         '''

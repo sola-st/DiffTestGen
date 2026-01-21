@@ -17,13 +17,13 @@ with open(".target_project", "r") as f:
     target_project = f.read().strip()
     
 # marshmallow 53, keras 133, pandas 128, scipy 129
-num = 53
+num = 65
 if target_project == "keras":
-    num = 133
+    num = 160
 elif target_project == "pandas":
-    num = 128
+    num = 143
 elif target_project == "scipy":
-    num = 129
+    num = 157
 
 pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
 if pr_split_num:
