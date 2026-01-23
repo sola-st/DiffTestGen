@@ -2,12 +2,56 @@ import argparse
 import json
 from os.path import join, exists
 from os import listdir
+import re
 from chaco.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest
-from testora.RegressionFinder import execute_tests_on_commit, get_repo, simplify_test_execution, validate_output_difference
+from chaco.ChaCoDockerExecutor import ChaCoDockerExecutor
+from testora.RegressionFinder import execute_test, get_repo, simplify_test_execution, validate_output_difference
 from testora.execution.TestExecution import TestExecution
-from testora.prompts.RuntimeErrorsFixingPrompt import extract_error_type
-from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, append_event, start_logging, store_logs
+from testora.util.Exceptions import TestoraException
+from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, TestExecutionEvent, append_event, start_logging, store_logs
 
+
+def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, version):
+    cloned_repo = cloned_repo_manager.get_cloned_repo(commit)
+    container_name = cloned_repo.container_name
+    docker_executor = ChaCoDockerExecutor(pr, container_name,
+            project_name=cloned_repo_manager.repo_name,
+            coverage_files=pr.non_test_modified_python_files)
+
+    append_event(
+        Event(pr_nb=-1, message=f"Compiling {cloned_repo_manager.repo_name} at commit {commit} in container {container_name}"))
+
+    # to trigger re-compilation (e.g., for pandas or scikit-learn)
+    docker_executor.execute_python_code(f"import {cloned_repo_manager.module_name}")
+
+    append_event(
+        Event(pr_nb=pr.number, message=f"Done with compiling {cloned_repo_manager.repo_name} at commit {commit}"))
+
+    try:
+        for test_execution in test_executions:
+            execute_test(test_execution, docker_executor, version)
+            append_event(TestExecutionEvent(pr_nb=pr.number,
+                                            message=f"Test execution ({version})",
+                                            code=test_execution.code,
+                                            output=test_execution.output))
+    except RecursionError as e:
+        raise TestoraException(f"Exception during merge_tests_and_execute: {str(e)}")
+    
+def extract_error_type(execution_output):
+    # only focus on tracback reported errors.
+    error_type = None
+
+    # if error exists, extract the error message
+    if "=========================== short test summary info ============================" in execution_output:
+        post = execution_output.split("=========================== short test summary info ============================")[1]
+        output_lines:list = post.splitlines()
+        for line in output_lines:
+            error_type = re.findall(r'^(\S*Error:)\b', line)
+            if error_type:
+                break
+
+    return error_type
+    
 class RunChaCoTests():
     def __init__(self, github_repo, cloned_repo_manager, pr):
         self.github_repo = github_repo
@@ -26,11 +70,11 @@ class RunChaCoTests():
         execute_tests_on_commit(self.cloned_repo_manager, self.pr, old_executions, self.pr.pre_commit, "old")
         execute_tests_on_commit(self.cloned_repo_manager, self.pr, new_executions, self.pr.post_commit, "new")
 
-        # early stop for PRs with no executable modified lines
-        if ("(0/0)" in old_executions[0].coverage_percentage) and ("(0/0)" in new_executions[0].coverage_percentage):
-            append_event(Event(pr_nb=self.pr.number, message="Ignoring because no executable modified code lines/statements."))
-            # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
-            return 
+        # # early stop for PRs with no executable modified lines
+        # if ("(0/0)" in old_executions[0].coverage_percentage) and ("(0/0)" in new_executions[0].coverage_percentage):
+        #     append_event(Event(pr_nb=self.pr.number, message="Ignoring because no executable modified code lines/statements."))
+        #     # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
+        #     return 
         
         all_covered_modified_stmts_old = []
         all_covered_modified_stmts_new = []
