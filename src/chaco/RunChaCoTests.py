@@ -2,14 +2,23 @@ import argparse
 import json
 from os.path import join, exists
 from os import listdir
-import re
 from chaco.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest
 from chaco.ChaCoDockerExecutor import ChaCoDockerExecutor
-from testora.RegressionFinder import execute_test, get_repo, simplify_test_execution, validate_output_difference
+from testora.RegressionFinder import get_repo, simplify_test_execution, validate_output_difference
 from testora.execution.TestExecution import TestExecution
 from testora.util.Exceptions import TestoraException
 from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, TestExecutionEvent, append_event, start_logging, store_logs
 
+
+def execute_test(test_execution, docker_executor, version):
+    # True -> to analyze the coverage info inside the container
+    analysis = True
+    if version == "main":
+        analysis = False # Do not check coverage info when run tests at main. 1. in case the file does not exist in main 2. save time
+    output, coverage_report = docker_executor.execute_python_code(test_execution.code, \
+            analysis, version=version, test_execution=test_execution)
+    test_execution.output = output
+    test_execution.coverage_report = coverage_report
 
 def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, version):
     cloned_repo = cloned_repo_manager.get_cloned_repo(commit)
@@ -37,21 +46,6 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
     except RecursionError as e:
         raise TestoraException(f"Exception during merge_tests_and_execute: {str(e)}")
     
-def extract_error_type(execution_output):
-    # only focus on tracback reported errors.
-    error_type = None
-
-    # if error exists, extract the error message
-    if "=========================== short test summary info ============================" in execution_output:
-        post = execution_output.split("=========================== short test summary info ============================")[1]
-        output_lines:list = post.splitlines()
-        for line in output_lines:
-            error_type = re.findall(r'^(\S*Error:)\b', line)
-            if error_type:
-                break
-
-    return error_type
-    
 class RunChaCoTests():
     def __init__(self, github_repo, cloned_repo_manager, pr):
         self.github_repo = github_repo
@@ -69,12 +63,6 @@ class RunChaCoTests():
 
         execute_tests_on_commit(self.cloned_repo_manager, self.pr, old_executions, self.pr.pre_commit, "old")
         execute_tests_on_commit(self.cloned_repo_manager, self.pr, new_executions, self.pr.post_commit, "new")
-
-        # # early stop for PRs with no executable modified lines
-        # if ("(0/0)" in old_executions[0].coverage_percentage) and ("(0/0)" in new_executions[0].coverage_percentage):
-        #     append_event(Event(pr_nb=self.pr.number, message="Ignoring because no executable modified code lines/statements."))
-        #     # return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
-        #     return 
         
         all_covered_modified_stmts_old = []
         all_covered_modified_stmts_new = []
@@ -112,35 +100,15 @@ class RunChaCoTests():
 
             # check for behavioral differences
             difference_found = old_execution.output != new_execution.output
-            old_error_type = extract_error_type(old_execution.output)
-            new_error_type = extract_error_type(new_execution.output)
 
-            if old_error_type == new_error_type:
-                if old_error_type != None: # same error type exists in both version
-                    append_event(ComparisonEvent(pr_nb=self.pr.number,
-                        message=f"Both tests failed with error {old_error_type}, considering them the same\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
-                        test_code=old_execution.code, old_output=old_execution.output,
-                        new_output=new_execution.output))
-                else: # no errors, go for flaky tests
-                    if difference_found:
-                        old_executions_to_flaky.append(old_execution)
-                        new_executions_to_flaky.append(new_execution)
-                        flaky_indices.append(i)
-                    else:
-                        append_event(ComparisonEvent(pr_nb=self.pr.number, 
-                                message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
-                                test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
+            if difference_found:
+                old_executions_to_flaky.append(old_execution)
+                new_executions_to_flaky.append(new_execution)
+                flaky_indices.append(i)
             else:
-                # 1. error exists in one version,
-                # 2. two different error types
-                append_event(ComparisonEvent(pr_nb=self.pr.number,
-                        message=f"Different outputs\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
+                append_event(ComparisonEvent(pr_nb=self.pr.number, 
+                        message=f"Same output\nCovered lines in old: {old_covered}, Covered lines in new: {new_covered}",
                         test_code=old_execution.code, old_output=old_execution.output, new_output=new_execution.output))
-                
-                simplified_old_execution = simplify_test_execution(old_execution)
-                simplified_new_execution = simplify_test_execution(new_execution)
-                old_executions_differ_relevant.append(simplified_old_execution)
-                new_executions_differ_relevant.append(simplified_new_execution)
         
         # step 2: to handle the xxx_to_flaky executions
         # double-check differences by re-executing the tests

@@ -6,7 +6,27 @@ import tarfile
 import tempfile
 from os.path import join
 from os import chdir, getcwd
+import xml.etree.ElementTree as ET
 
+
+def get_pass_fail_tests(xml_file):
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+
+    # pytest may wrap in <testsuites><testsuite>...</testsuite></testsuites>
+    if root.tag == "testsuites":
+        suite = root.find("testsuite")
+    else:
+        suite = root
+
+    tests = int(suite.attrib.get("tests", 0))
+    failures = int(suite.attrib.get("failures", 0))
+    errors = int(suite.attrib.get("errors", 0))
+    skipped = int(suite.attrib.get("skipped", 0))
+
+    passed = tests - failures - errors - skipped
+    failed = failures + errors
+    return passed, failed
 
 class ChaCoDockerExecutor:
     def __init__(self, pr, container_name, project_name, coverage_files):
@@ -67,7 +87,7 @@ class ChaCoDockerExecutor:
         command = (
             f"timeout 300s python -u -m coverage run "
             f"--include={coverage_files} "
-            f"--data-file /tmp/coverage_report -m pytest -q /tmp/Testora/Testora_test_code.py"
+            f"--data-file /tmp/coverage_report -m pytest /tmp/Testora/Testora_test_code.py --junitxml=/tmp/report.xml"
         )
 
         # for scipy and numpy, make sure we run inside the their dev environment
@@ -90,8 +110,29 @@ class ChaCoDockerExecutor:
                 f"' && mamba activate numpy-dev && {command}'"
             )
 
-        exec_result = self.container.exec_run(command)
-        output = exec_result.output.decode("utf-8")
+        # exec_result = self.container.exec_run(command)
+        # output = exec_result.output.decode("utf-8")
+        self.container.exec_run(command)
+                # After running the pytest command in the container...
+        # Instead of: output = get_pass_fail_tests("/tmp/report.xml")
+        
+        # Run the parsing inside the container
+        parse_command = (
+            'python -c "'
+            'import xml.etree.ElementTree as ET; '
+            'tree = ET.parse(\'/tmp/report.xml\'); '
+            'root = tree.getroot(); '
+            'suite = root.find(\'testsuite\') if root.tag == \'testsuites\' else root; '
+            'tests = int(suite.attrib.get(\'tests\', 0)); '
+            'failures = int(suite.attrib.get(\'failures\', 0)); '
+            'errors = int(suite.attrib.get(\'errors\', 0)); '
+            'skipped = int(suite.attrib.get(\'skipped\', 0)); '
+            'passed = tests - failures - errors - skipped; '
+            'failed = failures + errors; '
+            'print(passed, failed)"'
+        )
+        exec_result = self.container.exec_run(parse_command)
+        output = f"The number of passed and failed tests: {exec_result.output.decode().strip()}"
 
         if analysis == True:
             # copy CoverageAnalyzer.py to the container root directory
