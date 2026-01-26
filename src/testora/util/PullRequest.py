@@ -834,13 +834,18 @@ class PullRequest:
                                 # we do not check more info, like 'new_path' in the else branch, because this will be an early stop
                             else:
                                 new_path_detailed = [call_function] + path_detailed
-                                if new_signature_docstring: # found the public function
-                                    append_event(Event(pr_nb=self.number, message=f"The hover text length of caller function '{next_func}': {len(new_signature_docstring)}."))
+                                if new_signature_docstring or (next_func.startswith("__") and next_func.endswith("__")): # found the public function or special method entry
                                     # * From file {caller['relativePath']}:\n
                                     # new_ref_imports_to_queue = f"To access function '{next_func}': {new_ref_import}\n"
                                     # signature_docstring_to_queue = f"Signature and docstrings (if available) of function '{next_func}': {new_signature_docstring}\n"
-                                    new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
+                                    if new_signature_docstring:
+                                        append_event(Event(pr_nb=self.number, message=f"The hover text length of caller function '{next_func}': {len(new_signature_docstring)}."))
+                                        new_ref_imports_to_queue = f"To access it: {new_ref_import}\n"
+                                    else:
+                                        new_ref_imports_to_queue = f"* To trigger entry function '{next_func}', which is a special method of the class '{parent_class[0]}', access the class with: {new_ref_import}"
+                                    
                                     signature_docstring_to_queue = f"Its signature and docstrings (if available): {new_signature_docstring}\n"
+                                
                             queue.append((next_func, next_rel_path, next_line, next_col, new_path, new_path_detailed, new_ref_imports_to_queue, signature_docstring_to_queue))
                         else:
                             path_str = ", ".join(map(str,  [call_function] + path_detailed))

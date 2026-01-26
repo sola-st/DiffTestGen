@@ -317,7 +317,11 @@ def prepare_call_info(pr):
         offical_special_methods_file = "src/testora/util/special_methods.txt"
         with open(offical_special_methods_file, "r") as f:
             offical_special_methods_tmp = f.readlines()
-            offical_special_method_guidelines = [{methods.split("\t")[0]: methods} for methods in offical_special_methods_tmp if methods.startswith("__")]
+            offical_special_method_guidelines_tmp = [{methods.split(" ", 1)[0]: methods} for methods in offical_special_methods_tmp if methods.startswith("__")]
+            offical_special_method_guidelines = {}
+            for d in offical_special_method_guidelines_tmp:
+                offical_special_method_guidelines.update(d)
+
 
         # 1: for public functions
         import_lines_info = ""
@@ -329,7 +333,8 @@ def prepare_call_info(pr):
                     if "is a special method of the class" in imline:
                         # Example: To trigger changed method '{fully_qulified_name}' ...
                         # From file PullRequest.py
-                        fully_qulaified_name = re.search(r"To trigger changed method '([^']+)', which is a special method of the class", imline)
+                        fully_qulaified_name = re.search([r"To trigger changed method '([^']+)', which is a special method of the class", 
+                                r"To trigger entry function '([^']+)', which is a special method of the class"], imline)
                         special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
                         try: # ideally should always exists, no errors
                             special_method_explaination = offical_special_method_guidelines[special_method]

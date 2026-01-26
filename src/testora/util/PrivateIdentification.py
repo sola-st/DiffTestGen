@@ -153,10 +153,19 @@ def has_private_accesses_or_fails_to_parse_api_lsp(codes: list, pr):
     # 3. start to check the test codes
     with pre_server.lsp.start_server():
         with post_server.lsp.start_server():
+            # for special methods
+            offical_special_methods_file = "src/testora/util/special_methods.txt"
+            with open(offical_special_methods_file, "r") as f:
+                offical_special_methods_tmp = f.readlines()
+                offical_special_method_guidelines_tmp = [{methods.split(" ", 1)[0]: methods} for methods in offical_special_methods_tmp if methods.startswith("__")]
+                offical_special_method_guidelines = {}
+                for d in offical_special_method_guidelines_tmp:
+                    offical_special_method_guidelines.update(d)
+
             # the lsp will incrementally check the newly added test code file
             for i, test in enumerate(codes):
                 indexed_file_path = test_file_rel_path.replace(".py", f"_{i}.py")
-                has, static_error_msg = private_identification_helper(test, pre_server, post_server, indexed_file_path, pr.public_apis_union)
+                has, static_error_msg = private_identification_helper(test, pre_server, post_server, indexed_file_path, pr.public_apis_union, offical_special_method_guidelines)
                 if has == False:
                     result.append(test)
                 else:
@@ -170,7 +179,7 @@ def has_private_accesses_or_fails_to_parse_api_lsp(codes: list, pr):
 
     return result, test_msg_pairs
 
-def private_identification_helper(code, pre_server, post_server, test_file_rel_path, public_apis_union):
+def private_identification_helper(code, pre_server, post_server, test_file_rel_path, public_apis_union, offical_special_method_guidelines):
     has_error = False
     static_error_msg = None
     try:
@@ -189,9 +198,14 @@ def private_identification_helper(code, pre_server, post_server, test_file_rel_p
     # private_callees = list({tuple(sorted(d.items())): d for d in (private_callees_old + private_callees_new)}.values()) # for dict
     
     if private_callees:
+        special_methods_guidelines_str = ""
+        special_methods_guidelines = [f"Hints for triggering special method {offical_special_method_guidelines[callee]}" for callee in private_callees if callee.startswith("__") and callee.endswith("__")]
+        if special_methods_guidelines:
+            special_methods_guidelines_str = "\n ".join(private_callees)
+        
         has_error = True 
         private_callees_str = ", ".join(private_callees)
-        static_error_msg = f"The code snippet accesses the following function(s)/attribute(s), which is not part of the public API: {private_callees_str}."
+        static_error_msg = f"The code snippet accesses the following function(s)/attribute(s), which is not part of the public API: {private_callees_str}.\n{special_methods_guidelines_str}"
 
     return has_error, static_error_msg
 
@@ -203,7 +217,9 @@ def check_callees(callees, container_repo_path, public_apis_union):
             range_starts_at1 = range(callee["line"]+1, callee["line"]+2) # +1 to start at 1, +1 to be a right-open range
             module = callee["relative"].replace("src/", "", 1).replace(".py", "").replace("/", ".")
             parent_class = get_callee_function_parent_class(join(container_repo_path, callee["relative"]), range_starts_at1)
-            if is_public(None, None, module, parent_class, callee["callee_name"], public_apis_union, None, return_bool=True) == False: 
+            if callee["callee_name"].startswith("__") and callee["callee_name"].endswith("__"): # special methods
+                private_callees.append(callee["callee_name"])
+            elif is_public(None, None, module, parent_class, callee["callee_name"], public_apis_union, None, return_bool=True) == False: 
                 # private function and protected attribution = not in api list + startswith "_"
                 private_callees.append(callee["callee_name"])
                     
