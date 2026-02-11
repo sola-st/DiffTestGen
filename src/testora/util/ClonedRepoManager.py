@@ -63,6 +63,8 @@ class ClonedRepoManager:
             cloned_repo.git.reset('--hard')
             if "pandas" in self.repo_name or "scipy" in self.repo_name:
                 cloned_repo.git.clean('-f', '-d', '-e', 'doc/source/_build/')
+            elif "keras" in self.repo_name:
+                cloned_repo.git.clean('-f', '-d', '-e', 'docs')
             else:
                 cloned_repo.git.clean('-f', '-d')
             origin = cloned_repo.remotes.origin

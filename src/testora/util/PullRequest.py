@@ -351,7 +351,11 @@ class PullRequest:
                             # to build documentation
                             container_name = cloned_repo.container_name
                             # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
-                            api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
+                            api_file_name = "objects.inv"
+                            if self.cloned_repo_manager.repo_name == "keras":
+                                api_file_name = "keras_objects.txt"
+                            api_file = f"apis/api_{container_name}_{self.number}/{api_file_name}"
+                            
                             if not exists(api_file): # write it to local for quick repetition
                                 # to build only once per version
                                 # project_name = self.cloned_repo_manager.repo_name

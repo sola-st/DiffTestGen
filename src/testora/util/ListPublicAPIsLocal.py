@@ -34,10 +34,14 @@ The roles represent Python language constructs that can appear in objects.inv en
 '''
 
 
-import sphobjinv as soi
-from pathlib import Path
-
 def get_apis(path):
+    if "keras" in path:
+        all_apis, full_names, abbr_names = get_apis_keras(path)
+        return all_apis, full_names, abbr_names
+    
+    import sphobjinv as soi
+    from pathlib import Path
+    
     all_apis = []
     full_names = []
     abbr_names = []
@@ -66,6 +70,40 @@ def get_apis(path):
                     full_names.append(o.name)
                     abbr_names.append(name)
                 all_apis.append(name)
+
+    # the order of the full and abbr name could differ, so here we do a second round check to update the names
+    all_relevant_apis = []
+    for full, abbr in zip(full_names, abbr_names):
+        tmp = [(idx, full, abbr) for idx, api in enumerate(all_apis) if abbr in api]
+        all_relevant_apis.extend(tmp)
+
+    for triple in all_relevant_apis:
+        idx, full, abbr = triple
+        all_apis[idx] = all_apis[idx].replace(abbr, full)
+
+    return all_apis, full_names, abbr_names
+
+
+def get_apis_keras(path):
+    all_apis = []
+    full_names = []
+    abbr_names = []
+
+    with open(path, "r") as f:
+        apis_rows = f.readlines()
+    
+    for row in apis_rows:
+        full_name, role, abbr_name_expr = row.split("\t")
+
+        # check whether a abbr. qualified name exists
+        if "#$" in abbr_name_expr: 
+            all_apis.append(full_name)
+        else:
+            name = abbr_name_expr.split("#")[1]
+            if full_name not in full_names and name not in abbr_names:
+                full_names.append(full_name)
+                abbr_names.append(name)
+            all_apis.append(name)
 
     # the order of the full and abbr name could differ, so here we do a second round check to update the names
     all_relevant_apis = []
