@@ -98,11 +98,16 @@ class ChaCoDockerExecutor:
             #     f" && {command}'"
             # )
             command = (
-                "bash -c '"
-                "source /root/conda/etc/profile.d/conda.sh"
-                " && conda activate scipy-dev"
+                f"bash -c 'source /root/conda/etc/profile.d/conda.sh"
+                f" && eval \"$(mamba shell hook --shell bash)\" && mamba activate scipy-dev"
                 f" && {command}'"
             )
+            # command = (
+            #     "bash -c '"
+            #     "source /root/conda/etc/profile.d/conda.sh"
+            #     " && conda activate scipy-dev"
+            #     f" && {command}'"
+            # )
         elif self.container.name.startswith("numpy-dev"):
             command = (
                 f"bash -c 'source /root/conda/etc/profile.d/conda.sh"

@@ -37,10 +37,10 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
         Event(pr_nb=pr.number, message=f"Done with compiling {cloned_repo_manager.repo_name} at commit {commit}"))
 
     try:
-        for test_execution in test_executions:
+        for i, test_execution in enumerate(test_executions):
             execute_test(test_execution, docker_executor, version)
             append_event(TestExecutionEvent(pr_nb=pr.number,
-                                            message=f"Test execution ({version})",
+                                            message=f"Test execution #test_{i} ({version})",
                                             code=test_execution.code,
                                             output=test_execution.output))
     except RecursionError as e:
