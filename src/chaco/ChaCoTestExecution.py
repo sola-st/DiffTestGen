@@ -5,6 +5,7 @@ from typing import Optional
 @dataclass
 class ChaCoTestExecution:
     code: str
+    test_idx: Optional[str] = None # expected to get from the test file name, e.g., # Test test_123
     output: Optional[str] = None # to summarize the number of failed and passed tests, and records which tests are failed
     raw_output: Optional[str] = None
     # coverage_report: Optional[str] = None

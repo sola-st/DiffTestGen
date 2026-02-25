@@ -16,6 +16,7 @@ def execute_test(test_execution, docker_executor, version):
     if version == "main":
         analysis = False # Do not check coverage info when run tests at main. 1. in case the file does not exist in main 2. save time
     raw_output, output = docker_executor.execute_python_code(test_execution.code, analysis, version=version, test_execution=test_execution)
+    test_execution.test_idx = test_execution.code.splitlines()[0] # extract test index from the first line of the code (e.g., "# Test test_123" -> "test_123")
     test_execution.output = output
     test_execution.raw_output = raw_output
 
@@ -36,10 +37,10 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
         Event(pr_nb=pr.number, message=f"Done with compiling {cloned_repo_manager.repo_name} at commit {commit}"))
 
     try:
-        for i, test_execution in enumerate(test_executions):
+        for test_execution in test_executions:
             execute_test(test_execution, docker_executor, version)
             append_event(ChaCoTestExecutionEvent(pr_nb=pr.number,
-                                            message=f"Test execution #test_{i} ({version})",
+                                            message=f"Test execution {test_execution.test_idx} ({version})",
                                             code=test_execution.code,
                                             output=test_execution.output,
                                             raw_output=test_execution.raw_output))
@@ -152,7 +153,8 @@ def get_generated_tests(project, pr_nb):
         for file in test_files:
             with open(join(test_folder, file), "r") as f:
                 test_code = f.readlines()
-                generated_tests.append("".join(test_code))
+                test_idx = file.split("_")[1].replace(".py", "") # extract test index from filename (e.g., "test_123.py" -> "test_123")
+                generated_tests.append(f"# Test_{test_idx}\n" + "".join(test_code))
     
     return generated_tests
     
