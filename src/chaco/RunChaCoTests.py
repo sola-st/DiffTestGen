@@ -4,10 +4,10 @@ from os.path import join, exists
 from os import listdir
 from chaco.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest
 from chaco.ChaCoDockerExecutor import ChaCoDockerExecutor
+from chaco.ChaCoTestExecution import ChaCoTestExecution
 from testora.RegressionFinder import get_repo, simplify_test_execution, validate_output_difference
-from testora.execution.TestExecution import TestExecution
 from testora.util.Exceptions import TestoraException
-from testora.util.Logs import ComparisonEvent, CoverageEvent, Event, PREvent, TestExecutionEvent, append_event, start_logging, store_logs
+from testora.util.Logs import ChaCoTestExecutionEvent, ComparisonEvent, CoverageEvent, Event, PREvent, append_event, start_logging, store_logs
 
 
 def execute_test(test_execution, docker_executor, version):
@@ -15,10 +15,9 @@ def execute_test(test_execution, docker_executor, version):
     analysis = True
     if version == "main":
         analysis = False # Do not check coverage info when run tests at main. 1. in case the file does not exist in main 2. save time
-    output, coverage_report = docker_executor.execute_python_code(test_execution.code, \
-            analysis, version=version, test_execution=test_execution)
+    raw_output, output = docker_executor.execute_python_code(test_execution.code, analysis, version=version, test_execution=test_execution)
     test_execution.output = output
-    test_execution.coverage_report = coverage_report
+    test_execution.raw_output = raw_output
 
 def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, version):
     cloned_repo = cloned_repo_manager.get_cloned_repo(commit)
@@ -39,10 +38,11 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
     try:
         for i, test_execution in enumerate(test_executions):
             execute_test(test_execution, docker_executor, version)
-            append_event(TestExecutionEvent(pr_nb=pr.number,
+            append_event(ChaCoTestExecutionEvent(pr_nb=pr.number,
                                             message=f"Test execution #test_{i} ({version})",
                                             code=test_execution.code,
-                                            output=test_execution.output))
+                                            output=test_execution.output,
+                                            raw_output=test_execution.raw_output))
     except RecursionError as e:
         raise TestoraException(f"Exception during merge_tests_and_execute: {str(e)}")
     
@@ -58,8 +58,8 @@ class RunChaCoTests():
         append_event(Event(pr_nb=self.pr.number, message=f"Run {len(generated_tests)} tests."))
         
         # execute tests
-        old_executions = [TestExecution(t) for t in generated_tests]
-        new_executions = [TestExecution(t) for t in generated_tests]
+        old_executions = [ChaCoTestExecution(t) for t in generated_tests]
+        new_executions = [ChaCoTestExecution(t) for t in generated_tests]
 
         execute_tests_on_commit(self.cloned_repo_manager, self.pr, old_executions, self.pr.pre_commit, "old")
         execute_tests_on_commit(self.cloned_repo_manager, self.pr, new_executions, self.pr.post_commit, "new")
@@ -115,7 +115,7 @@ class RunChaCoTests():
         if old_executions_to_flaky:
             flaky_change_found_list = validate_output_difference(self.cloned_repo_manager, self.pr, old_executions_to_flaky, new_executions_to_flaky)
             for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
-                if flaky_change_found == False: # flaky test gets the same output as before
+                if flaky_change_found == True: # flaky test gets the different outputs as before, consider as the same
                     append_event(ComparisonEvent(pr_nb=self.pr.number, 
                             message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                             test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))

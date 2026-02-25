@@ -115,16 +115,14 @@ class ChaCoDockerExecutor:
                 f"' && mamba activate numpy-dev && {command}'"
             )
 
-        # exec_result = self.container.exec_run(command)
-        # output = exec_result.output.decode("utf-8")
-        self.container.exec_run(command)
-                # After running the pytest command in the container...
-        # Instead of: output = get_pass_fail_tests("/tmp/report.xml")
+        exec_result = self.container.exec_run(command)
+        raw_output = exec_result.output.decode("utf-8")
         
         # Run the parsing inside the container
         parse_command = (
             'python -c "'
             'import xml.etree.ElementTree as ET; '
+            'import json; '
             'tree = ET.parse(\'/tmp/report.xml\'); '
             'root = tree.getroot(); '
             'suite = root.find(\'testsuite\') if root.tag == \'testsuites\' else root; '
@@ -134,10 +132,13 @@ class ChaCoDockerExecutor:
             'skipped = int(suite.attrib.get(\'skipped\', 0)); '
             'passed = tests - failures - errors - skipped; '
             'failed = failures + errors; '
-            'print(passed, failed)"'
+            'failed_tests = [tc.attrib.get(\'name\', \'\') for tc in suite.findall(\'testcase\') if tc.find(\'failure\') is not None or tc.find(\'error\') is not None]; '
+            'failed_tests.sort(); '
+            'result = {\'passed\': passed, \'failed\': failed, \'failed_tests\': failed_tests}; '
+            'print(json.dumps(result))"'
         )
         exec_result = self.container.exec_run(parse_command)
-        output = f"The number of passed and failed tests: {exec_result.output.decode().strip()}"
+        output = exec_result.output.decode().strip()
 
         if analysis == True:
             # copy CoverageAnalyzer.py to the container root directory
@@ -180,8 +181,4 @@ class ChaCoDockerExecutor:
 
             self.container.exec_run("rm -rf CoverageAnalyzer.py")
             
-        self.copy_file_from_container("/tmp/coverage_report", ".")
-        with open("coverage_report", "rb") as f:
-            coverage_report = f.read()
-            return output, coverage_report
-
+        return raw_output, output

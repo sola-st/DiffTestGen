@@ -22,6 +22,10 @@ class TestExecutionEvent(Event):
     code: str
     output: str
 
+class ChaCoTestExecutionEvent(Event):
+    code: str
+    output: str
+    raw_output: str
 
 class ComparisonEvent(Event):
     test_code: str
