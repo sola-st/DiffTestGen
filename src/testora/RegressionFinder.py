@@ -324,6 +324,8 @@ def prepare_call_info(pr):
 
 
         # 1: for public functions
+        patterns = [r"To trigger changed method '([^']+)', which is a special method of the class", 
+                r"To trigger entry function '([^']+)', which is a special method of the class"]
         import_lines_info = ""
         for label, import_lines in pr.public_func_imports.items():
             import_lines_info_sub = ""
@@ -333,9 +335,11 @@ def prepare_call_info(pr):
                     if "is a special method of the class" in imline:
                         # Example: To trigger changed method '{fully_qulified_name}' ...
                         # From file PullRequest.py
-                        fully_qulaified_name = re.search([r"To trigger changed method '([^']+)', which is a special method of the class", 
-                                r"To trigger entry function '([^']+)', which is a special method of the class"], imline)
-                        special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
+                        special_method = ""
+                        for pattern in patterns:
+                            fully_qulaified_name = re.search(pattern, imline)
+                            special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
+                            break
                         try: # ideally should always exists, no errors
                             special_method_explaination = offical_special_method_guidelines[special_method]
                             # update imline
