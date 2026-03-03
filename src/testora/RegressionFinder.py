@@ -38,7 +38,6 @@ from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorP
 from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
-from testora.util.ExtractExistingTests import ExtractExistingTests
 from testora.util.PrivateIdentification import has_private_accesses_or_fails_to_parse_api_lsp
 from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
@@ -437,6 +436,7 @@ def prepare_call_info(pr):
             info_public_and_private += "\n".join(pr.class_hover_texts)
 
     append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
+    return info_public_and_private
     # exit()
     
 def generate_tests(pr, github_repo, changed_functions):

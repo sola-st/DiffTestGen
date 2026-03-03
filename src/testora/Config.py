@@ -40,16 +40,16 @@ iteration = 0
 classification_prompt_version = 4
 
 # different prompts for initial round (0th) test generation
-initial_test_generation_prompt_version = 2
+initial_test_generation_prompt_version = 5
 
 # different prompts for feedback rounds (1th - {max_round}th) test generation
 # 0 indicates no feedback loop (original version Testora)
-feedback_test_generation_prompt_version = 2
+feedback_test_generation_prompt_version = 8
 
 # different versions of contexts
 # it follows a similar version above, but versions 2 and 3 are from the same implementation
 # the implementation can return for both the versions, use one or both the returned info as needed.
-context_version = 2 # available from 1 to 8 (with 2 and 3 direct to the same implementation)
+context_version = 8 # available from 1 to 8 (with 2 and 3 direct to the same implementation)
 
 
 # full_coverage_level = "union" # valid values: "union", "single"
@@ -58,7 +58,7 @@ phase_selection = "test_generation" # valid values: "test_generation", "all"
 use_error_feedback = True # runtime rror
 error_feedback_max = 5 # for both static and runtime fix
 
-fix_static_error = False
+fix_static_error = True
 
 # existing developer-written tests
 # None: do not make any extra effort about developer-written tests,

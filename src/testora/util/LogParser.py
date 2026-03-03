@@ -107,18 +107,20 @@ class PRResult:
             elif phase == "classification":
                 self.time_taken_classification += time_taken
 
-        too_long_mark = False
+        ignored_reason_note = ""
         for i, entry in enumerate(self.entries):
             if entry["message"].startswith("Starting to check PR"):
                 self.title = entry["title"]
                 self.url = entry["url"]
             elif "Full diff is too long" in entry["message"]:
-                too_long_mark = True
+                ignored_reason_note = "Diff is too long"
+            elif "Too many changed functions" in entry["message"]:
+                ignored_reason_note = entry["message"]
             elif entry["message"].startswith("Ignoring") and self.nb_generated_tests == 0:
                 # Now we have multiple round, if the 1st round is not ignored, we mark it as checked.
                 self.ignored = True
-                if too_long_mark:
-                    self.ignored_reason = "Full diff is too long"
+                if ignored_reason_note:
+                    self.ignored_reason = ignored_reason_note
                 else:
                     self.ignored_reason = entry["message"]
 
@@ -307,6 +309,7 @@ class PRResult:
         if s == "ignored":
             return self.ignored_reason
         elif s == "checked":
+            # print(self.number)
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs, {self.cg}, {self.some_changes_at_fun_level}" # (N fail(s) to 1 fix)
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
