@@ -20,7 +20,7 @@ if target_project == "scipy":
 pr_file = join("data", "meta", f"chaco_{target_project}_unique_{num}.txt")
 with open(pr_file, "r") as f:
     prs = f.readlines()
-    pr_list = [int(pr) for pr in prs][:1]
+    pr_list = [int(pr) for pr in prs]
 
 for model_version in model_versions:
     breakpoints_data_folder = join(results_folder, "breakpoint", model_version)
