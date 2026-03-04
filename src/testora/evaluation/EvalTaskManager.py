@@ -168,7 +168,9 @@ def show_status():
             project_to_count = Counter()
             # *** Self added, to get the the results from 2026 only ***
             year = 2026
-            start = f"{year}-01-01 00:00:00"
+            month = "03"
+            day = "04"
+            start = f"{year}-{month}-{day} 00:00:00"
             end   = f"{year+1}-01-01 00:00:00"
 
             cursor.execute(query, (start, end))
@@ -248,11 +250,10 @@ def fetch_results(is_classification, fetch_single_project=False):
             print(f"Fetching results for {project}")
             done_prs_and_timestamps_query = (
                 f"SELECT pr, timestamp FROM {table_name} "
-                f"WHERE project = %s AND result IS NOT NULL AND timestamp LIKE '%2026-%'"
-            ) # f"WHERE project = %s AND result IS NOT NULL"
-            cursor.execute(done_prs_and_timestamps_query, (project,))
-            done_prs_and_timestamps = [[str(row[0]), str(row[1])]
-                                       for row in cursor.fetchall()]
+                f"WHERE project = %s AND result IS NOT NULL AND timestamp >= %s"
+            )
+            cursor.execute(done_prs_and_timestamps_query, (project, '2026-03-04 00:00:00'))
+            done_prs_and_timestamps = [[str(row[0]), str(row[1])] for row in cursor.fetchall()]
 
             nb_new_results = 0
             for pr, timestamp in done_prs_and_timestamps:
