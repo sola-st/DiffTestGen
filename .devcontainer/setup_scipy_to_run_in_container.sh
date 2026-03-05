@@ -14,5 +14,3 @@ mamba env create -f environment.yml
 mamba activate scipy-dev
 
 pip install -e . --no-build-isolation
-
-pip install coverage==7.11.0

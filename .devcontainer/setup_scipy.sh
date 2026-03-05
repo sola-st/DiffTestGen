@@ -23,7 +23,7 @@ docker run -t -d --name scipy-dev1 -v ${PWD}:/home/scipy python:3.10
 docker cp /workspaces/Testora-diff-test-gen/.devcontainer/setup_scipy_to_run_in_container.sh scipy-dev1:/root/setup.sh  #1
 docker exec scipy-dev1 chmod +x /root/setup.sh
 docker exec -w /home/scipy scipy-dev1 /root/setup.sh
-docker exec -w /home/scipy scipy-dev1 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning
+docker exec -w /home/scipy scipy-dev1 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning coverage==7.11.0
 docker exec -w /home/scipy scipy-dev1 apt update
 docker exec -w /home/scipy scipy-dev1 apt install -y make ninja-build
 echo "Done with first clone"
@@ -37,7 +37,7 @@ docker run -t -d --name scipy-dev2 -v ${PWD}:/home/scipy python:3.10
 docker cp /workspaces/Testora-diff-test-gen/.devcontainer/setup_scipy_to_run_in_container.sh scipy-dev2:/root/setup.sh #2
 docker exec scipy-dev2 chmod +x /root/setup.sh
 docker exec -w /home/scipy scipy-dev2 /root/setup.sh
-docker exec -w /home/scipy scipy-dev2 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning
+docker exec -w /home/scipy scipy-dev2 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning coverage==7.11.0
 docker exec -w /home/scipy scipy-dev2 apt update
 docker exec -w /home/scipy scipy-dev2 apt install -y make ninja-build
 echo "Done with second clone"
@@ -51,7 +51,7 @@ docker run -t -d --name scipy-dev3 -v ${PWD}:/home/scipy python:3.10
 docker cp /workspaces/Testora-diff-test-gen/.devcontainer/setup_scipy_to_run_in_container.sh scipy-dev3:/root/setup.sh #3
 docker exec scipy-dev3 chmod +x /root/setup.sh
 docker exec -w /home/scipy scipy-dev3 /root/setup.sh
-docker exec -w /home/scipy scipy-dev3 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning
+docker exec -w /home/scipy scipy-dev3 pip install sphinx intersphinx_registry matplotlib numpydoc sphinx-version-warning coverage==7.11.0
 docker exec -w /home/scipy scipy-dev3 apt update
 docker exec -w /home/scipy scipy-dev3 apt install -y make ninja-build
 echo "Done with third clone"
