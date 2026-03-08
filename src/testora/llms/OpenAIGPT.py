@@ -4,13 +4,13 @@ from typing import List
 from openai import OpenAI, RateLimitError
 from testora.prompts.PromptCommon import system_message
 from testora.util.Logs import append_event, LLMEvent
-from testora.Config import model_version
+from testora import Config
 
-if model_version.startswith("gpt"):
+if Config.model_version.startswith("gpt"):
     with open(".openai_token", "r") as f:
         openai_key = f.read().strip()
         openai = OpenAI(api_key=openai_key)
-elif model_version.startswith("deepseek"):
+elif Config.model_version.startswith("deepseek"):
     with open(".openrouter_token", "r") as f:
         openrouter_key = f.read().strip()
         openai = OpenAI(api_key=openrouter_key,
@@ -19,7 +19,7 @@ elif model_version.startswith("deepseek"):
 
 class OpenAIGPT:
     def __init__(self):
-        self.model = model_version
+        self.model = Config.model_version
 
     def query(self, prompt, nb_samples=1, temperature=1) -> List:
         user_message = prompt.create_prompt()

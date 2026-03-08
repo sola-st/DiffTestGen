@@ -51,20 +51,6 @@ from testora.util.UndefinedRefsFinder import get_undefined_references
 from testora.evaluation import EvalTaskManager
 from testora import Config
 
-llm = LLMCache(OpenAIGPT())
-
-if Config.classification_prompt_version == 1:
-    RegressionClassificationPrompt = RegressionClassificationPromptV1
-elif Config.classification_prompt_version == 2:
-    RegressionClassificationPrompt = RegressionClassificationPromptV2
-elif Config.classification_prompt_version == 3:
-    RegressionClassificationPrompt = RegressionClassificationPromptV3
-elif Config.classification_prompt_version == 4:
-    RegressionClassificationPrompt = RegressionClassificationPromptV4
-elif Config.classification_prompt_version == 5:
-    RegressionClassificationPrompt = RegressionClassificationPromptV5
-elif Config.classification_prompt_version == 6:
-    RegressionClassificationPrompt = RegressionClassificationPromptV6
 
 def clean_output(output):
     # remove warnings caused by coverage measurements
@@ -1307,8 +1293,25 @@ def get_repo(project_name):
 
 
 def check_single_pr(project, pr_nb):
+    global llm
+    llm = LLMCache(OpenAIGPT())
+    
+    global RegressionClassificationPrompt
     global RegressionTestGeneratorPrompt
     global FeedbackTestGeneratorPrompt
+
+    if Config.classification_prompt_version == 1:
+        RegressionClassificationPrompt = RegressionClassificationPromptV1
+    elif Config.classification_prompt_version == 2:
+        RegressionClassificationPrompt = RegressionClassificationPromptV2
+    elif Config.classification_prompt_version == 3:
+        RegressionClassificationPrompt = RegressionClassificationPromptV3
+    elif Config.classification_prompt_version == 4:
+        RegressionClassificationPrompt = RegressionClassificationPromptV4
+    elif Config.classification_prompt_version == 5:
+        RegressionClassificationPrompt = RegressionClassificationPromptV5
+    elif Config.classification_prompt_version == 6:
+        RegressionClassificationPrompt = RegressionClassificationPromptV6
 
     if Config.initial_test_generation_prompt_version == 1:
         RegressionTestGeneratorPrompt = RegressionTestGeneratorPromptV1
