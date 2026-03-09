@@ -377,9 +377,9 @@ def prepare_call_info(pr):
                             * provide only the entry function (Prefer)
                             '''
                             if cg[0].startswith("__") and cg[0].endswith("__"):
-                                special_method_explaination = offical_special_method_guidelines[cg[0]]
-                                call_graph_info_str_sub += f"Method #{i}: by triggering special method '{cg[0]}' of the following imported class\n"
                                 try: # ideally should always exists
+                                    special_method_explaination = offical_special_method_guidelines[cg[0]]
+                                    call_graph_info_str_sub += f"Method #{i}: by triggering special method '{cg[0]}' of the following imported class\n"
                                     call_graph_info_str_sub +=  f"Hints: {special_method_explaination}.\n"
                                 except:
                                     append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {cg[0]}"))
