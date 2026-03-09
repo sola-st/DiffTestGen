@@ -68,7 +68,9 @@ use_existing_tests = "pr-modified"
 
 call_graph = True
 
-private_call_indentification = 2 # 1 with "_", 2 with lsp + API
+# the code will automatically change the identification to 1 if needed,
+# which means do not need to explicitly change it.
+private_call_identification = 2 # 1 with "_", 2 with lsp + API
 
 top_k_entries = 5
 

@@ -405,7 +405,7 @@ class PullRequest:
                             else: # new code version
                                 # self.public_apis_new, self.full_names_new, self.abbr_names_new
                                 self.public_apis_new = get_apis(api_file)
-                                if Config.private_call_indentification == 2: # this only used for private checking in the generated code
+                                if Config.private_call_identification == 2: # this only used for private checking in the generated code
                                     if self.public_apis_old:
                                         self.public_apis_union = (self.public_apis_old[0] + self.public_apis_new[0], 
                                                                 self.public_apis_old[1] + self.public_apis_new[1], 
@@ -466,7 +466,7 @@ class PullRequest:
                             self.public_apis_old = get_apis(api_file)
                         else:
                             self.public_apis_new = get_apis(api_file)
-                            if Config.private_call_indentification == 2: # this only used for private checking in the generated code
+                            if Config.private_call_identification == 2: # this only used for private checking in the generated code
                                 if self.public_apis_old:
                                     self.public_apis_union = (self.public_apis_old[0] + self.public_apis_new[0], 
                                                             self.public_apis_old[1] + self.public_apis_new[1], 

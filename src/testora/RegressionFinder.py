@@ -276,7 +276,7 @@ def remove_tests_with_private_call(tests, pr):
     result = []
     test_msg_pairs = [] # the msg could be parse error, could be private call issue
 
-    if Config.private_call_indentification == 2 and Config.initial_test_generation_prompt_version != 1: # check with public API
+    if Config.private_call_identification == 2 and Config.initial_test_generation_prompt_version != 1: # check with public API
         result, test_msg_pairs = has_private_accesses_or_fails_to_parse_api_lsp(tests, pr)
     else:
         for i, test in enumerate(tests):
