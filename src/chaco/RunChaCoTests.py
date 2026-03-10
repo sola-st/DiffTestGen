@@ -46,7 +46,27 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
                                             raw_output=test_execution.raw_output))
     except RecursionError as e:
         raise TestoraException(f"Exception during merge_tests_and_execute: {str(e)}")
-    
+
+def validate_output_difference(cloned_repo_manager, pr, old_executions, new_executions):
+    repeat_difference_found_list = []
+    old_executions_repeated = [ChaCoTestExecution(old_exec.code) for old_exec in old_executions]
+    new_executions_repeated = [ChaCoTestExecution(new_exec.code) for new_exec in new_executions]
+
+    # re-execute test on old and new version and ignore flaky differences
+    execute_tests_on_commit(cloned_repo_manager, pr, old_executions_repeated, pr.pre_commit, "old_flaky")
+    execute_tests_on_commit(cloned_repo_manager, pr, new_executions_repeated, pr.post_commit, "new_flaky")
+
+    for old_execution, new_execution, old_execution_repeated, new_execution_repeated in zip(old_executions, new_executions, old_executions_repeated, new_executions_repeated):
+        if old_execution.output != old_execution_repeated.output:
+            repeat_difference_found_list.append(False)
+            continue
+        if new_execution.output != new_execution_repeated.output:
+            repeat_difference_found_list.append(False)
+            continue
+        repeat_difference_found_list.append(True)
+
+    return repeat_difference_found_list
+
 class RunChaCoTests():
     def __init__(self, github_repo, cloned_repo_manager, pr):
         self.github_repo = github_repo
@@ -116,7 +136,7 @@ class RunChaCoTests():
         if old_executions_to_flaky:
             flaky_change_found_list = validate_output_difference(self.cloned_repo_manager, self.pr, old_executions_to_flaky, new_executions_to_flaky)
             for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
-                if flaky_change_found == True: # flaky test gets the different outputs as before, consider as the same
+                if flaky_change_found == False:  # flaky test gets the same output as before, consider as the same
                     append_event(ComparisonEvent(pr_nb=self.pr.number, 
                             message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                             test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
