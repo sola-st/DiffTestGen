@@ -5,30 +5,41 @@ from os import listdir, makedirs
 import shutil
 
 
-iterations = [0, 1, 2, 3, 4]
-base_folder = join("data", "results")
+iterations = [0]
+model_version = "gpt-5-mini-2025-08-07"
 
 # option 1: for all projects
-target_projects = ["scipy", "marshmallow", "pandas", "keras"]
+target_projects = ["scipy", "marshmallow", "keras"]# "pandas", 
 
 # option 2: for a single project
 # with open(".target_project", "r") as f:
 #     target_project = f.read().strip()
 # target_projects = [target_project]
 
-for target_project in target_projects:
-    config_versions = [
-        [1, 0, 1, False],
-        [5, 8, 8, True]
-    ]
+config_versions = [
+    [5, 8, 8, 'pr-modified', True, True, True],
+    [5, 0, 8, 'pr-modified', True, True, True],
+    [5, 8, 8, None, True, True, True],
+    [5, 8, 8, 'pr-modified', True, False, True],
+    [5, 8, 8, 'pr-modified', True, True, False],
+]
 
-    version_ids_with_iter = ['_'.join(map(str, config)) + f"_{iteration}" for config in config_versions for iteration in iterations]
-    # version_ids_with_iter = ['_'.join(map(str, config)) for config in config_versions]
-    
+config_versions_names = [
+    "DiffTestGen",
+    "no_feedback_loop",
+    "no_changed_tests",
+    "no_cg",
+    "no_static",
+    "no_runtime",
+]
+
+base_folder = join("data", "results")
+for target_project in target_projects:
+    # version_ids = ['_'.join(map(str, config)) + f"_{name}" for config in config_versions for name in config_versions_names]
+    version_ids = ['_'.join(map(str, config)) for config in config_versions]
 
     log_results = join(base_folder, target_project)
     archive_results= join(log_results, "archive")
-
     result_folder = [log_results, archive_results]
 
     for log_folder in result_folder:
@@ -36,31 +47,29 @@ for target_project in target_projects:
         for file in log_files:
             log_file_path = join(log_folder, file)
             if isfile(log_file_path):
-                # just for convenience, time-based filter
-                if "09-" in file:
-                    date = int(file.split(" ")[0].split("09-")[1])
-                    if date < 18: 
-                        continue
-                else:
-                    continue
+                # # just for convenience, time-based filter
+                # if "09-" in file:
+                #     date = int(file.split(" ")[0].split("09-")[1])
+                #     if date < 18: 
+                #         continue
+                # else:
+                #     continue
 
                 with open(log_file_path, "r") as f:
                     info = json.load(f) 
                 
                 config_message_tmp = info[0]["message"].replace("Configuration: ", "", 1)
                 config_message = ast.literal_eval(config_message_tmp)
-                model_version = config_message["model_version"] # to support each version with a separate folder
-                initial_prompt = config_message["initial_test_generation_prompt_version"]
-                feedback_prompt = config_message["feedback_test_generation_prompt_version"]
-                context = config_message["context_version"]
-                try:
-                    whether_feedback = config_message["use_error_feedabck"]
-                    version_id = f"{initial_prompt}_{feedback_prompt}_{context}_{whether_feedback}"
-                    iteration = config_message["iteration"]
-                    if f"{version_id}_{iteration}" in version_ids_with_iter:
-                        separated_results_folder = join(base_folder, model_version, f"iter_{iteration}", f"log_{version_id}", target_project)
-                        makedirs(separated_results_folder, exist_ok=True)
-                        if not exists(join(separated_results_folder, file)):
-                            shutil.copy2(log_file_path, separated_results_folder)
-                except:
-                    pass # old executions with no the newly added configs
+                option_list = [config_message[key] for key in ["initial_test_generation_prompt_version", \
+                        "feedback_test_generation_prompt_version", "context_version", \
+                        "use_existing_tests", "call_graph", "fix_static_error", "use_error_feedback"]]
+                version_id = '_'.join(map(str, option_list))
+                iteration = config_message["iteration"]
+                if version_id in version_ids:
+                    idx = version_ids.index(version_id)
+                    name = config_versions_names[idx]
+                    named_version_id = f"{version_id}_{name}"
+                    separated_results_folder = join(base_folder, model_version, f"iter_{iteration}", f"log_{named_version_id}", target_project)
+                    makedirs(separated_results_folder, exist_ok=True)
+                    if not exists(join(separated_results_folder, file)):
+                        shutil.copy2(log_file_path, separated_results_folder)
