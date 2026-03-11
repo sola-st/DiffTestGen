@@ -1,11 +1,10 @@
 import argparse
-import ast
+# import ast
 from github import Github, Auth
 from testora.util import SphinxOnlyPR
 from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.SphinxOnlyPR import SphinxOnlyPR
-from testora.util.Logs import (start_logging, append_event, Event, store_logs)
-from testora import Config
+from testora.util.Logs import (start_logging, store_logs)
 
 
 def get_repo(project_name):
@@ -52,35 +51,17 @@ def check_single_pr(project, pr_nb):
 
 def main():
     parser = argparse.ArgumentParser(description="Testora's main entry point")
-    parser.add_argument("--db", action="store_true", help="Run on PRs fetched from the database")
-    parser.add_argument("--paras", type=ast.literal_eval, help="To help run exepeimenta non-stop")
-    parser.add_argument("--prs", type=ast.literal_eval, help="To help isolate the running among different containers")
+    # parser.add_argument("--prs", type=ast.literal_eval, help="To help isolate the running among different containers")
     parser.add_argument("--project", type=str,
                         help="Project to analyze",
                         choices=["keras", "marshmallow", "pandas", "scipy"])
     parser.add_argument("--pr", type=int, help="PR number to analyze")
     args = parser.parse_args()
 
-    start_logging()
-    if args.paras:
-        # auto-updates the prompt versions, available for both db mode and single-pr mode
-        if len(args.paras) == 8: # comparison mdoe
-            Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
-                    Config.use_error_feedback, Config.fix_static_error, Config.use_existing_tests, Config.iteration, Config.model_version = args.paras
-        else: # 9'. pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
-             Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
-                    Config.use_existing_tests, Config.call_graph, Config.fix_static_error, Config.use_error_feedback, \
-                    Config.iteration, Config.model_version = args.paras
-        
     if not args.project or not args.pr:
         raise ValueError("Must specify --project and --pr")
     
-    config_dict = {
-        k: v for k, v in vars(Config).items()
-        if not k.startswith("__") and not callable(v)
-    }
-    append_event(Event(pr_nb=0, message=f"Configuration: {config_dict}"))
-
+    start_logging()
     check_single_pr(args.project, args.pr)
     store_logs()
 
