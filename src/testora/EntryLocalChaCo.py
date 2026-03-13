@@ -25,16 +25,12 @@ with open(pr_file, "r") as f:
     pr_list = [int(pr) for pr in prs]
 
 for model_version in model_versions:
-    breakpoints_data_folder = join(results_folder, "breakpoint", model_version, f"iter_{iteration}")
     config = config + [iteration, model_version]
     # run RegressionFinder
     for pr_num in pr_list:
         subprocess.run(["python", "-m", "testora.RegressionFinder", 
                 "--project", target_project, "--pr", f"{pr_num}", f"--paras={config}"])
     
-    # store the breakpoint data seperately
-    bp_data_cur_version = join(breakpoints_data_folder, f"bp_chaco_{config_name}")
-    makedirs(bp_data_cur_version, exist_ok=True)
     # store the log results
     # no iter info, to separate local and db, but also good to have, becasuse the log file prefix are different.
     log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_chaco_{config_name}", target_project) 
@@ -42,7 +38,5 @@ for model_version in model_versions:
 
     for f in os.listdir('.'):
         if isfile(f):
-            if f.endswith("_breakpoint_data.json"):
-                shutil.move(f, bp_data_cur_version)
-            elif f.startswith("logs_"):
+            if f.startswith("logs_"):
                 shutil.move(f, log_folder)

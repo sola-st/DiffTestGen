@@ -1,8 +1,6 @@
 import copy
-import shutil
 import subprocess
-from os.path import join, isfile, exists
-from os import makedirs
+from os.path import join, exists
 import os
 
 max_iteration = 1
@@ -72,8 +70,6 @@ elif mode == "ablation":
 
 results_folder = join("data", "results")
 for iteration in range(max_iteration):
-    breakpoints_data_folder = join(results_folder, "breakpoint", model_version, f"iter_{iteration}")
-
     # the default cache file setting form LLMCache
     cache_dir = join("data", "llm_cache", model_version, "cache.json")
 
@@ -89,13 +85,6 @@ for iteration in range(max_iteration):
         # run RegressionFinder
         config_with_iter = config + [iteration, model_version]
         subprocess.run(["python", "-m", "testora.RegressionFinder", "--db", f"--paras={config_with_iter}", f"--prs={pr_list}"])
-        
-        # store the breakpoint data seperately
-        bp_data_cur_version = join(breakpoints_data_folder, f"bp_{config_name}", target_project)
-        makedirs(bp_data_cur_version, exist_ok=True)
-        for f in os.listdir('.'):
-            if isfile(f) and f.endswith("_breakpoint_data.json"):
-                shutil.move(f, bp_data_cur_version)
 
         # rename the llm cache, to check the Non-determinism of models
         # Finally, we get a cache file for each iteration and for each config, and the cache file can be reuse if needed

@@ -71,7 +71,6 @@ elif mode == "ablation":
         config_versions.update({name_key: turn_off_op})
         
 results_folder = join("data", "results")
-breakpoints_data_folder = join(results_folder, "breakpoint", model_version, f"iter_{iteration}")
 log_folder = join(results_folder, model_version, f"iter_{iteration}")
 
  # the default cache file setting form LLMCache
@@ -89,9 +88,6 @@ for config_name, config in config_versions.items():
         subprocess.run(["python", "-m", "testora.RegressionFinder", 
                 "--project", target_project, "--pr", f"{pr_num}", f"--paras={config}"])
     
-    # store the breakpoint data seperately
-    bp_data_cur_version = join(breakpoints_data_folder, f"bp_{config_name}", target_project)
-    makedirs(bp_data_cur_version, exist_ok=True)
     # store the log results
     # no iter info, to separate local and db, but also good to have, becasuse the log file prefix are different.
     log_folder_cur_version = join(log_folder, f"log_{config_name}", target_project) 
@@ -99,9 +95,7 @@ for config_name, config in config_versions.items():
 
     for f in os.listdir('.'):
         if isfile(f):
-            if f.endswith("_breakpoint_data.json"):
-                shutil.move(f, bp_data_cur_version)
-            elif f.startswith("logs_"):
+            if f.startswith("logs_"):
                 shutil.move(f, log_folder)
 
     os.rename(cache_dir, marked_cache_dir)

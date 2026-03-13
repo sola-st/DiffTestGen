@@ -41,7 +41,7 @@ from testora.util.Exceptions import TestoraException
 from testora.util.PrivateIdentification import has_private_accesses_or_fails_to_parse_api_lsp
 from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
-from testora.util.Logs import (CallGraphEvent, CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
+from testora.util.Logs import (BreakpointEvent, CallGraphEvent, CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
         ClassificationEvent, ErrorEvent, PREvent, SelectBehaviorEvent, TestExecutionEvent, append_event, 
         Event, ComparisonEvent, LLMEvent, get_logs_as_json, store_logs, reset_logs)
 from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
@@ -873,17 +873,12 @@ def check_pr(github_repo, cloned_repo_manager, pr):
                 old_executions_differ_relevant.append(simplified_old_execution)
                 new_executions_differ_relevant.append(simplified_new_execution)
 
-    # When need to further classify the different outputs, read the test info from stored files.
-    # organize and write the breakpoint data to a local/db file
+    # When need to further classify the different outputs, read the test info from stored info.
     if old_executions_differ_relevant:
-        breakpoint_data_str = {
-            "changed_functions": changed_functions,
-            "old_executions_differ_relevant": f"{old_executions_differ_relevant}",
-            "new_executions_differ_relevant": f"{new_executions_differ_relevant}"
-        }
+        append_event(BreakpointEvent(pr_nb=pr.number, message=f"Breakpoint data", changed_functions=changed_functions, 
+                old_executions_differ_relevant=f"{old_executions_differ_relevant}", new_executions_differ_relevant=f"{new_executions_differ_relevant}"))
+    # else: # no different outputs
 
-        with open(f"{github_repo.name}_{pr.number}_breakpoint_data.json", "w") as f:
-            json.dump(breakpoint_data_str, f, indent=2)
 
 def simplify_test_execution(execution):
     # simplify the execution by removing the redundant information.

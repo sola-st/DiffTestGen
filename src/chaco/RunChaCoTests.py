@@ -7,7 +7,7 @@ from chaco.ChaCoDockerExecutor import ChaCoDockerExecutor
 from chaco.ChaCoTestExecution import ChaCoTestExecution
 from testora.RegressionFinder import get_repo, simplify_test_execution, validate_output_difference
 from testora.util.Exceptions import TestoraException
-from testora.util.Logs import ChaCoTestExecutionEvent, ComparisonEvent, CoverageEvent, Event, PREvent, append_event, start_logging, store_logs
+from testora.util.Logs import BreakpointEvent, ChaCoTestExecutionEvent, ComparisonEvent, CoverageEvent, Event, PREvent, append_event, start_logging, store_logs
 
 
 def execute_test(test_execution, docker_executor, version):
@@ -154,14 +154,9 @@ class RunChaCoTests():
         # When need to further classify the different outputs, read the test info from stored files.
         # organize and write the breakpoint data to a local/db file
         if old_executions_differ_relevant:
-            breakpoint_data_str = {
-                "changed_functions": changed_functions,
-                "old_executions_differ_relevant": f"{old_executions_differ_relevant}",
-                "new_executions_differ_relevant": f"{new_executions_differ_relevant}"
-            }
-
-            with open(f"{self.github_repo.name}_{self.pr.number}_breakpoint_data.json", "w") as f:
-                json.dump(breakpoint_data_str, f, indent=2)
+            append_event(BreakpointEvent(pr_nb=self.pr.number, message=f"Breakpoint data", changed_functions=changed_functions, 
+                    old_executions_differ_relevant=f"{old_executions_differ_relevant}", new_executions_differ_relevant=f"{new_executions_differ_relevant}"))
+        # else: # no different outputs
 
 def get_generated_tests(project, pr_nb):
     # read chaco genrated tests

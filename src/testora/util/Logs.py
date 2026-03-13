@@ -32,6 +32,11 @@ class ComparisonEvent(Event):
     old_output: str
     new_output: str
 
+class BreakpointEvent(Event):
+    pr_nb: int
+    changed_functions: str
+    old_executions_differ_relevant: str
+    new_executions_differ_relevant: str
 
 class PreClassificationEvent(Event):
     test_code: str

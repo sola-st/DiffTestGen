@@ -2,7 +2,6 @@ import shutil
 import subprocess
 from os.path import join, isfile
 from os import makedirs, listdir
-
 from testora.analysis.RenameLocalLogs import rename_log_file
 
 
@@ -34,12 +33,3 @@ for f in listdir('.'):
         else:
             shutil.move(f, log_folder) # keep the original file if read the file fails
 print(f"\n-- Gets {log_num} PR logs.")
-
-bp_data_cur_version = join("data", "results", "breakpoint", "bp_chaco", target_project) # no multi-round needed
-makedirs(bp_data_cur_version, exist_ok=True)
-bp_num = 0
-for f in listdir('.'):
-    if isfile(f) and f.endswith("_breakpoint_data.json"):
-        bp_num +=1
-        shutil.move(f, bp_data_cur_version)
-print(f"-- Gets {bp_num} PRs with different outputs.")

@@ -10,10 +10,10 @@ from testora.util.Logs import ErrorEvent, Event, PREvent, append_event, get_logs
 from testora.util.PullRequest import PullRequest
 
 
-def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, breakpoint_file):
+def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file):
     '''Record changed functions and test executions to restart/continue the classification phase.'''
 
-    changed_functions, old_executions_differ_relevant, new_executions_differ_relevant = get_stored_info(breakpoint_file)
+    changed_functions, old_executions_differ_relevant, new_executions_differ_relevant = get_stored_info(log_file)
     if changed_functions:
         for old_execution, new_execution in zip(old_executions_differ_relevant, new_executions_differ_relevant):
             '''The following are exactly the remaining steps from RegressionFinder.'''
@@ -42,7 +42,7 @@ def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, breakpoint_f
         append_event(Event(pr_nb=pr.number, message="No tests expose differences from the previous phase."))
 
 
-def check_single_pr(project, pr_nb, breakpoint_file):
+def check_single_pr(project, pr_nb, log_file):
     # reproduce the cloned_repo_manager, git_repo, and pr
     start = time.time()
     github_repo, cloned_repo_manager = get_repo(project)
@@ -54,7 +54,7 @@ def check_single_pr(project, pr_nb, breakpoint_file):
                          message="Starting to Reduce and Classify Tests",
                          title=pr.github_pr.title, url=pr.github_pr.html_url))
 
-    reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, breakpoint_file)
+    reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file)
 
     append_event(PREvent(pr_nb=pr_nb,
                          message="Done with Reduction and Classification",
@@ -82,15 +82,18 @@ def fetch_and_check_prs():
 
     print("No more tasks to work on")
 
-def get_stored_info(breakpoint_file):
-    with open(breakpoint_file, "r") as f:
-        loaded_data = json.load(f)
-    changed_functions = loaded_data["changed_functions"] # a list of fully qualified function names
-    # Make TestExecution available in eval scope
-    old_executions_differ_relevant = eval(loaded_data["old_executions_differ_relevant"], {"TestExecution": TestExecution}) # a list of TestExecution objects.
-    new_executions_differ_relevant = eval(loaded_data["new_executions_differ_relevant"], {"TestExecution": TestExecution})
+def get_stored_info(log_file):
+    with open(log_file, "r") as f:
+        data = json.load(f)
+    loaded_data = data[-2] # breakpoint info
+    if breakpoint["message"] == "Breakpoint data":
+        changed_functions = loaded_data["changed_functions"] # a list of fully qualified function names
+        # Make TestExecution available in eval scope
+        old_executions_differ_relevant = eval(loaded_data["old_executions_differ_relevant"], {"TestExecution": TestExecution}) # a list of TestExecution objects.
+        new_executions_differ_relevant = eval(loaded_data["new_executions_differ_relevant"], {"TestExecution": TestExecution})
 
-    return changed_functions, old_executions_differ_relevant, new_executions_differ_relevant
+        return changed_functions, old_executions_differ_relevant, new_executions_differ_relevant
+    return None, None, None
     
 def main():
     parser = argparse.ArgumentParser(description="Testora's reduction and classification entry point")
@@ -98,7 +101,7 @@ def main():
                         help="Project to analyze",
                         choices=["keras", "marshmallow", "pandas", "scipy"])
     parser.add_argument("--pr", type=int, help="PR number to analyze")
-    parser.add_argument("--breakpoint_file", type=str, help="The parent folder of breakpoint files")
+    parser.add_argument("--log_file", type=str, help="The parent folder of breakpoint files")
     args = parser.parse_args()
 
     start_logging()
@@ -108,7 +111,7 @@ def main():
     '''
     if not args.project or not args.pr:
         raise ValueError("Must specify --project and --pr")
-    check_single_pr(args.project, args.pr, args.breakpoint_file)
+    check_single_pr(args.project, args.pr, args.log_file)
     store_logs()
 
 
