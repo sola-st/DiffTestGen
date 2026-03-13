@@ -1,24 +1,44 @@
-# Only needed if running different versions of prompts non-stop.
 import copy
 import shutil
 import subprocess
-from os.path import join, isfile, exists
-from os import makedirs, rename
+from os.path import exists, join, isfile
+from os import makedirs
 import os
 
 iteration = 0
 mode = "ablation" # could be 'comparison' and 'ablation'
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
+pr_split_num = 1 # could be None, 1, 2, or 3
+
+with open(".target_project", "r") as f:
+    target_project = f.read().strip()
+    
+# marshmallow 53, keras 133, pandas 128, scipy 129
+num = 65
+if target_project == "keras":
+    num = 160
+elif target_project == "pandas":
+    num = 143
+elif target_project == "scipy":
+    num = 157
+
+pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
+if pr_split_num:
+    pr_file = pr_file.replace(".txt", f"_{pr_split_num}.txt")
+
+with open(pr_file, "r") as f:
+    prs = f.readlines()
+pr_list = [int(pr) for pr in prs]
 
 config_versions = []
 if mode == "comparison":
     # initial_prompt, feedback_prompt, context_version, \
     # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
-    config_versions = [
-        [1, 0, 1, None, False, True, False],
-        [5, 8, 8, "pr-modified", True, True, True]
-    ]
+    config_versions = {
+        "testora": [1, 0, 1, None, False, False, False],
+        "difftestgen": [5, 8, 8, "pr-modified", True, True, True]
+    } 
 elif mode == "ablation":
     # base setting about ablation
     # about initial prompt
@@ -28,54 +48,41 @@ elif mode == "ablation":
 
     # outer feedback loop
     feedback_prompt = 8 # coverage_feedback -> turn off, changed it to 0 # 3
-    # prior_generated_test = True # this is an entire set of coverage feedback, consider as a subsetting of feedback_prompt
-
     context_version = 8 # always the same, no need to turn off
 
     # inner loop for every round
     fix_static_error = True # could be only once and multiple attempts # 4
     runtime_error_feedback = True # inner loop for every round # 5
 
-    # TODO later
-    # updated_crash_detection = True # difference check
-    # use_pr_title_desc = True
-
     our_approach = [initial_prompt, feedback_prompt, context_version, \
                     pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback]
-    turn_off_values = [initial_prompt, 0, context_version, None, False, False, False]
+    turn_off_indices_values = {
+        "1": 0,
+        "4": False
+    } # trun off feedback and call graph
+    config_names = ["no_coverage_feedback", "no_cg"]
     
-    # [] to only focus on the ablation settings
-    # [our_approach] # to include our approach
-    config_versions = [our_approach] 
-    # all possible abalation settings
-    # [5, 0, 8, 'pr-modified', True, True, True]
-    # [5, 8, 8, None, True, True, True]
-    # [5, 8, 8, 'pr-modified', False, True, True]
-    # [5, 8, 8, 'pr-modified', True, False, True]
-    # [5, 8, 8, 'pr-modified', True, True, False]
-    for op_idx, turn_off_val in enumerate(turn_off_values):
-        # from setting 'initial_prompt' and 'context_version' we, 
-        if op_idx in [0, 2]:
-            continue
+    # {} to only focus on the ablation settings
+    # {"difftestgen": [5, 8, 8, "pr-modified", True, True, True]} # to include our approach
+    config_versions = {} 
+    for (op_idx_str, turn_off_val), name_key in zip(turn_off_indices_values.items(), config_names):
         turn_off_op = copy.deepcopy(our_approach)
-        turn_off_op[op_idx] = turn_off_val 
-        config_versions.append(turn_off_op)
+        turn_off_op[int(op_idx_str)] = turn_off_val 
+        config_versions.update({name_key: turn_off_op})
         
 results_folder = join("data", "results")
-if exists(results_folder):
-    rename(results_folder, f"{results_folder}_backup")
+breakpoints_data_folder = join(results_folder, "breakpoint", model_version, f"iter_{iteration}")
+log_folder = join(results_folder, model_version, f"iter_{iteration}")
 
-breakpoints_data_folder = join(results_folder, "breakpoint", model_version)
+ # the default cache file setting form LLMCache
+cache_dir = join("data", "llm_cache", model_version, "cache.json")
 
-with open(".target_project", "r") as f:
-    target_project = f.read().strip()
+for config_name, config in config_versions.items():
+    # to resuse the cache
+    marked_cache_dir = cache_dir.replace(".json", f"_{iteration}_{config_name}.json")
+    if exists(marked_cache_dir):
+        os.rename(marked_cache_dir, cache_dir)
 
-with open(f"data/meta/pr_nums/{target_project}_PRs_subset10.txt", "r") as f:
-    prs = f.readlines()
-    pr_list = [int(pr) for pr in prs]
-
-for config in config_versions:
-    version_id = '_'.join(map(str, config))
     config = config + [iteration, model_version]
     # run RegressionFinder
     for pr_num in pr_list:
@@ -83,11 +90,11 @@ for config in config_versions:
                 "--project", target_project, "--pr", f"{pr_num}", f"--paras={config}"])
     
     # store the breakpoint data seperately
-    bp_data_cur_version = join(breakpoints_data_folder, f"bp_{version_id}")
+    bp_data_cur_version = join(breakpoints_data_folder, f"bp_{config_name}", target_project)
     makedirs(bp_data_cur_version, exist_ok=True)
     # store the log results
     # no iter info, to separate local and db, but also good to have, becasuse the log file prefix are different.
-    log_folder = join(results_folder, model_version, f"log_{version_id}", target_project) 
+    log_folder_cur_version = join(log_folder, f"log_{config_name}", target_project) 
     makedirs(log_folder, exist_ok=True)
 
     for f in os.listdir('.'):
@@ -96,3 +103,5 @@ for config in config_versions:
                 shutil.move(f, bp_data_cur_version)
             elif f.startswith("logs_"):
                 shutil.move(f, log_folder)
+
+    os.rename(cache_dir, marked_cache_dir)

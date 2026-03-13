@@ -35,7 +35,7 @@ for f in listdir('.'):
             shutil.move(f, log_folder) # keep the original file if read the file fails
 print(f"\n-- Gets {log_num} PR logs.")
 
-bp_data_cur_version = join("data", "results", "breakpoint", "bp_chaco", target_project)
+bp_data_cur_version = join("data", "results", "breakpoint", "bp_chaco", target_project) # no multi-round needed
 makedirs(bp_data_cur_version, exist_ok=True)
 bp_num = 0
 for f in listdir('.'):
