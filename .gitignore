@@ -8,7 +8,8 @@ data/classification_results_03_2025
 data/target_prs
 data/figures
 data/chaco_tests*
-data/meta/chaco_prs
+data/meta/chaco_prs_filtering
+data/meta/older
 .github_token
 logs_*.json
 results_*.json
