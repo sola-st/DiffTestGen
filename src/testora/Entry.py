@@ -44,8 +44,8 @@ if mode == "comparison":
     '''
 
     config_versions = [
-        [1, 0, 1, False, False, None],
-        [5, 8, 8, True, True, "pr-modified"]
+        [1, 0, 1, None, False, True, False],
+        [5, 8, 8, "pr-modified", True, True, True]
     ]
 elif mode == "ablation":
     # base setting about ablation

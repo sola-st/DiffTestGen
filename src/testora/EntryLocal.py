@@ -13,9 +13,11 @@ model_version = "gpt-5-mini-2025-08-07"
 
 config_versions = []
 if mode == "comparison":
+    # initial_prompt, feedback_prompt, context_version, \
+    # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
     config_versions = [
-        [1, 0, 1, False, False, None],
-        [5, 8, 8, True, True, "pr-modified"]
+        [1, 0, 1, None, False, True, False],
+        [5, 8, 8, "pr-modified", True, True, True]
     ]
 elif mode == "ablation":
     # base setting about ablation

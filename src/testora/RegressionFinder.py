@@ -251,32 +251,11 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         name_formatted_generated_tests.append(formatted_test)
     return name_formatted_generated_tests, test_msg_pairs
 
-
-# def remove_tests_with_private_call(tests, public_apis, repo_package_name):
-#     result = []
-#     test_msg_pairs = [] # the msg could be parse error, could be private call issue
-
-#     for i, test in enumerate(tests):
-#         has = None
-#         static_error_msg = None
-#         if Config.initial_test_generation_prompt_version == 1: 
-#             has, static_error_msg = has_private_accesses_or_fails_to_parse(test)
-#         else: # for our approach
-#             has, static_error_msg = has_private_accesses_or_fails_to_parse_api_lsp(test, public_apis, repo_package_name)
-        
-#         if has == False:
-#             result.append(test)
-#         else:
-#             if static_error_msg:
-#                 test_msg_pairs.append([i, test, static_error_msg])
-
-#     return result, test_msg_pairs
-
 def remove_tests_with_private_call(tests, pr):
     result = []
     test_msg_pairs = [] # the msg could be parse error, could be private call issue
 
-    if Config.private_call_identification == 2 and Config.initial_test_generation_prompt_version != 1: # check with public API
+    if Config.private_call_identification == 2:
         result, test_msg_pairs = has_private_accesses_or_fails_to_parse_api_lsp(tests, pr)
     else:
         for i, test in enumerate(tests):
@@ -291,137 +270,133 @@ def remove_tests_with_private_call(tests, pr):
 
 
 def prepare_call_info(pr):
-    call_graph_info_str = ""
-    # to_add_special_method_intro = False
-    if Config.call_graph == True:
-        # 0: overall: from the perspective of forming the call graph info str
-        info_public_and_private = ""
+    # 0: overall: from the perspective of forming the call graph info str
+    call_graph_info_str = ""        
+    info_public_and_private = ""
+    offical_special_method_guidelines = {}
+
+    # for special methods
+    offical_special_methods_file = "src/testora/util/special_methods.txt"
+    with open(offical_special_methods_file, "r") as f:
+        offical_special_methods_tmp = f.readlines()
+        offical_special_method_guidelines_tmp = [{methods.split(" ", 1)[0]: methods} for methods in offical_special_methods_tmp if methods.startswith("__")]
         offical_special_method_guidelines = {}
-
-        # for special methods
-        offical_special_methods_file = "src/testora/util/special_methods.txt"
-        with open(offical_special_methods_file, "r") as f:
-            offical_special_methods_tmp = f.readlines()
-            offical_special_method_guidelines_tmp = [{methods.split(" ", 1)[0]: methods} for methods in offical_special_methods_tmp if methods.startswith("__")]
-            offical_special_method_guidelines = {}
-            for d in offical_special_method_guidelines_tmp:
-                offical_special_method_guidelines.update(d)
+        for d in offical_special_method_guidelines_tmp:
+            offical_special_method_guidelines.update(d)
 
 
-        # 1: for public functions
-        patterns = [r"To trigger changed method '([^']+)', which is a special method of the class", 
-                r"To trigger entry function '([^']+)', which is a special method of the class"]
-        import_lines_info = ""
-        for label, import_lines in pr.public_func_imports.items():
-            import_lines_info_sub = ""
-            if import_lines:
-                # add hints for special method entry functions.
-                for idx, imline in enumerate(import_lines):
-                    if "is a special method of the class" in imline:
-                        # Example: To trigger changed method '{fully_qulified_name}' ...
-                        # From file PullRequest.py
-                        special_method = ""
-                        for pattern in patterns:
-                            fully_qulaified_name = re.search(pattern, imline)
-                            special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
-                            break
-                        try: # ideally should always exists, no errors
-                            special_method_explaination = offical_special_method_guidelines[special_method]
-                            # update imline
-                            import_lines[idx] = f"{imline}\nHints: {special_method_explaination}.\n"
-                        except:
-                            append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {fully_qulaified_name}"))
+    # 1: for public functions
+    patterns = [r"To trigger changed method '([^']+)', which is a special method of the class", 
+            r"To trigger entry function '([^']+)', which is a special method of the class"]
+    import_lines_info = ""
+    for label, import_lines in pr.public_func_imports.items():
+        import_lines_info_sub = ""
+        if import_lines:
+            # add hints for special method entry functions.
+            for idx, imline in enumerate(import_lines):
+                if "is a special method of the class" in imline:
+                    # Example: To trigger changed method '{fully_qulified_name}' ...
+                    # From file PullRequest.py
+                    special_method = ""
+                    for pattern in patterns:
+                        fully_qulaified_name = re.search(pattern, imline)
+                        special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
+                        break
+                    try: # ideally should always exists, no errors
+                        special_method_explaination = offical_special_method_guidelines[special_method]
+                        # update imline
+                        import_lines[idx] = f"{imline}\nHints: {special_method_explaination}.\n"
+                    except:
+                        append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {fully_qulaified_name}"))
 
-                info = "\n".join(import_lines)
-                # here the old and new labeled info exists only when some functions/classes have been affected in only one version, there is no confusing info.
-                if label == "common":
-                    import_lines_info_sub = f"The following information is available for both the old and the new versions of code:\n{info}"
-                elif label == "old":
-                    import_lines_info_sub = f"The following information is available only for the old code version:\n{info}" 
-                else:
-                    import_lines_info_sub = f"The following information is available only for the new code version:\n{info}"
-                
-                import_lines_info += f"{import_lines_info_sub}\n"
+            info = "\n".join(import_lines)
+            # here the old and new labeled info exists only when some functions/classes have been affected in only one version, there is no confusing info.
+            if label == "common":
+                import_lines_info_sub = f"The following information is available for both the old and the new versions of code:\n{info}"
+            elif label == "old":
+                import_lines_info_sub = f"The following information is available only for the old code version:\n{info}" 
+            else:
+                import_lines_info_sub = f"The following information is available only for the new code version:\n{info}"
             
-        if import_lines_info:
-            info_public_and_private = (f"For each affected public function, the following lists the available ways to access it. "
-                f"Refer to the class information below and the given changed function body above to check how to initialize the relevant classes and to check how to access the function, if any.\n"
-            )
-            # if "is a special method of the class" in import_lines_info:
-            #     to_add_special_method_intro = True
-                
-            info_public_and_private += f"\n{import_lines_info}\n"
-
-        # 2: for private functions
-        # form the info about call graph
-        # each of them are a triple list: pr_level[function_level[path level]]
-        call_graph_info_str_funcs = ""
-        call_graph_info_str_prefix = (
-            "For each affected non-public function, the following lists the available ways to access it, if any. "
-            "Each way specifies which function to call, along with its signature and docstring (if available), to guide how it should be used. "
-            "Refer to the class information below to check how to initialize the relevant classes, if any.\n\n"
-        ) # to make sure provide only available info to the prompt
-
-        for func_name, cg_path_func_level in pr.call_graph_paths_k.items():
-            call_graph_info_str_function_level = ""
-            if cg_path_func_level:
-                for label, cg_paths in cg_path_func_level.items():
-                    call_graph_info_str_sub = ""
-                    if cg_paths:
-                        for i, cg in enumerate(cg_paths):
-                            sig_doc = pr.signatures_docstrings_k[func_name][label][i]
-                            imports = pr.imports_k[func_name][label][i]
-                            '''
-                            two options:
-                            * provide the entire call graph path to the prompt
-                            * provide only the entry function (Prefer)
-                            '''
-                            if cg[0].startswith("__") and cg[0].endswith("__"):
-                                try: # ideally should always exists
-                                    special_method_explaination = offical_special_method_guidelines[cg[0]]
-                                    call_graph_info_str_sub += f"Method #{i}: by triggering special method '{cg[0]}' of the following imported class\n"
-                                    call_graph_info_str_sub +=  f"Hints: {special_method_explaination}.\n"
-                                except:
-                                    append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {cg[0]}"))
-                            else:
-                                call_graph_info_str_sub += f"Method #{i}: by calling function '{cg[0]}'\n"
-                            if imports:
-                                call_graph_info_str_sub += f"{imports}" # import info endswith "\n", refer to PullRequest.py
-                            if sig_doc:
-                                call_graph_info_str_sub += f"{sig_doc}\n"
-                        
-                        if call_graph_info_str_sub:
-                            if label == "common":
-                                call_graph_info_str_sub = f"The following information is available for both the old and the new versions of code:\n{call_graph_info_str_sub}"
-                                # if common info exists for a changed function, only provide it to avoid any confusion from the one-version-info
-                                # option 1: get all the information, but only privide common to prompts
-                                call_graph_info_str_function_level += call_graph_info_str_sub
-                                break 
-                                # option 2: get common_info and stop in PullRequest.py get_union_call_graph
-                            elif label == "old":
-                                call_graph_info_str_sub = f"The following information is available only for the old code version:\n{call_graph_info_str_sub}" 
-                            else:
-                                call_graph_info_str_sub = f"The following information is available only for the new code version:\n{call_graph_info_str_sub}"
-                            
-                            call_graph_info_str_function_level += call_graph_info_str_sub
-
-                if call_graph_info_str_function_level:
-                    call_graph_info_str_function_level = f"To access the changed function {func_name}:\n\n{call_graph_info_str_function_level}"
-                    call_graph_info_str_funcs += call_graph_info_str_function_level
+            import_lines_info += f"{import_lines_info_sub}\n"
         
-        if call_graph_info_str_funcs:
-            call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
-            info_public_and_private += f"{call_graph_info_str}\n"
+    if import_lines_info:
+        info_public_and_private = (f"For each affected public function, the following lists the available ways to access it. "
+            f"Refer to the class information below and the given changed function body above to check how to initialize the relevant classes and to check how to access the function, if any.\n"
+        )
+            
+        info_public_and_private += f"\n{import_lines_info}\n"
 
-        # 3: all relevant classes
-        if pr.class_hover_texts:
-            info_public_and_private += f"The following shows the signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
-            info_public_and_private += f"Long docstrings are truncated, with an ellipsis (...) indicating omitted content.\n"
-            # add the relevant class hover texts
-            # for module_endswith_class, hover_text in pr.class_hover_texts.items():
-            info_public_and_private += "\n".join(pr.class_hover_texts)
+    # 2: for private functions
+    # form the info about call graph
+    # each of them are a triple list: pr_level[function_level[path level]]
+    call_graph_info_str_funcs = ""
+    call_graph_info_str_prefix = (
+        "For each affected non-public function, the following lists the available ways to access it, if any. "
+        "Each way specifies which function to call, along with its signature and docstring (if available), to guide how it should be used. "
+        "Refer to the class information below to check how to initialize the relevant classes, if any.\n\n"
+    ) # to make sure provide only available info to the prompt
 
-    append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))
+    for func_name, cg_path_func_level in pr.call_graph_paths_k.items():
+        call_graph_info_str_function_level = ""
+        if cg_path_func_level:
+            for label, cg_paths in cg_path_func_level.items():
+                call_graph_info_str_sub = ""
+                if cg_paths:
+                    for i, cg in enumerate(cg_paths):
+                        sig_doc = pr.signatures_docstrings_k[func_name][label][i]
+                        imports = pr.imports_k[func_name][label][i]
+                        '''
+                        two options:
+                        * provide the entire call graph path to the prompt
+                        * provide only the entry function (Prefer)
+                        '''
+                        if cg[0].startswith("__") and cg[0].endswith("__"):
+                            try: # ideally should always exists
+                                special_method_explaination = offical_special_method_guidelines[cg[0]]
+                                call_graph_info_str_sub += f"Method #{i}: by triggering special method '{cg[0]}' of the following imported class\n"
+                                call_graph_info_str_sub +=  f"Hints: {special_method_explaination}.\n"
+                            except:
+                                append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {cg[0]}"))
+                        else:
+                            call_graph_info_str_sub += f"Method #{i}: by calling function '{cg[0]}'\n"
+                        if imports:
+                            call_graph_info_str_sub += f"{imports}" # import info endswith "\n", refer to PullRequest.py
+                        if sig_doc:
+                            call_graph_info_str_sub += f"{sig_doc}\n"
+                    
+                    if call_graph_info_str_sub:
+                        if label == "common":
+                            call_graph_info_str_sub = f"The following information is available for both the old and the new versions of code:\n{call_graph_info_str_sub}"
+                            # if common info exists for a changed function, only provide it to avoid any confusion from the one-version-info
+                            # option 1: get all the information, but only privide common to prompts
+                            call_graph_info_str_function_level += call_graph_info_str_sub
+                            break 
+                            # option 2: get common_info and stop in PullRequest.py get_union_call_graph
+                        elif label == "old":
+                            call_graph_info_str_sub = f"The following information is available only for the old code version:\n{call_graph_info_str_sub}" 
+                        else:
+                            call_graph_info_str_sub = f"The following information is available only for the new code version:\n{call_graph_info_str_sub}"
+                        
+                        call_graph_info_str_function_level += call_graph_info_str_sub
+
+            if call_graph_info_str_function_level:
+                call_graph_info_str_function_level = f"To access the changed function {func_name}:\n\n{call_graph_info_str_function_level}"
+                call_graph_info_str_funcs += call_graph_info_str_function_level
+    
+    if call_graph_info_str_funcs:
+        call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
+        info_public_and_private += f"{call_graph_info_str}\n"
+
+    # 3: all relevant classes
+    if pr.class_hover_texts:
+        info_public_and_private += f"The following shows the signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
+        info_public_and_private += f"Long docstrings are truncated, with an ellipsis (...) indicating omitted content.\n"
+        # add the relevant class hover texts
+        # for module_endswith_class, hover_text in pr.class_hover_texts.items():
+        info_public_and_private += "\n".join(pr.class_hover_texts)
+
+    append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))        
     return info_public_and_private
     # exit()
     
@@ -442,6 +417,8 @@ def generate_tests(pr, github_repo, changed_functions):
     if len(pr.full_diff.split("\n")) <= 200:
         if Config.call_graph == True: 
             info_public_and_private = prepare_call_info(pr)
+        else:
+            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled."))
 
         full_diff_len_fit = True
         prompt_full_diff = None
@@ -459,8 +436,11 @@ def generate_tests(pr, github_repo, changed_functions):
         append_event(Event(pr_nb=pr.number, message=f"Full diff is too long. #Round 0"))
 
     if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
-        if Config.call_graph == True and not info_public_and_private: 
-            info_public_and_private = prepare_call_info(pr)
+        if Config.call_graph == True:
+            if not info_public_and_private:
+                info_public_and_private = prepare_call_info(pr)
+        else:
+            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled."))
             
         filtered_diff_len_nonequal_fit = True
         prompt_filtered_diff = None
@@ -1402,13 +1382,12 @@ def main():
     start_logging()
     if args.paras:
         # auto-updates the prompt versions, available for both db mode and single-pr mode
-        if len(args.paras) == 8: # comparison mdoe
-            Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
-                    Config.use_error_feedback, Config.fix_static_error, Config.use_existing_tests, Config.iteration, Config.model_version = args.paras
-        else: # 9'. pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
-             Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
-                    Config.use_existing_tests, Config.call_graph, Config.fix_static_error, Config.use_error_feedback, \
-                    Config.iteration, Config.model_version = args.paras
+        # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
+        Config.initial_test_generation_prompt_version, Config.feedback_test_generation_prompt_version, Config.context_version, \
+                Config.use_existing_tests, Config.call_graph, Config.fix_static_error, Config.use_error_feedback, \
+                Config.iteration, Config.model_version = args.paras
+        if Config.initial_test_generation_prompt_version == 1:
+            Config.private_call_identification = 1 # to make sure baseline will not call for call paths
         
     if args.db:
         if args.project or args.pr:
