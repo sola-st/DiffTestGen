@@ -66,6 +66,7 @@ class PRResult:
         self.nb_different_behavior = 0
         self.cg = None
         self.some_changes_at_fun_level = None
+        self.max_round = 0
         self.differentiating_tests = []
         self.classification_results = []
 
@@ -142,7 +143,13 @@ class PRResult:
                 else:
                     if "_error_fix_" in entry["message"]:
                         self.nb_test_fixed += 1
-
+                if entry["message"] == "Test execution (old)":
+                    try:
+                        max_round_tmp = int(entry["code"].split("Round ", 1)[1].split(" ", 1)[0])
+                        self.max_round = max_round_tmp if max_round_tmp > self.max_round else self.max_round
+                    except:
+                        # print(entry["code"])
+                        pass
 
             elif entry["message"] == "Pre-classification":
                 diff_test = DifferentiatingTest(
@@ -310,7 +317,7 @@ class PRResult:
             return self.ignored_reason
         elif s == "checked":
             # print(self.number)
-            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs, {self.cg}, {self.some_changes_at_fun_level}" # (N fail(s) to 1 fix)
+            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs, {self.cg}, {self.some_changes_at_fun_level}, max_round: {self.max_round}" # (N fail(s) to 1 fix)
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
         else:

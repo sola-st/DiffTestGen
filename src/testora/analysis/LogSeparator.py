@@ -10,7 +10,7 @@ iterations = [0]
 model_version = "gpt-5-mini-2025-08-07"
 
 # option 1: for all projects
-target_projects = ["scipy", "marshmallow", "keras"]# "pandas", 
+target_projects = ["scipy", "marshmallow", "keras", "pandas"]
 
 # option 2: for a single project
 # with open(".target_project", "r") as f:
@@ -28,7 +28,7 @@ base_folder = join("data", "results")
 for target_project in target_projects:
     # version_ids = ['_'.join(map(str, config)) + f"_{name}" for config in config_versions for name in config_versions_names]
     version_ids = ['_'.join(map(str, config)) for config in config_versions.values()]
-    config_names = config_versions.keys()
+    config_names = list(config_versions.keys())
 
     log_results = join(base_folder, target_project)
     archive_results= join(log_results, "archive")
