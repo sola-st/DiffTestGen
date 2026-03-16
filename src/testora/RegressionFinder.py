@@ -875,7 +875,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
 
     # When need to further classify the different outputs, read the test info from stored info.
     if old_executions_differ_relevant:
-        append_event(BreakpointEvent(pr_nb=pr.number, message=f"Breakpoint data", changed_functions=changed_functions, 
+        append_event(BreakpointEvent(pr_nb=pr.number, message=f"Breakpoint data", changed_functions=f"{changed_functions}", 
                 old_executions_differ_relevant=f"{old_executions_differ_relevant}", new_executions_differ_relevant=f"{new_executions_differ_relevant}"))
     # else: # no different outputs
 
