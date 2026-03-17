@@ -65,15 +65,15 @@ def fetch_task(table_name="tasks"):
     def inner(connection, cursor):
         connection.start_transaction()
 
-        # check if there's already an unfinished task assigned to this container; if yes, work on it
-        select_query = (
-            f"SELECT project, pr, timestamp FROM {table_name} "
-            f"WHERE worker=%s AND result IS NULL"
-        )
-        cursor.execute(select_query, (my_worker_id,))
-        row = cursor.fetchone()
-        if row:
-            return row[0], row[1], row[2]
+        # # check if there's already an unfinished task assigned to this container; if yes, work on it
+        # select_query = (
+        #     f"SELECT project, pr, timestamp FROM {table_name} "
+        #     f"WHERE worker=%s AND result IS NULL"
+        # )
+        # cursor.execute(select_query, (my_worker_id,))
+        # row = cursor.fetchone()
+        # if row:
+        #     return row[0], row[1], row[2]
 
         # otherwise, fetch a new task and mark it as assigned to this container
         target_project_file = Path(".target_project")
@@ -111,15 +111,15 @@ def fetch_task_with_pr_filter(allowed_prs, table_name="tasks"):
     def inner(connection, cursor):
         connection.start_transaction()
 
-        # check if there's already an unfinished task assigned to this container; if yes, work on it
-        select_query = (
-            f"SELECT project, pr, timestamp FROM {table_name} "
-            f"WHERE worker=%s AND result IS NULL"
-        )
-        cursor.execute(select_query, (my_worker_id,))
-        row = cursor.fetchone()
-        if row:
-            return row[0], row[1], row[2]
+        # # check if there's already an unfinished task assigned to this container; if yes, work on it
+        # select_query = (
+        #     f"SELECT project, pr, timestamp FROM {table_name} "
+        #     f"WHERE worker=%s AND result IS NULL"
+        # )
+        # cursor.execute(select_query, (my_worker_id,))
+        # row = cursor.fetchone()
+        # if row:
+        #     return row[0], row[1], row[2]
 
         # otherwise, fetch a new task and mark it as assigned to this container, but only if pr in allowed_prs
         target_project_file = Path(".target_project")
