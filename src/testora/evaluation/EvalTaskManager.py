@@ -290,21 +290,29 @@ def schedule_classification_tasks():
         write_tasks(project, [classification_pr_nb], table_name)
 
 
-def remove_unfinished(project):
+def remove_unfinished(project, specified_prs=[]):
     if project == "all":
         for project in project_to_target_prs().keys():
             remove_unfinished_for_project(project)
     else:
-        remove_unfinished_for_project(project)
+        remove_unfinished_for_project(project, specified_prs)
 
 
-def remove_unfinished_for_project(project):
+def remove_unfinished_for_project(project, specified_prs=[], table_name="tasks"):
     def inner(connection, cursor):
-        delete_query = (
-            f"DELETE FROM {table_name} "
-            f"WHERE project = %s AND result IS NULL"
-        ) # f"WHERE project = %s AND timestamp LIKE '%2026-%'"
-        cursor.execute(delete_query, (project,))
+        if specified_prs:
+            placeholders = ",".join(["%s"] * len(specified_prs))
+            delete_query = (
+                f"DELETE FROM {table_name} "
+                f"WHERE project = %s AND pr IN ({placeholders}) AND result IS NULL"
+            )
+            cursor.execute(delete_query, (project, *specified_prs, ))
+        else:
+            delete_query = (
+                f"DELETE FROM {table_name} "
+                f"WHERE project = %s AND result IS NULL"
+            ) # f"WHERE project = %s AND timestamp LIKE '%2026-%'"
+            cursor.execute(delete_query, (project,))
 
     connect_and_do(inner)
 
