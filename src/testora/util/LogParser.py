@@ -182,10 +182,10 @@ class PRResult:
             elif entry["message"].startswith("Querying") or entry["message"].startswith("Cached result for querying"):
                 # to show whether the approach detects the changed function (not always all the changes at the function-level)
                 if not self.some_changes_at_fun_level:
-                    if "The diff affects the following functions: .\n" in entry["content"]: # no changes atthe function-level
-                        self.some_changes_at_fun_level = "No func-level changes"
-                    else:
+                    if "The diff affects the following functions: " in entry["content"]: # no changes atthe function-level
                         self.some_changes_at_fun_level = "Partial/all changes at the func-level"
+                    else:
+                        self.some_changes_at_fun_level = "No func-level changes"
                         
                 # if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
                 
@@ -317,7 +317,7 @@ class PRResult:
             return self.ignored_reason
         elif s == "checked":
             # print(self.number)
-            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, {self.nb_different_behavior} different outputs, {self.cg}, {self.some_changes_at_fun_level}, max_round: {self.max_round}" # (N fail(s) to 1 fix)
+            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, max_round: {self.max_round}, {self.nb_different_behavior} different outputs, {self.cg}, {self.some_changes_at_fun_level}" # (N fail(s) to 1 fix)
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
         else:
