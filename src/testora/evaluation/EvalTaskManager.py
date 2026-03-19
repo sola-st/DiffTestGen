@@ -317,6 +317,28 @@ def remove_unfinished_for_project(project, specified_prs=[], table_name="tasks")
     connect_and_do(inner)
 
 
+def show_unfinished(project):
+    if project == "all":
+        for project in project_to_target_prs().keys():
+            show_unfinished_for_project(project)
+    else:
+        show_unfinished_for_project(project)
+
+def show_unfinished_for_project(project):
+    def inner(connection, cursor):
+        check_query = (
+            f"SELECT pr FROM {table_name} "
+            f"WHERE project = %s AND result IS NULL"
+        )
+        cursor.execute(check_query, (project,))
+        results = cursor.fetchall()
+        print(f"Unfinished tasks in {project}:")
+        for row in results:
+            print(row[0])  # pr_nb
+
+    connect_and_do(inner)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Manage experiments/tasks via MySQL database")
@@ -332,6 +354,8 @@ if __name__ == "__main__":
                         help="Apply to classification tasks")
     parser.add_argument("--fetch_single_project", action="store_true",
                         help="Fetch results of finished tasks from the target project")
+    parser.add_argument("--show_unfinished", type=str,
+                        help="Fetch results of unfinished tasks from the target project")
 
     args = parser.parse_args()
 
@@ -351,5 +375,7 @@ if __name__ == "__main__":
             schedule_target_prs(args.schedule)
     elif args.remove_unfinished:
         remove_unfinished(args.remove_unfinished)
+    elif args.show_unfinished:
+        show_unfinished(args.show_unfinished)
     else:
         print("Must pass an argument.")
