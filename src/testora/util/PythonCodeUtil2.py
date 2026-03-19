@@ -264,14 +264,14 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
             return True
         else:
             # check whether the module is in the public api list, e.g., pandas 60183 changed some files not in the public apis
-            if whether_module_is_public(public_apis_list, [target_base_module, target_base_module_abbr]) == False:
-                # fall back to name conventions
-                if func_name.startswith("_"): 
-                    return False
-                else:
-                    return True
+            # if whether_module_is_public(public_apis_list, [target_base_module, target_base_module_abbr]) == False:
+            # fall back to name conventions
+            if func_name.startswith("_"): # not allowed to call both "_" and "__" leading 'functions'. 
+                return False
             else:
                 return True
+            # else:
+            #     return True
     
     # 2: for the general changed function and caller function check 
     import_line = ""
@@ -289,7 +289,7 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
                 import_line = f"from {module_to_import} import {func_name}"
         else:
             import_line = f"from {module_to_import} import {func_name}" # import the function
-    elif whether_module_is_public(public_apis_list, [target_base_module, target_base_module_abbr]) == False:
+    else: # if whether_module_is_public(public_apis_list, [target_base_module, target_base_module_abbr]) == False:
             # fall back to name conventions
             if func_name.startswith("__") and func_name.endswith("__") and parent_class_name:
                 import_line = f"from {module_to_import} import {parent_class_name}"
@@ -303,14 +303,14 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
         
     return import_line, module_to_import, class_hover_text_to_return
 
-def whether_module_is_public(public_apis_list, modules):
-    in_public_list = False
-    for module in modules:
-        found = [api for api in public_apis_list if api.startswith(module)]
-        if found:
-            in_public_list = True
-            break
-    return in_public_list
+# def whether_module_is_public(public_apis_list, modules):
+#     in_public_list = False
+#     for module in modules:
+#         found = [api for api in public_apis_list if api.startswith(module)]
+#         if found:
+#             in_public_list = True
+#             break
+#     return in_public_list
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """

@@ -60,7 +60,7 @@ class PullRequest:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
         
-        if Config.call_graph == True and Config.initial_test_generation_prompt_version == 5:
+        if Config.call_graph == True:
             # earlier check whether we should compute the call graph
             if len(self.full_diff.split("\n")) <= 200 or len(self.filtered_diff.split("\n")) <= 200:
                 self._prepare_to_use_call_graph()
