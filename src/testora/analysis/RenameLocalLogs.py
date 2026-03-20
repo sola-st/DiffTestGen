@@ -3,13 +3,14 @@ from os import listdir, rename
 from os.path import join
 
 
-def rename_log_file(file):
+def rename_log_file(file, file_folder):
     new_file_name = None
+    log_file = join(file_folder, file)
     try:
-        with open(file, "r") as f:
+        with open(log_file, "r") as f:
             info = json.load(f)
     except:
-        print(f"Error reading {file}")
+        print(f"Error reading {log_file}")
         return new_file_name
 
     call_graph_block = info[-1]
@@ -19,16 +20,15 @@ def rename_log_file(file):
     if not str(pr) in file:
         if call_graph_block["message"] == "Done with PR":
             new_file_name = f"{pr}_{file}"
-            rename(file, new_file_name)
         else:
             unfinshed_file = file.replace(".json", "_unfinished.json")
             new_file_name = f"{pr}_{unfinshed_file}"
-            rename(file, new_file_name)
+        rename(log_file, join(file_folder, new_file_name))
     
     return new_file_name
     
 
-if "__main__"=="__name__":
+if __name__ == "__main__":
     # to rename logs in folder
     # projects = ["marshmallow","scipy", "pandas", "keras"]
     folder = "."
@@ -37,4 +37,4 @@ if "__main__"=="__name__":
     files = listdir(folder)
     for file in files:
         if file.startswith("logs_"):
-            rename_log_file(join(folder, file))
+            rename_log_file(file, folder)
