@@ -67,6 +67,7 @@ class PRResult:
         self.cg = None
         self.some_changes_at_fun_level = None
         self.max_round = 0
+        self.error_types = set()
         self.differentiating_tests = []
         self.classification_results = []
 
@@ -134,6 +135,9 @@ class PRResult:
                     self.cg += ", private"
                 if "special method" in content:
                     self.cg += ", special"
+            elif entry["message"].startswith("Added info about call graph"):
+                if not "added" in self.cg:
+                    self.cg = f"{self.cg}, added"
 
             # include all the error tests (even been fixed later)
             elif entry["message"].startswith("Test execution"):
@@ -150,6 +154,14 @@ class PRResult:
                     except:
                         # print(entry["code"])
                         pass
+
+            elif entry["message"].startswith("Fix runtime errors"):
+                tmp = entry["message"].split("old: ['")[1]
+                tmp2 = tmp.split("'], new: ['")
+                error_old = tmp2[0]
+                error_new = tmp2[1].rstrip("']")
+                self.error_types.add(error_old)
+                self.error_types.add(error_new)
 
             elif entry["message"] == "Pre-classification":
                 diff_test = DifferentiatingTest(
@@ -317,7 +329,12 @@ class PRResult:
             return self.ignored_reason
         elif s == "checked":
             # print(self.number)
-            return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, max_round: {self.max_round}, {self.nb_different_behavior} different outputs, {self.cg}, {self.some_changes_at_fun_level}" # (N fail(s) to 1 fix)
+            return (f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, "
+                    f"{self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, "
+                    f"max_round: {self.max_round}, {self.nb_different_behavior} different outputs, "
+                    f"{self.cg}, {self.some_changes_at_fun_level}, " # (N fail(s) to 1 fix)
+                    f"{self.error_types}"
+            )
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
         else:
@@ -369,7 +386,10 @@ def parse_log_files(log_files):
                 entry["pr_nb"] = current_pr_number
                 current_entries.append(entry)
             elif entry["pr_nb"] == 0:
-                meta_entries.append(entry)
+                if entry["message"].startswith("Added info"):
+                    current_entries.append(entry)
+                else:
+                    meta_entries.append(entry)
             elif entry["message"] == "Done with PR":
                 current_entries.append(entry)
                 pr_results.append(
