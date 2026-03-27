@@ -37,7 +37,8 @@ if mode == "comparison":
         "testora": [1, 0, 1, None, False, False, False],
         "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
         # "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
-        # "no_cg": [5, 8, 8, 'pr-modified', False, True, True]
+        # "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
+        # "no-runtime": [5, 8, 8, 'pr-modified', True, False, True]
     } 
 elif mode == "ablation":
     # base setting about ablation, to trun off feedback and call graph
@@ -58,9 +59,10 @@ elif mode == "ablation":
                     pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback]
     turn_off_indices_values = {
         "1": 0,
-        "4": False
+        "4": False,
+        "5": False
     } # trun off feedback and call graph
-    config_names = ["no_coverage_feedback", "no_cg"]
+    config_names = ["no_coverage_feedback", "no_cg", "no_runtime"]
     
     # {} to only focus on the ablation settings
     # {"difftestgen": [5, 8, 8, "pr-modified", True, True, True]} # to include our approach
