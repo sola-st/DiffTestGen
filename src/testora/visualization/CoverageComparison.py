@@ -158,10 +158,16 @@ class CoverageComparison():
     
     # # option 2: run on the specified PRs (in order)
     def get_multiple_pr_coverage_info(self, project=""):
-        pr_file = join("data", "meta", "pr_nums", f"{project}_checked.txt")
-        # # marshmallow 53, keras 149, 
-        # # pandas 132, scipy 136
-        # pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset43.txt")
+        # pr_file = join("data", "meta", "pr_nums", f"{project}_checked.txt")
+        num = 53
+        if project == "keras":
+            num = 160
+        elif project == "pandas":
+            num = 128
+        elif project == "scipy":
+            num = 129
+
+        pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
 
         with open(pr_file, "r") as f:
             prs = f.readlines()

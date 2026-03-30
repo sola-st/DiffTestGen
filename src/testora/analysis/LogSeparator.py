@@ -21,7 +21,8 @@ config_versions = {
     "testora": [1, 0, 1, None, False, False, False],
     "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
     "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
-    "no_cg": [5, 8, 8, 'pr-modified', False, True, True]
+    "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
+    "no-runtime": [5, 8, 8, 'pr-modified', True, False, True]
 }
 
 base_folder = join("data", "results")

@@ -43,8 +43,16 @@ def get_overall_cov_rate(cov_pair_dict):
     # option 1: (old_ucovered + new_convered) / (old_all + new_all)
     old = cov_pair_dict["old"]
     new = cov_pair_dict["new"]
-    numerator_old, denominator_old = get_numerator_and_denominator_from_str(old)
-    numerator_new, denominator_new = get_numerator_and_denominator_from_str(new)
+
+    numerator_old = 0
+    denominator_old = 0
+    if old != "--":
+        numerator_old, denominator_old = get_numerator_and_denominator_from_str(old)
+    
+    numerator_new = 0
+    denominator_new = 0
+    if new != "--":
+        numerator_new, denominator_new = get_numerator_and_denominator_from_str(new)
 
     # old + new
     numerator_all = numerator_old + numerator_new
