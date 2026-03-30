@@ -149,27 +149,27 @@ class RuntimeErrorFeedbackStatistics():
 
         # target_projects = ["scipy"]
 
-        config_versions = [
-            # [1, 0, 1, False],
-            # [5, 5, 5, False],
-            # [5, 8, 8, False],
-            [5, 8, 8, True]
-        ]
+        config_names = ["difftestgen", "no_coverage_feedback", "no_cg"]#, "no_runtime"]
+
+        target_projects = {
+            "marshmallow": 53,
+            "pandas": 128,
+            "scipy": 129
+        }
 
         project_level = []
         single_iteration = []
-        for config in config_versions:
-            version_id = '_'.join(map(str, config))
 
-            for target_project in target_projects:
-                pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset10.txt")
+        for version_name in config_names:
+            for target_project, num in target_projects.items():
+                pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
                 with open(pr_file, "r") as f:
                     prs = f.readlines()
                 pr_list = [int(pr) for pr in prs]
                 
                 for pr in pr_list:
                     # use a fixed order of the prs, could help when check across repetitions (iterations).
-                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_id}", target_project)
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
                     log_file_path = None
                     for fname in listdir(log_folder):
                         if str(pr) in fname:
@@ -211,9 +211,9 @@ class RuntimeErrorFeedbackStatistics():
             }
 
             to_write = [overall_str] + project_level + single_iteration
-            parent_folder = join(results_folder, "table_and_plots", model_version)
+            parent_folder = join(results_folder, "table_and_plots", "differ_distribution")
             makedirs(parent_folder, exist_ok=True)
-            result_file = join(parent_folder, f"runtime_error_feedback_statistics_{version_id}.json")
+            result_file = join(parent_folder, f"differ_statistics_{version_name}.json")
             with open(result_file, "w") as f:
                 json.dump(to_write, f, indent=4)
 

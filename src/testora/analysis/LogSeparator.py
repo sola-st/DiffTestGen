@@ -22,7 +22,7 @@ config_versions = {
     "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
     "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
     "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
-    "no-runtime": [5, 8, 8, 'pr-modified', True, False, True]
+    "no_runtime": [5, 8, 8, 'pr-modified', True, False, True]
 }
 
 base_folder = join("data", "results")

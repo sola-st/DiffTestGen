@@ -167,7 +167,8 @@ class CoverageComparison():
         elif project == "scipy":
             num = 129
 
-        pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
+        # pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
+        pr_file = join("data", "meta", f"subset_{project}.txt")
 
         with open(pr_file, "r") as f:
             prs = f.readlines()

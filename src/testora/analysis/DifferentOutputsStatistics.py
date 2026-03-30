@@ -159,29 +159,25 @@ class DifferentOutputsStatistics():
         #     target_project = f.read().strip()
         # target_projects = [target_project]
 
-        config_versions = [
-            [1, 0, 1, False],
-            [5, 8, 8, True]
-            ]
+        config_names = ["difftestgen", "no_coverage_feedback", "no_cg"]#, "no_runtime"]
         comparison_str_list = [] # to record the comparison info between the two versions
         baseline_pr_set = None
         our_approach_pr_set = None
 
-        for i, config in enumerate(config_versions):
+        for i, version_name in enumerate(config_names):
             project_level = []
             single_iteration = []
-            version_id = '_'.join(map(str, config))
 
             for target_project, num in project_info.items():
                 self.overall_diff_related_pr_nums.update({target_project: set()})
 
-                pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
+                pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
                 with open(pr_file, "r") as f:
                     prs = f.readlines()
                 pr_list = [int(pr) for pr in prs]
                 
                 for pr in pr_list:
-                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_id}", target_project)
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
                     log_file_path = None
                     for fname in os.listdir(log_folder):
                         if str(pr) in fname:
@@ -236,58 +232,58 @@ class DifferentOutputsStatistics():
 
             to_write = [overall_str] + project_level + single_iteration
 
-            result_file = join(results_folder, "table_and_plots", model_version, f"Different_outputs_statistics_{version_id}.json")
+            result_file = join(results_folder, "table_and_plots", f"Different_outputs_statistics_{version_name}.json")
             with open(result_file, "w") as f:
                 json.dump(to_write, f, indent=4)
 
-            if len(config_versions) > 1: # hard code 1, assue the two versions are baseline and our approach
-                # create a comparison file to check whether the diff_related_prs are unique.
-                comparison_str_list.append({version_id: overall_str})
-                if i == 0:
-                    baseline_pr_set = self.overall_diff_related_pr_nums
-                elif i == 1:
-                    our_approach_pr_set = self.overall_diff_related_pr_nums
+            # if len(config_versions) > 1: # hard code 1, assue the two versions are baseline and our approach
+            #     # create a comparison file to check whether the diff_related_prs are unique.
+            #     comparison_str_list.append({version_name: overall_str})
+            #     if i == 0:
+            #         baseline_pr_set = self.overall_diff_related_pr_nums
+            #     elif i == 1:
+            #         our_approach_pr_set = self.overall_diff_related_pr_nums
 
             self.clear_overall()
 
-        if len(config_versions) > 1:
-            # comparison, # hard code 2
-            unique_prs_by_baseline = {"unique_prs_by_baseline_num": 0}
-            unique_prs_by_our_approach = {"unique_prs_by_our_approach_num": 0}
-            unique_prs_by_baseline_num = 0
-            unique_prs_by_our_approach_num = 0
+        # if len(config_versions) > 1:
+        #     # comparison, # hard code 2
+        #     unique_prs_by_baseline = {"unique_prs_by_baseline_num": 0}
+        #     unique_prs_by_our_approach = {"unique_prs_by_our_approach_num": 0}
+        #     unique_prs_by_baseline_num = 0
+        #     unique_prs_by_our_approach_num = 0
 
-            for project, prs_base in baseline_pr_set.items():
-                prs_our_approach = our_approach_pr_set[project]
-                # focus on baseline
-                unique_prs_by_baseline_sub = prs_base.difference(prs_our_approach)
-                unique_prs_by_baseline_sub_num = len(unique_prs_by_baseline_sub)
-                unique_prs_by_baseline_num += unique_prs_by_baseline_sub_num
-                unique_prs_by_baseline.update({project: {
-                        "num": unique_prs_by_baseline_sub_num,
-                        "prs": f"{unique_prs_by_baseline_sub}"
-                        }})
+        #     for project, prs_base in baseline_pr_set.items():
+        #         prs_our_approach = our_approach_pr_set[project]
+        #         # focus on baseline
+        #         unique_prs_by_baseline_sub = prs_base.difference(prs_our_approach)
+        #         unique_prs_by_baseline_sub_num = len(unique_prs_by_baseline_sub)
+        #         unique_prs_by_baseline_num += unique_prs_by_baseline_sub_num
+        #         unique_prs_by_baseline.update({project: {
+        #                 "num": unique_prs_by_baseline_sub_num,
+        #                 "prs": f"{unique_prs_by_baseline_sub}"
+        #                 }})
                 
-                # focus on our approach
-                unique_prs_by_our_approach_sub = prs_our_approach.difference(prs_base)
-                unique_prs_by_our_approach_sub_num = len(unique_prs_by_our_approach_sub)
-                unique_prs_by_our_approach_num += unique_prs_by_our_approach_sub_num
-                unique_prs_by_our_approach.update({project: {
-                        "num": unique_prs_by_our_approach_sub_num,
-                        "prs": f"{unique_prs_by_our_approach_sub}"
-                        }})
+        #         # focus on our approach
+        #         unique_prs_by_our_approach_sub = prs_our_approach.difference(prs_base)
+        #         unique_prs_by_our_approach_sub_num = len(unique_prs_by_our_approach_sub)
+        #         unique_prs_by_our_approach_num += unique_prs_by_our_approach_sub_num
+        #         unique_prs_by_our_approach.update({project: {
+        #                 "num": unique_prs_by_our_approach_sub_num,
+        #                 "prs": f"{unique_prs_by_our_approach_sub}"
+        #                 }})
             
-            # update the overall unique numbers
-            unique_prs_by_baseline["unique_prs_by_baseline_num"] = unique_prs_by_baseline_num
-            unique_prs_by_our_approach["unique_prs_by_our_approach_num"] = unique_prs_by_our_approach_num
+        #     # update the overall unique numbers
+        #     unique_prs_by_baseline["unique_prs_by_baseline_num"] = unique_prs_by_baseline_num
+        #     unique_prs_by_our_approach["unique_prs_by_our_approach_num"] = unique_prs_by_our_approach_num
             
-            # integrate to a big str
-            comparison_str_list.append({"unique_prs_by_baseline": unique_prs_by_baseline})
-            comparison_str_list.append({"unique_prs_by_our_approach": unique_prs_by_our_approach})
+        #     # integrate to a big str
+        #     comparison_str_list.append({"unique_prs_by_baseline": unique_prs_by_baseline})
+        #     comparison_str_list.append({"unique_prs_by_our_approach": unique_prs_by_our_approach})
 
-            result_file = join(results_folder, "table_and_plots", model_version, f"Different_outputs_statistics_comparison.json")
-            with open(result_file, "w") as f:
-                json.dump(comparison_str_list, f, indent=4)
+        #     result_file = join(results_folder, "table_and_plots", model_version, f"Different_outputs_statistics_comparison.json")
+        #     with open(result_file, "w") as f:
+        #         json.dump(comparison_str_list, f, indent=4)
 
 
 if __name__=="__main__":

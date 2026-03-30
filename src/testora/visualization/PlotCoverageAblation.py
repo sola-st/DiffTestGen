@@ -90,7 +90,7 @@ def plot_coverages_violin(overall_data, all_version_id, title, result_pdf):
     # Add legend
     legend_elements = [
         Line2D([0], [0], marker='x', color='blue', label='Arithmetic Mean', linestyle='None'),
-        Line2D([0], [0], marker='o', color='orange', label='Geometric Mean', linestyle='None'),
+        # Line2D([0], [0], marker='o', color='orange', label='Geometric Mean', linestyle='None'),
     ]
     ax.legend(handles=legend_elements, loc='lower right')
     
@@ -102,17 +102,8 @@ def main():
     iteration = 0
    # model_version = "gpt-4o-mini-2024-07-18"
     model_version = "gpt-5-mini-2025-08-07"
-    target_projects = ["scipy", "marshmallow", "pandas"]#, "keras"]
-    config_names = ["difftestgen", "no_coverage_feedback", "no_cg"]#, "no_runtime"]
-    # config_versions = {
-    #     "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
-    #     "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
-    #     "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
-    #     "no_runtime": [5, 8, 8, 'pr-modified', True, True, False]
-    # }
-    # config_names = list(config_versions.keys())
-    # all_version_id = list(config_versions.values())
-
+    target_projects = ["marshmallow", "pandas", "scipy"]#, "keras"]
+    config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_runtime"]
 
     results_folder = join("data", "results")
     across_projects = []
@@ -142,7 +133,7 @@ def main():
 
     # for the plot
     overall_data = get_overall_coverage_rates(across_projects)
-    result_pdf = join(results_folder, "table_and_plots", "Comparison_ablation_3proj.pdf") 
+    result_pdf = join(results_folder, "table_and_plots", "Comparison_ablation.pdf") 
     title = "Coverage Comparison (Ablation study)"
     plot_coverages_violin(overall_data, config_names, title, result_pdf)
 
