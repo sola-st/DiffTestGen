@@ -207,7 +207,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests, pr)
 
         append_event(Event(pr_nb=pr.number,
-                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning)"))
+                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
 
         return static_err_fixed_tests, test_msg_pairs # static_err_fixed_tests may duplicate
         
