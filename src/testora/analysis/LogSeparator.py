@@ -8,6 +8,7 @@ import shutil
 iterations = [0]
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
+subset_mode = True # to grab only a specific list of PRs.
 
 # option 1: for all projects
 target_projects = ["scipy", "marshmallow", "keras", "pandas"]
@@ -22,11 +23,18 @@ config_versions = {
     "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
     "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
     "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
-    "no_runtime": [5, 8, 8, 'pr-modified', True, False, True]
+    "no_runtime": [5, 8, 8, 'pr-modified', True, True, False]
 }
 
 base_folder = join("data", "results")
 for target_project in target_projects:
+    pr_list = None
+    if subset_mode:
+        pr_file = join("data", "meta", f"subset_{target_project}.txt")
+        with open(pr_file, "r") as f:
+            prs = f.readlines()
+        pr_list = [int(pr) for pr in prs]
+
     # version_ids = ['_'.join(map(str, config)) + f"_{name}" for config in config_versions for name in config_versions_names]
     version_ids = ['_'.join(map(str, config)) for config in config_versions.values()]
     config_names = list(config_versions.keys())
@@ -40,13 +48,19 @@ for target_project in target_projects:
         for file in log_files:
             log_file_path = join(log_folder, file)
             if isfile(log_file_path):
-                # # just for convenience, time-based filter
-                # if "09-" in file:
-                #     date = int(file.split(" ")[0].split("09-")[1])
-                #     if date < 18: 
-                #         continue
-                # else:
-                #     continue
+                # to get only the specified pr logs.
+                if pr_list:
+                    pr_num = int(file.split("_", 1)[0])
+                    if pr_num not in pr_list:
+                        continue
+
+                # just for convenience, time-based filter
+                if "03-" in file:
+                    date = int(file.split(" ")[0].split("03-")[1])
+                    if date < 20: 
+                        continue
+                else:
+                    continue
 
                 with open(log_file_path, "r") as f:
                     info = json.load(f) 
@@ -62,6 +76,8 @@ for target_project in target_projects:
                     idx = version_ids.index(version_id)
                     config_name = config_names[idx]
                     separated_results_folder = join(base_folder, model_version, f"iter_{iteration}", f"log_{config_name}", target_project)
+                    if pr_list:
+                        separated_results_folder = join(base_folder, model_version, f"iter_{iteration}_subset", f"log_{config_name}", target_project)
                     makedirs(separated_results_folder, exist_ok=True)
                     if not exists(join(separated_results_folder, file)):
                         shutil.copy2(log_file_path, separated_results_folder)
