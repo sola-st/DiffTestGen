@@ -180,7 +180,7 @@ def de_dup_tests_with_name(tests):
 
 def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, round=0, do_name_reformatting=True):
     raw_answer = model.query(prompt, nb_samples)
-    append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+    append_event(LLMEvent(pr_nb=pr.number, message=f"Raw answer ({diff_version})", content="\n---(next sample)---".join(raw_answer)))
 
     generated_tests = prompt.parse_answer(raw_answer)
     # Separate the examples if the model answers in a big python code block.
@@ -189,7 +189,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         if len(matches) > 1: # multiple usage examples in one python block
             speparator_prompt = TestPythonBlockSeparatorPrompt(generated_tests[0])
             separate_raw_answer = llm.query(speparator_prompt)
-            append_event(LLMEvent(pr_nb=pr.number, message="Separate raw answer", content="\n---(next sample)---".join(separate_raw_answer)))
+            append_event(LLMEvent(pr_nb=pr.number, message=f"Separate raw answer ({diff_version})", content="\n---(next sample)---".join(separate_raw_answer)))
             generated_tests = prompt.parse_answer(raw_answer)
 
     nb_tests_before_dedup_and_cleaning = len(generated_tests)
@@ -207,7 +207,7 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
         static_err_fixed_tests, test_msg_pairs = remove_tests_with_private_call(generated_tests, pr)
 
         append_event(Event(pr_nb=pr.number,
-                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
+                message=f"Static error fixed {len(static_err_fixed_tests)}/{len(static_err_fixed_tests_dedup)} tests, ({diff_version}), ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. #Round {round})"))
 
         return static_err_fixed_tests, test_msg_pairs # static_err_fixed_tests may duplicate
         
@@ -402,28 +402,20 @@ def prepare_call_info(pr):
     
 def generate_tests(pr, github_repo, changed_functions):
     # prepare context used by one or more prompts
-    # full_diff is already computed (pr.full_diff) when the pull request is instantiated
-    pr.get_filtered_diff() # this adds filtered_diff info to pr.filtered_diff 
-
     all_tests = []
     test_msg_pairs_full_diff = []
     test_msg_pairs_filtered_diff = []
-
-    full_diff_len_fit = False
-    filtered_diff_len_nonequal_fit = False
-
     info_public_and_private = ""
     
-    if len(pr.full_diff.split("\n")) <= 200:
+    if pr.full_diff_len_fit == True:
         if Config.call_graph == True: 
             info_public_and_private = prepare_call_info(pr)
         else:
             append_event(Event(pr_nb=pr.number, message=f"Call graph disabled."))
 
-        full_diff_len_fit = True
         prompt_full_diff = None
         # full diff with GPT4, 5
-        if Config.initial_test_generation_prompt_version == 5: # TODO specific version of prompts
+        if Config.initial_test_generation_prompt_version == 5:
             prompt_full_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, \
                 pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=info_public_and_private)
         else: # e.g., other prompts, and testora
@@ -433,18 +425,17 @@ def generate_tests(pr, github_repo, changed_functions):
         if type(generated_tests) != dict:
             all_tests.extend(generated_tests)
     else:
-        append_event(Event(pr_nb=pr.number, message=f"Full diff is too long. #Round 0"))
+        append_event(Event(pr_nb=pr.number, message=f"Full diff is too long."))
 
-    if len(pr.filtered_diff.split("\n")) <= 200 and pr.filtered_diff != pr.full_diff:
+    if pr.filtered_diff_len_fit == True and pr.filtered_diff_len_nonequal_fit == True:
         if Config.call_graph == True:
             if not info_public_and_private:
                 info_public_and_private = prepare_call_info(pr)
         else:
             append_event(Event(pr_nb=pr.number, message=f"Call graph disabled."))
             
-        filtered_diff_len_nonequal_fit = True
         prompt_filtered_diff = None
-        # filtered diff with GPT4
+        # full diff with GPT4, 5
         if Config.initial_test_generation_prompt_version == 5:
             prompt_filtered_diff = RegressionTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff, \
                     pr.old_context, pr.new_context, pr.old_test_function_code, pr.new_test_function_code, call_graph_info=info_public_and_private)
@@ -455,14 +446,13 @@ def generate_tests(pr, github_repo, changed_functions):
         if type(generated_tests) != dict: # if it is a dict, empty_answer_filtered_diff = True
             all_tests.extend(generated_tests)
     else:
-        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is the same as full diff or it is too long. #Round 0"))
+        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is too long."))
     
     # also return the bool values to not check multiple times in the feedback rounds
-    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit
+    return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff
 
 
-def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len_fit, filtered_diff_len_nonequal_fit,
-            all_uncovered_modified_stmts_info_dict, round, all_for_further_needs:dict=None):
+def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered_modified_stmts_info_dict, round, all_for_further_needs:dict=None):
     '''
     Generate replacment tests for the ones that failed to reach the changed lines, 
     and keep different with the exisiting reached tests.
@@ -518,26 +508,14 @@ def generate_replacement_tests(pr, github_repo, changed_functions, full_diff_len
     test_msg_pairs_full_diff = []
     test_msg_pairs_filtered_diff = []
 
-    if full_diff_len_fit == True:
-        # full diff with GPT4
-        prompt_full_diff = None
-        # if Config.initial_test_generation_prompt_version == 5: # TODO specific version of prompts
-        #     prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff, 
-        #         all_uncovered_modified_stmts_info, old_context, new_context, pr.old_test_function_code, pr.new_test_function_code)
-        # else: # e.g., other prompts, and testora
+    if pr.full_diff_len_fit == True:
         prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
                 all_uncovered_modified_stmts_info, old_context, new_context)
         
         generated_test, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", round=round)
         all_tests.extend(generated_test)
 
-    if filtered_diff_len_nonequal_fit == True:
-        # filtered diff with GPT4
-        prompt_filtered_diff = None
-        # if Config.initial_test_generation_prompt_version == 5:
-        #     prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
-        #             all_uncovered_modified_stmts_info, old_context, new_context, pr.old_test_function_code, pr.new_test_function_code)
-        # else:
+    if pr.filtered_diff_len_fit == True and pr.filtered_diff_len_nonequal_fit == True:
         prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
                 all_uncovered_modified_stmts_info, old_context, new_context)
         
@@ -732,13 +710,18 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         return
 
     # ignore if only comment changes
-    if not pr.has_non_comment_change():
+    if not pr.with_non_comment_change:
         append_event(Event(pr_nb=pr.number, message="Ignoring because only comments changed"))
         return
 
     # ignore if labeled as documentation-only change
     if pr.title.startswith("DOC"):
         append_event(Event(pr_nb=pr.number, message="Ignoring because labeled as 'DOC'"))
+        return
+    
+    # ignore if both full diff and filtered diff are too long
+    if pr.full_diff_len_fit == False and pr.filtered_diff_len_fit == False:
+        append_event(Event(pr_nb=pr.number, message=f"Ignoring because both full and filtered diff are too long."))
         return
 
     '''
@@ -757,8 +740,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         return
 
     # generate tests via LLM
-    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit, \
-            = generate_tests(pr, github_repo, changed_functions)
+    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff = generate_tests(pr, github_repo, changed_functions)
     
     if not generated_tests:
         if not test_msg_pairs_full_diff and not test_msg_pairs_filtered_diff:
@@ -767,7 +749,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
     
     old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new = \
             run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, \
-                    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit)
+                    generated_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff)
     if all_covered_modified_stmts_old == None:
         return
 
@@ -899,7 +881,7 @@ def check_union_coverage_full_cover_exist(missed_stmts:dict, covered_stmts:dict)
     return updated_missed_stmts, uncover_exist
 
 def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, generated_tests, 
-            test_msg_pairs_full_diff, test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit,
+            test_msg_pairs_full_diff, test_msg_pairs_filtered_diff,
             old_executions=None, new_executions=None, all_covered_modified_stmts_old=None, all_covered_modified_stmts_new=None, 
             round=0, old_missed=None, new_missed=None):
     ''' 
@@ -947,7 +929,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                         refine_tests_with_no_private_call(pr, github_repo, changed_functions, code_and_err_msgs_full_diff, code_and_err_msgs_filtered_diff)
                 # go through to update the tests
                 append_event(Event(pr_nb=pr.number, 
-                        message=f"Static error feedback fixed {len(static_err_fixed_tests_may_dup)} tests. #Round {round}. #Inner round {inner_round}"))
+                        message=f"Static error feedback fixed {len(static_err_fixed_tests_may_dup)} tests, overall on full and filtered diff. #Round {round}. #Inner round {inner_round}"))
                 # # the indices does not match
                 # for idx, test in zip((test_idx_full_diff + test_idx_filtered_diff), static_err_fixed_tests_may_dup):
                 #     generated_tests.insert(test_idx, test)
@@ -1028,13 +1010,13 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 # option 1
                 if inner_round >= Config.error_feedback_max:
                     # max attempt to fix the test, but still fails on both versions of the code
-                    append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Max attempt ({Config.error_feedback_max}) reaches."))
+                    append_event(Event(pr_nb=pr.number, message=f"Runtime error feedback loop ends after inner round {inner_round}. Max attempt ({Config.error_feedback_max}) reaches."))
                     break
                 
                 # option 2
                 # if [error_type_in_old, error_type_in_new] in pre_error_types:
                 #     # TODO same type error, or same type but different location
-                #     append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Error type does not change."))
+                #     append_event(Event(pr_nb=pr.number, message=f"Runtime error feedback loop ends after inner round {inner_round}. Error type does not change."))
                 #     end_event_recorded = True
                 #     break
 
@@ -1068,7 +1050,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 fixed_executions_old.append(old_execution)
                 fixed_executions_new.append(new_execution)
                 if end_event_recorded == False:
-                    append_event(Event(pr_nb=pr.number, message=f"Error feedback loop ends after inner round {inner_round}. Test passes at least one of the code versions."))
+                    append_event(Event(pr_nb=pr.number, message=f"Runtime error feedback loop ends after inner round {inner_round}. Test passes at least one of the code versions."))
 
         # replace the old failed tests with the last fix
         append_event(Event(pr_nb=pr.number, message=f"Round #{round}. Discard {len(error_fixed_tests)} error tests."))
@@ -1152,7 +1134,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 # start from the first round of feedback, if the union coverage (round level) does not change, even have not reaches 100%, stop the feedback loop.
                 if pre_round_old_missed == old_missed and pre_round_new_missed == new_missed:
                     is_coverage_changed = False
-                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, union coverage info does not change anymore."))
+                    append_event(Event(pr_nb=pr.number, message=f"Coverage feedback ends after round {round}, union coverage info does not change anymore."))
             
             # feedback loop to get new tests that are expected to cover more modified lines.
             if is_coverage_changed == True: # and round < Config.max_round:
@@ -1161,18 +1143,18 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     round+=1
                     details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"
                     append_event(CoverageEvent(pr_nb=pr.number, 
-                            message=f"Refinement, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
+                            message=f"Coverage feedback, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
                     
                     # here test_msg_pairs_full_diff, test_msg_pairs_filtered_diff only used for round 0
                     refined_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff = generate_replacement_tests(pr, github_repo, changed_functions, 
-                            full_diff_len_fit, filtered_diff_len_nonequal_fit, all_uncovered_modified_stmts_info, round, all_for_further_needs)
+                            all_uncovered_modified_stmts_info, round, all_for_further_needs)
                     run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, test_msg_pairs_full_diff,
-                            test_msg_pairs_filtered_diff, full_diff_len_fit, filtered_diff_len_nonequal_fit,
+                            test_msg_pairs_filtered_diff,
                             old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
                 else:
-                    append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, union coverage reaches 100%."))
+                    append_event(Event(pr_nb=pr.number, message=f"Coverage feedback ends after round {round}, union coverage reaches 100%."))
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Refinement ends after round {round}, full coverage exists."))
+            append_event(Event(pr_nb=pr.number, message=f"Coverage feedback ends after round {round}, full coverage exists."))
 
     return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
 

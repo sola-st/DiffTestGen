@@ -6,7 +6,7 @@ from os import makedirs
 import os
 
 iteration = 0
-mode = "ablation" # could be 'comparison' and 'ablation'
+mode = "comparison" # could be 'comparison' and 'ablation'
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
 pr_split_num = 1 # could be None, 1, 2, or 3
@@ -37,7 +37,10 @@ if mode == "comparison":
     # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
     config_versions = {
         "testora": [1, 0, 1, None, False, False, False],
-        "difftestgen": [5, 8, 8, "pr-modified", True, True, True]
+        "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
+        "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
+        "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
+        "no_runtime": [5, 8, 8, 'pr-modified', True, True, False]
     } 
 elif mode == "ablation":
     # base setting about ablation

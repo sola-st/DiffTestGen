@@ -10,10 +10,8 @@ class RegressionTestGeneratorPromptV345:
 
         # the following only provide the info when it is available
         self.changed_function_block = ""
-        if fut_qualified_names:
-            fut_qualified_names_str = ", ".join(fut_qualified_names)
+        if fut_qualified_names: # at least one of the versions has the function body
             self.changed_function_block = (
-                f"The diff affects the following functions: {fut_qualified_names_str}.\n"
                 f"The following are the old and the new versions of these affected functions:\n"
                 f"Old version:\n\n{old_context}\n\nNew version:\n\n{new_context}\n"
             )
@@ -33,34 +31,6 @@ class RegressionTestGeneratorPromptV345:
         self.use_json_output = False
 
     def create_prompt(self, default_len_limit=40000):
-        # option 1: raise the legnth to handle the "too long" prompts, e.g., to 100,000
-#         template = """
-# Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff:
-
-# {diff}
-
-# {changed_function_block}
-# {call_graph_block}
-# {test_function_block}
-# The usage examples you create should use only the public API of the {project_name} project. You can assume that the project is installed and ready to be imported. Do NOT use any randomly generated data or timestamps in your examples; instead use fixed or deterministically created inputs. Create usage examples that are diverse and cover a wide range of scenarios, e.g., by (not) passing optional parameters or using different APIs to achieve the same purpose.
-
-# Answer by giving two usage examples that cover normal usage scenarios and two usage examples that focus on corner cases (e.g., unusual values, such as None, NaN or empty lists).
-# Each example must be an executable piece of Python code, including all necessary imports.
-# Print all relevant values, including intermediate values, in a human-readable form.
-
-# If multiples examples are generated, do not combine them as a single Python code block. Instead, wrap each individual example in its own separate Python code block using the following output format:
-# ```python
-# # Example 1:
-# ...
-# ```
-# ```python
-# # Example 2:
-# ...
-# ```
-# etc.
-# """
-
-        # option 2: dynamically add info
         template_prefix = """
 Your task is to generate usage examples of the {project_name} project that expose behavioral differences introduced by the following diff:
 
@@ -89,6 +59,15 @@ etc.
 
         # template part 1
         template_prompt = template_prefix_str
+        if self.fut_qualified_names:
+            fut_qualified_names_str = ", ".join(self.fut_qualified_names)
+            affected_funcs = f"The diff affects the following functions: {fut_qualified_names_str}.\n"
+
+            if (current_len + len(affected_funcs) <= default_len_limit):
+                template_prompt += f"\n{affected_funcs}"
+                current_len += len(affected_funcs)
+            else:
+                append_event(Event(pr_nb=0, message=f"Initial prompt fails to add info about changed function names. Current prompt length: {current_len}."))
 
         # template part 2
         # collect the available blocks until reaching len limit.

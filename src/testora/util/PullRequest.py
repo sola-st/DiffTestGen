@@ -39,10 +39,21 @@ class PullRequest:
         self.full_diff = self.get_full_diff() 
         self._compute_modified_lines() # extract from full_diff, all modified lines, includes the non-excutable ones
         self._get_refined_changed_hunks()
-
-        # only compute diffs once, full_diff at above location, and filtered diff at the initial round test generation
-        # all the following feedback rounds will get the diff strs by these two attributes.
+        
+        self.with_non_comment_change = self.has_non_comment_change()
         self.filtered_diff = ""
+        self.get_filtered_diff() # get self.filtered_diff
+        # earlier check whether we should compute further details
+        self.full_diff_len_fit = False # default
+        self.filtered_diff_len_fit = False
+        self.filtered_diff_len_nonequal_fit = False
+
+        if len(self.full_diff.split("\n")) <= 200:
+            self.full_diff_len_fit = True
+        if len(self.filtered_diff.split("\n")) <= 200:
+            self.filtered_diff_len_fit = True
+        if self.filtered_diff != self.full_diff:
+            self.filtered_diff_len_nonequal_fit = True
 
         # a extra context provider. 
         # could contains different types of contexts, e.g., the entire file contents, only the modified functions, etc.
@@ -59,13 +70,6 @@ class PullRequest:
         if Config.use_existing_tests != None:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
-        
-        if Config.call_graph == True:
-            # earlier check whether we should compute the call graph
-            if len(self.full_diff.split("\n")) <= 200 or len(self.filtered_diff.split("\n")) <= 200:
-                self._prepare_to_use_call_graph()
-            else:
-                Config.call_graph == False #  do not compute call graph
 
     def _prepare_to_use_call_graph(self):
         self.public_apis_union = [] # for identifying the private functions in the generated tests
@@ -288,6 +292,8 @@ class PullRequest:
                     return "too many"
         else:
             too_many = self.helper_inner(cloned_repo, version, prompt_base)
+            if too_many:
+                return "too many"
 
     def helper_inner(self, cloned_repo, version, prompt_base, server=None):
         code_context = ""
@@ -342,9 +348,13 @@ class PullRequest:
                         code_context_with_line_num_str += "\n"
 
                 if function_names:
-                    if len(function_names) > 10:
-                        append_event(Event(pr_nb=self.number, message=f"Too many changed functions ({len(function_names)})."))
-                        return "too many"
+                    func_tuple_with_only_name = None
+                    if type(function_names[0]) == tuple: # our approach
+                        func_tuple_with_only_name = [func[0] for func in function_names]
+                        tmp_filter = [func for func in func_tuple_with_only_name if func.startswith("_") and not func.startswith("__")]
+                        if len(tmp_filter) > 10:
+                            append_event(Event(pr_nb=self.number, message=f"Too many changed private functions ({len(function_names)})."))
+                            return "too many"
                         
                     if type(function_names[0]) == tuple: # our approach
                         if Config.call_graph == True:
@@ -444,6 +454,14 @@ class PullRequest:
                                 
                                 if function_names_to_get_cg_new:
                                     self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
+                        else:
+                            if version == "old":
+                                for func_name in func_tuple_with_only_name:
+                                    self.changed_function_qualified_names_old.append(f"{module_name}.{func_name}") 
+                            else:
+                                for func_name in func_tuple_with_only_name:
+                                    self.changed_function_qualified_names_new.append(f"{module_name}.{func_name}") 
+
                     else: # original Testora
                         for func_name in function_names:
                             self.changed_function_qualified_names_new.append(f"{module_name}.{func_name}")
