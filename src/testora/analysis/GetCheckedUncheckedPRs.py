@@ -19,6 +19,7 @@ for project in target_projects:
         num = 157
     # pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
     pr_file = join("data", "meta", "pr_nums", f"{project}_PRs_all.txt")
+    # pr_file = join("data", "meta",  f"subset_{project}.txt")
 
     with open(pr_file, "r") as f:
         prs = f.readlines()
