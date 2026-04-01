@@ -71,6 +71,9 @@ class PullRequest:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
 
+        if Config.call_graph == True:
+            self._prepare_to_use_call_graph()
+
     def _prepare_to_use_call_graph(self):
         self.public_apis_union = [] # for identifying the private functions in the generated tests
         self.public_apis_old = [] 
