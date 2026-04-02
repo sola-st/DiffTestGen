@@ -7,23 +7,28 @@ max_iteration = 1
 mode = "comparison" # could be 'comparison' and 'ablation'
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
-pr_split_num = 1 # could be None, 1, 2, or 3
 
 with open(".target_project", "r") as f:
     target_project = f.read().strip()
-    
-# marshmallow 53, keras 133, pandas 128, scipy 129
-num = 65
-if target_project == "keras":
-    num = 160
-elif target_project == "pandas":
-    num = 143
-elif target_project == "scipy":
-    num = 157
 
-pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
-if pr_split_num:
-    pr_file = pr_file.replace(".txt", f"_{pr_split_num}.txt")
+subset_mode = True
+pr_files = None
+if subset_mode == True:
+    pr_file = join("data", "meta", f"subset_{target_project}.txt")
+else:
+    pr_split_num = 1 # could be None, 1, 2, or 3
+    # marshmallow 53, keras 133, pandas 128, scipy 129
+    num = 65
+    if target_project == "keras":
+        num = 160
+    elif target_project == "pandas":
+        num = 143
+    elif target_project == "scipy":
+        num = 157
+
+    pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
+    if pr_split_num:
+        pr_file = pr_file.replace(".txt", f"_{pr_split_num}.txt")
 
 with open(pr_file, "r") as f:
     prs = f.readlines()

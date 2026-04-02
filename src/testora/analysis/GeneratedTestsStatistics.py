@@ -93,10 +93,15 @@ class DifferentOutputsStatistics():
 
     def main(self):
         results_folder = join("data", "results")
+        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics")
+        os.makedirs(output_folder, exist_ok=True)
 
         iteration = 0
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
+        config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_runtime"]
+        subset_mode = True
+
         # option 1: for all projects
         project_info = {
             "scipy": 129,
@@ -108,30 +113,31 @@ class DifferentOutputsStatistics():
         # option 2: for a single project
         # with open(".target_project", "r") as f:
         #     target_project = f.read().strip()
-        # target_projects = [target_project]
-
-        config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_runtime"]
+        # target_projects = [target_project, 0]
 
         for version_name in config_names:
             project_level = []
             single_iteration = []
 
             for target_project, proj_num in project_info.items():
-                # pr_file = join("data", "meta", f"subset_{target_project}.txt")
                 pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{proj_num}.txt")
+                if subset_mode == True:
+                    pr_file = join("data", "meta", f"subset_{target_project}.txt")
                 with open(pr_file, "r") as f:
                     prs = f.readlines()
                 pr_list = [int(pr) for pr in prs]
                 
                 for pr in pr_list:
                     log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
+                    if subset_mode == True:
+                        log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
                     log_file_path = None
                     for fname in os.listdir(log_folder):
                         if str(pr) in fname:
                             log_file_path = join(log_folder, fname)
                             break
                     if log_file_path is None:
-                        print(f"Iteration {iteration}: No log file found for PR {pr} in {log_folder}")
+                        print(f"Iteration {iteration}, {version_name}: No log file found for PR {pr} in {log_folder}")
                         single_iteration.append({"pr_num": pr}) 
                     else:
                         with open(log_file_path, "r") as f:
@@ -172,7 +178,7 @@ class DifferentOutputsStatistics():
 
             to_write = [overall_str] + project_level + single_iteration
 
-            result_file = join(results_folder, "table_and_plots", f"Generated_tests_statistics_{version_name}.json")
+            result_file = join(output_folder, f"{version_name}.json")
             with open(result_file, "w") as f:
                 json.dump(to_write, f, indent=4)
 

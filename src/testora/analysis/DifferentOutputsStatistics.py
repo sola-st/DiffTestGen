@@ -66,8 +66,11 @@ class DifferentOutputsStatistics():
             if "message" in info_block.keys():
                 msg = info_block["message"]
                 if not max_rounds:
-                    if msg.startswith("Refinement ends"):
-                        max_rounds = int(msg.split("Refinement ends after round ", 1)[1].split(",", 1)[0])
+                    if msg.startswith("Coverage feedback ends") or msg.startswith("Refinement ends"):
+                        try:
+                            max_rounds = int(msg.split("Coverage feedback ends after round ", 1)[1].split(",", 1)[0])
+                        except:
+                            max_rounds = int(msg.split("Refinement ends after round ", 1)[1].split(",", 1)[0])
                         from_rounds = [0 for _ in range(max_rounds+1)]
 
                 if msg.startswith("Different outputs"):
@@ -81,7 +84,7 @@ class DifferentOutputsStatistics():
                     else:
                         from_uncertain_diff += 1
 
-                    if "# Round" in test_name:
+                    if "# Round " in test_name:
                         round_num = int(test_name.split("# Round ", 1)[1].split(" ", 1)[0])
                         from_rounds[round_num] += 1
                     else:
@@ -95,6 +98,7 @@ class DifferentOutputsStatistics():
                 "from_full_diff": from_full_diff,
                 "from_filtered_diff": from_filtered_diff,
                 "from_uncertain_diff": from_uncertain_diff,
+                "from_uncertain_round": from_uncertain_round
             }
         }
 
@@ -142,10 +146,15 @@ class DifferentOutputsStatistics():
 
     def main(self):
         results_folder = join("data", "results")
+        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics")
+        os.makedirs(output_folder, exist_ok=True)
 
         iteration = 0
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
+        config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_runtime"]
+        subset_mode = True
+
         # option 1: for all projects
         project_info = {
             "scipy": 129,
@@ -159,7 +168,6 @@ class DifferentOutputsStatistics():
         #     target_project = f.read().strip()
         # target_projects = [target_project]
 
-        config_names = ["difftestgen", "no_coverage_feedback", "no_cg"]#, "no_runtime"]
         comparison_str_list = [] # to record the comparison info between the two versions
         baseline_pr_set = None
         our_approach_pr_set = None
@@ -172,12 +180,17 @@ class DifferentOutputsStatistics():
                 self.overall_diff_related_pr_nums.update({target_project: set()})
 
                 pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
+                if subset_mode == True:
+                    pr_file = join("data", "meta", f"subset_{target_project}.txt")
+
                 with open(pr_file, "r") as f:
                     prs = f.readlines()
                 pr_list = [int(pr) for pr in prs]
                 
                 for pr in pr_list:
                     log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
+                    if subset_mode == True:
+                        log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
                     log_file_path = None
                     for fname in os.listdir(log_folder):
                         if str(pr) in fname:
@@ -204,6 +217,7 @@ class DifferentOutputsStatistics():
                         "project_from_full_diff": self.project_from_full_diff,
                         "project_from_filtered_diff": self.project_from_filtered_diff,
                         "project_from_uncertain_diff": self.project_from_uncertain_diff,
+                        "project_from_uncertain_round": self.project_from_uncertain_round
                     }
                 }
 
@@ -223,6 +237,7 @@ class DifferentOutputsStatistics():
                     "overall_from_full_diff": self.overall_from_full_diff,
                     "overall_from_filtered_diff": self.overall_from_filtered_diff,
                     "overall_from_uncertain_diff": self.overall_from_uncertain_diff,
+                    "overall_from_uncertain_round": self.overall_from_uncertain_round
                 },
                 "related_prs": f"{self.overall_diff_related_pr_nums}"
             }
@@ -232,7 +247,8 @@ class DifferentOutputsStatistics():
 
             to_write = [overall_str] + project_level + single_iteration
 
-            result_file = join(results_folder, "table_and_plots", f"Different_outputs_statistics_{version_name}.json")
+            
+            result_file = join(output_folder, f"{version_name}.json")
             with open(result_file, "w") as f:
                 json.dump(to_write, f, indent=4)
 
