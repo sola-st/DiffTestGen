@@ -10,7 +10,7 @@ class RegressionTestGeneratorPromptV345:
 
         # the following only provide the info when it is available
         self.changed_function_block = ""
-        if fut_qualified_names: # at least one of the versions has the function body
+        if old_context or new_context: # at least one of the versions has the function body
             self.changed_function_block = (
                 f"The following are the old and the new versions of these affected functions:\n"
                 f"Old version:\n\n{old_context}\n\nNew version:\n\n{new_context}\n"

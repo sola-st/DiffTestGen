@@ -495,7 +495,7 @@ class PullRequest:
                                 else:
                                     self.public_apis_union = self.public_apis_new
 
-                if functions_code:
+                if functions_code and Config.changed_function_body == True:
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
                     code_context += "\n\n".join(functions_code)
                     code_context += "\n"
@@ -508,10 +508,13 @@ class PullRequest:
             self.get_top_k_shortest_across_different_entries()
             self.update_class_hover_text()
 
-        if version == "old":
-            self.old_context = code_context
+        if Config.changed_function_body == True:
+            if version == "old":
+                self.old_context = code_context
+            else:
+                self.new_context = code_context 
         else:
-            self.new_context = code_context 
+            append_event(Event(pr_nb=self.number, message=f"Providing changed function bodies is disabled ({version})."))
 
         if Config.context_version == 5 or prompt_base == 5:
             if version == "old":

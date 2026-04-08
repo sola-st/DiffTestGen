@@ -411,7 +411,7 @@ def get_function_names_code_with_line_num(code: str, patch_ranges: list):
 
 def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
     ''' 
-    Retrun modified function names, the code of the functions, 
+    Return modified function names, the code of the functions, 
     and a line marked version of code (will be used to add the to_cover mark)
     '''
     try:

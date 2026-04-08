@@ -19,11 +19,14 @@ target_projects = ["scipy", "marshmallow", "keras", "pandas"]
 # target_projects = [target_project]
 
 config_versions = {
-    "testora": [1, 0, 1, None, False, False, False],
-    "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
-    "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
-    "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
-    "no_runtime": [5, 8, 8, 'pr-modified', True, True, False]
+    "testora": [1, 0, 1, True, None, False, False, False],
+    "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
+    "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
+    "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
+    "no_runtime": [5, 8, 8, True, 'pr-modified', True, True, False],
+    "changed_function_body": [5, 8, 8, False, "pr-modified", True, True, True],
+    "no_changed_tests": [5, 8, 8, True, None, True, True, True],
+    "no_bodies": [5, 8, 8, False, None, True, True, True]
 }
 
 base_folder = join("data", "results")

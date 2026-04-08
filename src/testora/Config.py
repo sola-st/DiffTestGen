@@ -65,6 +65,7 @@ fix_static_error = True
 # "pr-modified": use the PR-modified tests, 
 # "all": use PR-modified tests + local tests
 use_existing_tests = "pr-modified"
+changed_function_body = True 
 
 call_graph = True
 

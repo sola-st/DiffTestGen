@@ -14,14 +14,20 @@ pr_split_num = 1 # could be None, 1, 2, or 3
 with open(".target_project", "r") as f:
     target_project = f.read().strip()
     
-# marshmallow 53, keras 133, pandas 128, scipy 129
-num = 65
-if target_project == "keras":
-    num = 160
-elif target_project == "pandas":
-    num = 143
-elif target_project == "scipy":
-    num = 157
+subset_mode = True
+pr_files = None
+if subset_mode == True:
+    pr_file = join("data", "meta", f"subset_{target_project}.txt")
+else:
+    pr_split_num = 1 # could be None, 1, 2, or 3
+    # marshmallow 53, keras 133, pandas 128, scipy 129
+    num = 65
+    if target_project == "keras":
+        num = 160
+    elif target_project == "pandas":
+        num = 143
+    elif target_project == "scipy":
+        num = 157
 
 pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
 if pr_split_num:
@@ -36,16 +42,20 @@ if mode == "comparison":
     # initial_prompt, feedback_prompt, context_version, \
     # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
     config_versions = {
-        "testora": [1, 0, 1, None, False, False, False],
-        "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
-        "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
-        "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
-        "no_runtime": [5, 8, 8, 'pr-modified', True, True, False]
+        "testora": [1, 0, 1, True, None, False, False, False],
+        "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
+        "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
+        "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
+        "no_runtime": [5, 8, 8, True, 'pr-modified', True, True, False],
+        "changed_function_body": [5, 8, 8, False, "pr-modified", True, True, True],
+        "no_changed_tests": [5, 8, 8, True, None, True, True, True], # turn off test function body,
+        "no_bodies": [5, 8, 8, False, None, True, True, True] # turn off both test function body and function body
     } 
 elif mode == "ablation":
     # base setting about ablation
     # about initial prompt
     initial_prompt = 5 # itself does not change, but inner changes, e.g., 1 and 2
+    changed_function_body = True
     pr_modified_tests = "pr-modified" # 1
     use_call_graph = True # in initial prompt # 2
 
@@ -57,12 +67,14 @@ elif mode == "ablation":
     fix_static_error = True # could be only once and multiple attempts # 4
     runtime_error_feedback = True # inner loop for every round # 5
 
-    our_approach = [initial_prompt, feedback_prompt, context_version, \
+    our_approach = [initial_prompt, feedback_prompt, context_version, changed_function_body, \
                     pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback]
     turn_off_indices_values = {
         "1": 0,
-        "4": False,
-        "5": False
+        "3": False,
+        "4": None,
+        "5": False,
+        "7": False
     } # trun off feedback and call graph
     config_names = ["no_coverage_feedback", "no_cg", "no_runtime"]
     

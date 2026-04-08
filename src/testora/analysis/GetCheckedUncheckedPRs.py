@@ -5,21 +5,27 @@ from os import listdir
 iteration = 0
 model_version = "gpt-5-mini-2025-08-07"
 version_name = "log_no_coverage_feedback"
+target_projects = ["marshmallow", "pandas", "scipy", "keras"]
+subset_mode = True
 results_folder = join("data", "results", model_version, f"iter_{iteration}", version_name)
-target_projects = ["scipy"] #, "scipy"] #["marshmallow", "pandas", "scipy", "keras"]
+if subset_mode:
+    results_folder = join("data", "results", model_version, f"iter_{iteration}_subset", version_name)
 
+num = 0
 for project in target_projects:
-    # marshmallow 53, keras 133, pandas 128, scipy 129
-    num = 65
-    if project == "keras":
-        num = 160
-    elif project == "pandas":
-        num = 143
-    elif project == "scipy":
-        num = 157
-    # pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
-    pr_file = join("data", "meta", "pr_nums", f"{project}_PRs_all.txt")
-    # pr_file = join("data", "meta",  f"subset_{project}.txt")
+    if subset_mode:
+        # marshmallow 53, keras 133, pandas 128, scipy 129
+        num = 65
+        if project == "keras":
+            num = 160
+        elif project == "pandas":
+            num = 143
+        elif project == "scipy":
+            num = 157
+        # pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
+        pr_file = join("data", "meta", "pr_nums", f"{project}_PRs_all.txt")
+    else:
+        pr_file = join("data", "meta",  f"subset_{project}.txt")
 
     with open(pr_file, "r") as f:
         prs = f.readlines()
