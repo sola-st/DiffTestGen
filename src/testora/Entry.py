@@ -44,7 +44,7 @@ if mode == "comparison":
         "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
         "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
         "no_runtime": [5, 8, 8, True, 'pr-modified', True, True, False],
-        "changed_function_body": [5, 8, 8, False, "pr-modified", True, True, True],
+        "no_changed_function": [5, 8, 8, False, "pr-modified", True, True, True],
         "no_changed_tests": [5, 8, 8, True, None, True, True, True], # turn off test function body,
         "no_bodies": [5, 8, 8, False, None, True, True, True] # turn off both test function body and function body
     } 
