@@ -374,7 +374,7 @@ def get_test_function_names_code_imports(code: str, patch_ranges: list):
             if set(list(range(start_line, end_line+1))).intersection(set(list(patch_range))):
                 # the start and end lines are both included, and start at 1.
                 module_with_node = cst.Module(body=[func_node])
-                function_code = module_with_node.code
+                function_code = module_with_node.code.lstrip()
                 matched_functions_code.add(function_code)
 
     return list(matched_functions_code), collector.imports # test functions
@@ -448,7 +448,7 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
                 matched_functions.add((func_node.name.value, name_start_line_0base, name_start_col_0base, parent_class)) # languge server is 0-based
 
                 module_with_node = cst.Module(body=[func_node])
-                function_code = module_with_node.code
+                function_code = module_with_node.code.lstrip()
                 matched_functions_code.add(function_code)
                 numbered_lines = [f"<{start_to_compare + i}> {line}" for i, line in enumerate(function_code.splitlines())]
                 function_code_with_line_numbers = "\n".join(numbered_lines)
@@ -475,6 +475,8 @@ def mark_to_cover_code_stmt(uncovered_info:list, file_path_to_code:dict): # list
         code_list = file_path_to_code[file_path]
         code_block = []
         for code in code_list:
+            if code_block:
+                code_block.append("\n") # add an empty line between the functions
             for code_line in code.splitlines(): # every code line starts with its line number
                 num_mark, ori_line = code_line.split("> ", 1)
                 if int(num_mark.replace("<", "")) in uncovered_stmt_nums:
@@ -484,6 +486,7 @@ def mark_to_cover_code_stmt(uncovered_info:list, file_path_to_code:dict): # list
                 else:
                     code_block.append(ori_line)
 
+        if code_block:
             code_with_to_cover_mark += f"The following are the affected functions from file <{file_path}>:\n"
             code_with_to_cover_mark += "\n".join(code_block)
             code_with_to_cover_mark += "\n"
@@ -501,17 +504,21 @@ def mark_code_stmt(covered_info:dict, union_uncovered_info:dict, file_path_to_co
             code_list = file_path_to_code[file_path]
             code_block = []
             for code in code_list:
+                if code_block:
+                    code_block.append("\n") # add an empty line between the functions
                 for code_line in code.splitlines(): # every code line starts with its line number
                     num_mark, ori_line = code_line.split("> ", 1)
-                    if int(num_mark.replace("<", "")) in still_uncovered_stmt_nums:
-                        # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
-                        # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
-                        code_block.append(f"{ori_line} # TO_COVER")
-                    elif int(num_mark.replace("<", "")) in covered_stmt_set:
-                        code_block.append(f"{ori_line} # COVERED")
-                    else:
-                        code_block.append(ori_line)
-
+                    if ori_line.strip():
+                        if int(num_mark.replace("<", "")) in still_uncovered_stmt_nums:
+                            # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
+                            # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
+                            code_block.append(f"{ori_line} # TO_COVER")
+                        elif int(num_mark.replace("<", "")) in covered_stmt_set:
+                            code_block.append(f"{ori_line} # COVERED")
+                        else:
+                            code_block.append(ori_line) # not changed lines
+            
+            if code_block:
                 code_with_mark += f"The following are the affected functions from file <{file_path}>:\n"
                 code_with_mark += "\n".join(code_block)
                 code_with_mark += "\n"

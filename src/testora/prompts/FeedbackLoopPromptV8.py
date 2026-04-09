@@ -13,11 +13,21 @@ class FeedbackTestGeneratorPromptV8:
         # the following only provide the info when it is available
         self.changed_function_block = ""
         if fut_qualified_names:
+            if old_context:
+                old_context = f"\n\n{old_context}"
+            else:
+                old_context = "<The functions do not exist in the old code version.>"
+
+            if new_context:
+                new_context = f"\n\n{new_context}"
+            else:
+                new_context = "<The functions do not exist in the new code version.>"
+
             fut_qualified_names_str = ", ".join(fut_qualified_names)
             self.changed_function_block = (
                 f"The diff affects the following functions: {fut_qualified_names_str}.\n"
                 f"The following are the old and the new versions of these affected functions:\n"
-                f"Old version:\n\n{old_context}\n\nNew version:\n\n{new_context}\n"
+                f"Old version: {old_context}\nNew version: {new_context}\n"
             )
 
         self.use_json_output = False

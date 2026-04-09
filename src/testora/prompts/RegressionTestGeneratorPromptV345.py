@@ -11,9 +11,19 @@ class RegressionTestGeneratorPromptV345:
         # the following only provide the info when it is available
         self.changed_function_block = ""
         if old_context or new_context: # at least one of the versions has the function body
+            if old_context:
+                old_context = f"\n\n{old_context}"
+            else:
+                old_context = "<The functions do not exist in the old code version.>"
+
+            if new_context:
+                new_context = f"\n\n{new_context}"
+            else:
+                new_context = "<The functions do not exist in the new code version.>"
+
             self.changed_function_block = (
                 f"The following are the old and the new versions of these affected functions:\n"
-                f"Old version:\n\n{old_context}\n\nNew version:\n\n{new_context}\n"
+                f"Old version: {old_context}\nNew version: {new_context}\n"
             )
 
         self.call_graph_block = ""
@@ -22,10 +32,20 @@ class RegressionTestGeneratorPromptV345:
 
         self.test_function_block = ""
         if old_tests or new_tests:
+            if old_tests:
+                old_tests = f"\n\n{old_tests}"
+            else:
+                old_tests = "<The test functions do not exist in the old code version.>"
+
+            if new_tests:
+                new_tests = f"\n\n{new_tests}"
+            else:
+                new_tests = "<The test functions do not exist in the new code version.>"
+
             self.test_function_block = (
                 f"The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested."
                 f"The following are the old and the new versions of these test functions:\n"
-                f"Old version:\n\n{old_tests}\n\nNew version:\n\n{new_tests}\n"
+                f"Old version: {old_tests}\nNew version: {new_tests}\n"
             )
 
         self.use_json_output = False

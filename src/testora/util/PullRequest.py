@@ -70,6 +70,8 @@ class PullRequest:
         if Config.use_existing_tests != None:
             # to extract self.modified_test_python_files
             self._compute_modified_test_python_files()
+        else:
+            append_event(Event(pr_nb=self.number, message=f"Providing changed test function bodies is disabled."))
 
         if Config.call_graph == True:
             self._prepare_to_use_call_graph()
