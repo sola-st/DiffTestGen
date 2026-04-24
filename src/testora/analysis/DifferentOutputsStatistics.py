@@ -179,6 +179,10 @@ class DifferentOutputsStatistics():
             for target_project, num in project_info.items():
                 self.overall_diff_related_pr_nums.update({target_project: set()})
 
+                log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
+                if subset_mode == True:
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
+
                 pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
                 if subset_mode == True:
                     pr_file = join("data", "meta", f"subset_{target_project}.txt")
@@ -188,9 +192,6 @@ class DifferentOutputsStatistics():
                 pr_list = [int(pr) for pr in prs]
                 
                 for pr in pr_list:
-                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
-                    if subset_mode == True:
-                        log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
                     log_file_path = None
                     for fname in os.listdir(log_folder):
                         if str(pr) in fname:

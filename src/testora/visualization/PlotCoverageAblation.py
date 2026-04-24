@@ -100,10 +100,11 @@ def plot_coverages_violin(overall_data, all_version_id, title, result_pdf):
 
 def main():
     iteration = 0
+    subset_mode = True
    # model_version = "gpt-4o-mini-2024-07-18"
     model_version = "gpt-5-mini-2025-08-07"
     target_projects = ["marshmallow", "pandas", "scipy"]#, "keras"]
-    config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_runtime"]
+    config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_changed_function", "no_changed_tests"]
 
     results_folder = join("data", "results")
     across_projects = []
@@ -115,6 +116,9 @@ def main():
 
         for name in config_names:
             log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{name}", project)
+            if subset_mode == True:
+                log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{name}", project)
+               
             init = CoverageComparison(log_folder, name)
             all_from_cur_version = init.get_multiple_pr_coverage_info(project)
             # write a meta file for a version

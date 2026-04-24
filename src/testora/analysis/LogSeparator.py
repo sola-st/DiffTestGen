@@ -5,7 +5,7 @@ from os import listdir, makedirs
 import shutil
 
 
-iterations = [0]
+# iterations = [0]
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
 subset_mode = True # to grab only a specific list of PRs.
@@ -21,10 +21,10 @@ target_projects = ["scipy", "marshmallow", "keras", "pandas"]
 config_versions = {
     "testora": [1, 0, 1, True, None, False, False, False],
     "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
-    "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
+    "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
     "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
     "no_runtime": [5, 8, 8, True, 'pr-modified', True, True, False],
-    "changed_function_body": [5, 8, 8, False, "pr-modified", True, True, True],
+    "no_changed_function": [5, 8, 8, False, "pr-modified", True, True, True],
     "no_changed_tests": [5, 8, 8, True, None, True, True, True],
     "no_bodies": [5, 8, 8, False, None, True, True, True]
 }
@@ -70,9 +70,12 @@ for target_project in target_projects:
                 
                 config_message_tmp = info[0]["message"].replace("Configuration: ", "", 1)
                 config_message = ast.literal_eval(config_message_tmp)
-                option_list = [config_message[key] for key in ["initial_test_generation_prompt_version", \
-                        "feedback_test_generation_prompt_version", "context_version", \
-                        "use_existing_tests", "call_graph", "fix_static_error", "use_error_feedback"]]
+                try :   
+                    option_list = [config_message[key] for key in ["initial_test_generation_prompt_version", \
+                            "feedback_test_generation_prompt_version", "context_version", "changed_function_body", \
+                            "use_existing_tests", "call_graph", "fix_static_error", "use_error_feedback"]]
+                except:
+                    pass # the old logs
                 version_id = '_'.join(map(str, option_list))
                 iteration = config_message["iteration"]
                 if version_id in version_ids:
