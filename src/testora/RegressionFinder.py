@@ -508,16 +508,30 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     test_msg_pairs_full_diff = []
     test_msg_pairs_filtered_diff = []
 
+    selected_cg_info =""
+    # TODO get the selected_cg_info
     if pr.full_diff_len_fit == True:
-        prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
-                all_uncovered_modified_stmts_info, old_context, new_context)
+        prompt_full_diff = None
+        if Config.feedback_test_generation_prompt_version == 8:
+            prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
+                    all_uncovered_modified_stmts_info, 
+                    pr.old_test_function_code, pr.new_test_function_code, call_graph_info=selected_cg_info)
+        else:
+            prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
+                    all_uncovered_modified_stmts_info, old_context, new_context)
         
         generated_test, test_msg_pairs_full_diff = generate_tests_with_prompt(pr, prompt_full_diff, llm, "full_diff", round=round)
         all_tests.extend(generated_test)
 
     if pr.filtered_diff_len_fit == True and pr.filtered_diff_len_nonequal_fit == True:
-        prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
-                all_uncovered_modified_stmts_info, old_context, new_context)
+        prompt_filtered_diff = None
+        if Config.feedback_test_generation_prompt_version == 8:
+            prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
+                    all_uncovered_modified_stmts_info, 
+                    pr.old_test_function_code, pr.new_test_function_code, call_graph_info=selected_cg_info)
+        else:
+            prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
+                    all_uncovered_modified_stmts_info, old_context, new_context)
         
         generated_test, test_msg_pairs_filtered_diff = generate_tests_with_prompt(pr, prompt_filtered_diff, llm, "filtered_diff", round=round)
         all_tests.extend(generated_test)
