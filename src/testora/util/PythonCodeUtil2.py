@@ -423,13 +423,12 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
     collector = FunctionCollector()
     wrapper.visit(collector)
 
-    matched_functions = set() # function names
-
+    matched_functions = [] # function names
     # the to_cover information represents future knowledge that isn't available during the initial test generation.
     # So, we can't provide the marked code at this stage. 
     # Instead, we add the marks during the feedback loop as part of creating prompt.
-    matched_functions_code = set() # used in initial test generation
-    matched_function_code_with_line_num = set() # used to mark to_cover lines in the feedback loop
+    matched_functions_code = [] # used in initial test generation
+    matched_function_code_with_line_num = [] # used to mark to_cover lines in the feedback loop
     for patch_range in patch_ranges:
         for func in collector.functions:
             func_node, deco_start_line, start_line, end_line, name_start_line_0base, name_start_col_0base, parent_class = func
@@ -445,14 +444,15 @@ def get_function_names_code_to_with_mark(code: str, patch_ranges: list):
                 # matched_functions.add(f"{class_name}.{func_node.name.value}")
 
                 # option 3: language server
-                matched_functions.add((func_node.name.value, name_start_line_0base, name_start_col_0base, parent_class)) # languge server is 0-based
-
-                module_with_node = cst.Module(body=[func_node])
-                function_code = module_with_node.code.lstrip()
-                matched_functions_code.add(function_code)
-                numbered_lines = [f"<{start_to_compare + i}> {line}" for i, line in enumerate(function_code.splitlines())]
-                function_code_with_line_numbers = "\n".join(numbered_lines)
-                matched_function_code_with_line_num.add(function_code_with_line_numbers)
+                func_to_append = (func_node.name.value, name_start_line_0base, name_start_col_0base, parent_class)
+                if func_to_append not in matched_functions:
+                    matched_functions.append(func_to_append) # languge server is 0-based
+                    module_with_node = cst.Module(body=[func_node])
+                    function_code = module_with_node.code.lstrip()
+                    matched_functions_code.append(function_code)
+                    numbered_lines = [f"<{start_to_compare + i}> {line}" for i, line in enumerate(function_code.splitlines())]
+                    function_code_with_line_numbers = "\n".join(numbered_lines)
+                    matched_function_code_with_line_num.append(function_code_with_line_numbers)
 
     return list(matched_functions), list(matched_functions_code), list(matched_function_code_with_line_num)
 
@@ -493,8 +493,9 @@ def mark_to_cover_code_stmt(uncovered_info:list, file_path_to_code:dict): # list
                 
     return code_with_to_cover_mark, overall_uncovered
 
-def mark_code_stmt(covered_info:dict, union_uncovered_info:dict, file_path_to_code:dict): 
+def mark_code_stmt(covered_info:dict, union_uncovered_info:dict, file_path_to_code:dict, file_path_to_func_name:dict): 
     code_with_mark = ""
+    uncovered_changed_ful_qua_funcs = []
 
     all_path_with_code = file_path_to_code.keys()
     for file_path, uncovered_stmt_nums in union_uncovered_info.items():
@@ -502,8 +503,10 @@ def mark_code_stmt(covered_info:dict, union_uncovered_info:dict, file_path_to_co
         still_uncovered_stmt_nums = uncovered_stmt_nums - covered_stmt_set
         if file_path in all_path_with_code:
             code_list = file_path_to_code[file_path]
+            func_name_list = file_path_to_func_name[file_path]
             code_block = []
-            for code in code_list:
+            covered_lines_exist = True
+            for code, func_name in zip(code_list, func_name_list):
                 if code_block:
                     code_block.append("\n") # add an empty line between the functions
                 for code_line in code.splitlines(): # every code line starts with its line number
@@ -513,17 +516,21 @@ def mark_code_stmt(covered_info:dict, union_uncovered_info:dict, file_path_to_co
                             # add a comment before the line/statement, keeps the structure clean, especially if lines are long or broken.
                             # Avoids accidental confusion with syntax in case trailing comments might affect parsing or execution.
                             code_block.append(f"{ori_line} # TO_COVER")
+                            covered_lines_exist = False
                         elif int(num_mark.replace("<", "")) in covered_stmt_set:
                             code_block.append(f"{ori_line} # COVERED")
                         else:
                             code_block.append(ori_line) # not changed lines
+
+                if covered_lines_exist == False:
+                    uncovered_changed_ful_qua_funcs.append(func_name)
             
             if code_block:
                 code_with_mark += f"The following are the affected functions from file <{file_path}>:\n"
                 code_with_mark += "\n".join(code_block)
                 code_with_mark += "\n"
                 
-    return code_with_mark
+    return code_with_mark, uncovered_changed_ful_qua_funcs
 
 
 # --- Example, for test ---

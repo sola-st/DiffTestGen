@@ -38,10 +38,11 @@ from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorP
 from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
+from testora.util.GetAccessInfoString import prepare_call_info, prepare_selected_call_info
 from testora.util.PrivateIdentification import has_private_accesses_or_fails_to_parse_api_lsp
 from testora.util.PullRequest import PullRequest
 from testora.llms.OpenAIGPT import OpenAIGPT
-from testora.util.Logs import (BreakpointEvent, CallGraphEvent, CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
+from testora.util.Logs import (BreakpointEvent, CoverageEvent, PreClassificationEvent, ReferenceTestEvent, start_logging, 
         ClassificationEvent, ErrorEvent, PREvent, SelectBehaviorEvent, TestExecutionEvent, append_event, 
         Event, ComparisonEvent, LLMEvent, get_logs_as_json, store_logs, reset_logs)
 from testora.util.PythonCodeUtil import has_private_accesses_or_fails_to_parse
@@ -267,138 +268,6 @@ def remove_tests_with_private_call(tests, pr):
                     test_msg_pairs.append([i, test, static_error_msg])
 
     return result, test_msg_pairs
-
-
-def prepare_call_info(pr):
-    # 0: overall: from the perspective of forming the call graph info str
-    call_graph_info_str = ""        
-    info_public_and_private = ""
-    offical_special_method_guidelines = {}
-
-    # for special methods
-    offical_special_methods_file = "src/testora/util/special_methods.txt"
-    with open(offical_special_methods_file, "r") as f:
-        offical_special_methods_tmp = f.readlines()
-        offical_special_method_guidelines_tmp = [{methods.split(" ", 1)[0]: methods} for methods in offical_special_methods_tmp if methods.startswith("__")]
-        offical_special_method_guidelines = {}
-        for d in offical_special_method_guidelines_tmp:
-            offical_special_method_guidelines.update(d)
-
-
-    # 1: for public functions
-    patterns = [r"To trigger changed method '([^']+)', which is a special method of the class", 
-            r"To trigger entry function '([^']+)', which is a special method of the class"]
-    import_lines_info = ""
-    for label, import_lines in pr.public_func_imports.items():
-        import_lines_info_sub = ""
-        if import_lines:
-            # add hints for special method entry functions.
-            for idx, imline in enumerate(import_lines):
-                if "is a special method of the class" in imline:
-                    # Example: To trigger changed method '{fully_qulified_name}' ...
-                    # From file PullRequest.py
-                    special_method = ""
-                    for pattern in patterns:
-                        fully_qulaified_name = re.search(pattern, imline)
-                        special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
-                        break
-                    try: # ideally should always exists, no errors
-                        special_method_explaination = offical_special_method_guidelines[special_method]
-                        # update imline
-                        import_lines[idx] = f"{imline}\nHints: {special_method_explaination}.\n"
-                    except:
-                        append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {fully_qulaified_name}"))
-
-            info = "\n".join(import_lines)
-            # here the old and new labeled info exists only when some functions/classes have been affected in only one version, there is no confusing info.
-            if label == "common":
-                import_lines_info_sub = f"The following information is available for both the old and the new versions of code:\n{info}"
-            elif label == "old":
-                import_lines_info_sub = f"The following information is available only for the old code version:\n{info}" 
-            else:
-                import_lines_info_sub = f"The following information is available only for the new code version:\n{info}"
-            
-            import_lines_info += f"{import_lines_info_sub}\n"
-        
-    if import_lines_info:
-        info_public_and_private = (f"For each affected public function, the following lists the available ways to access it. "
-            f"Refer to the class information below and the given changed function body above to check how to initialize the relevant classes and to check how to access the function, if any.\n"
-        )
-            
-        info_public_and_private += f"\n{import_lines_info}\n"
-
-    # 2: for private functions
-    # form the info about call graph
-    # each of them are a triple list: pr_level[function_level[path level]]
-    call_graph_info_str_funcs = ""
-    call_graph_info_str_prefix = (
-        "For each affected non-public function, the following lists the available ways to access it, if any. "
-        "Each way specifies which function to call, along with its signature and docstring (if available), to guide how it should be used. "
-        "Refer to the class information below to check how to initialize the relevant classes, if any.\n\n"
-    ) # to make sure provide only available info to the prompt
-
-    for func_name, cg_path_func_level in pr.call_graph_paths_k.items():
-        call_graph_info_str_function_level = ""
-        if cg_path_func_level:
-            for label, cg_paths in cg_path_func_level.items():
-                call_graph_info_str_sub = ""
-                if cg_paths:
-                    for i, cg in enumerate(cg_paths):
-                        sig_doc = pr.signatures_docstrings_k[func_name][label][i]
-                        imports = pr.imports_k[func_name][label][i]
-                        '''
-                        two options:
-                        * provide the entire call graph path to the prompt
-                        * provide only the entry function (Prefer)
-                        '''
-                        if cg[0].startswith("__") and cg[0].endswith("__"):
-                            try: # ideally should always exists
-                                special_method_explaination = offical_special_method_guidelines[cg[0]]
-                                call_graph_info_str_sub += f"Method #{i}: by triggering special method '{cg[0]}' of the following imported class\n"
-                                call_graph_info_str_sub +=  f"Hints: {special_method_explaination}.\n"
-                            except:
-                                append_event(Event(pr_nb=pr.number, message=f"Fail to get hints for private function: {cg[0]}"))
-                        else:
-                            call_graph_info_str_sub += f"Method #{i}: by calling function '{cg[0]}'\n"
-                        if imports:
-                            call_graph_info_str_sub += f"{imports}" # import info endswith "\n", refer to PullRequest.py
-                        if sig_doc:
-                            call_graph_info_str_sub += f"{sig_doc}\n"
-                    
-                    if call_graph_info_str_sub:
-                        if label == "common":
-                            call_graph_info_str_sub = f"The following information is available for both the old and the new versions of code:\n{call_graph_info_str_sub}"
-                            # if common info exists for a changed function, only provide it to avoid any confusion from the one-version-info
-                            # option 1: get all the information, but only privide common to prompts
-                            call_graph_info_str_function_level += call_graph_info_str_sub
-                            break 
-                            # option 2: get common_info and stop in PullRequest.py get_union_call_graph
-                        elif label == "old":
-                            call_graph_info_str_sub = f"The following information is available only for the old code version:\n{call_graph_info_str_sub}" 
-                        else:
-                            call_graph_info_str_sub = f"The following information is available only for the new code version:\n{call_graph_info_str_sub}"
-                        
-                        call_graph_info_str_function_level += call_graph_info_str_sub
-
-            if call_graph_info_str_function_level:
-                call_graph_info_str_function_level = f"To access the changed function {func_name}:\n\n{call_graph_info_str_function_level}"
-                call_graph_info_str_funcs += call_graph_info_str_function_level
-    
-    if call_graph_info_str_funcs:
-        call_graph_info_str = call_graph_info_str_prefix + call_graph_info_str_funcs 
-        info_public_and_private += f"{call_graph_info_str}\n"
-
-    # 3: all relevant classes
-    if pr.class_hover_texts:
-        info_public_and_private += f"The following shows the signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
-        info_public_and_private += f"Long docstrings are truncated, with an ellipsis (...) indicating omitted content.\n"
-        # add the relevant class hover texts
-        # for module_endswith_class, hover_text in pr.class_hover_texts.items():
-        info_public_and_private += "\n".join(pr.class_hover_texts)
-
-    append_event(CallGraphEvent(pr_nb=pr.number, message=f"Call graph ({len(info_public_and_private)})", content=info_public_and_private))        
-    return info_public_and_private
-    # exit()
     
 def generate_tests(pr, github_repo, changed_functions):
     # prepare context used by one or more prompts
@@ -461,6 +330,9 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
 
     old_context = ""
     new_context = ""
+    uncovered_changed_ful_qua_funcs_old = []
+    uncovered_changed_ful_qua_funcs_new = []
+    selected_cg_info = ""
     all_uncovered_modified_stmts_info = ""
 
     if Config.context_version == 5:
@@ -483,8 +355,11 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
         append_event(ReferenceTestEvent(pr_nb=pr.number, message=f"Reference test filtering, round {round}", details=event_detail))
         
         if union_uncovered_stmts: # prompt-5 based prompt 8
-            old_context = mark_code_stmt(old_covered_info, union_uncovered_stmts["old"], pr.old_context_with_line_num)
-            new_context = mark_code_stmt(new_covered_info, union_uncovered_stmts["new"], pr.new_context_with_line_num)
+            old_context, uncovered_changed_ful_qua_funcs_old = mark_code_stmt(
+                    old_covered_info, union_uncovered_stmts["old"], pr.old_context_with_line_num, pr.changed_function_qualified_names_old_dict)
+            new_context, uncovered_changed_ful_qua_funcs_new = mark_code_stmt(
+                    new_covered_info, union_uncovered_stmts["new"], pr.new_context_with_line_num, pr.changed_function_qualified_names_new_dict)
+            selected_cg_info = prepare_selected_call_info(pr, uncovered_changed_ful_qua_funcs_old, uncovered_changed_ful_qua_funcs_new)
         else:
             old_context = pr.old_context_with_line_num # code lines with line numbers marked
             new_context = pr.new_context_with_line_num
@@ -507,15 +382,13 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
     all_tests = []
     test_msg_pairs_full_diff = []
     test_msg_pairs_filtered_diff = []
-
-    selected_cg_info =""
-    # TODO get the selected_cg_info
+    
     if pr.full_diff_len_fit == True:
         prompt_full_diff = None
         if Config.feedback_test_generation_prompt_version == 8:
             prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
-                    all_uncovered_modified_stmts_info, 
-                    pr.old_test_function_code, pr.new_test_function_code, call_graph_info=selected_cg_info)
+                    all_uncovered_modified_stmts_info, old_context, new_context, 
+                    pr.old_test_function_code, pr.new_test_function_code, selected_cg_info=selected_cg_info)
         else:
             prompt_full_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.full_diff,
                     all_uncovered_modified_stmts_info, old_context, new_context)
@@ -527,8 +400,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
         prompt_filtered_diff = None
         if Config.feedback_test_generation_prompt_version == 8:
             prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
-                    all_uncovered_modified_stmts_info, 
-                    pr.old_test_function_code, pr.new_test_function_code, call_graph_info=selected_cg_info)
+                    all_uncovered_modified_stmts_info, old_context, new_context, 
+                    pr.old_test_function_code, pr.new_test_function_code, selected_cg_info=selected_cg_info)
         else:
             prompt_filtered_diff = FeedbackTestGeneratorPrompt(github_repo.name, changed_functions, pr.filtered_diff,
                     all_uncovered_modified_stmts_info, old_context, new_context)

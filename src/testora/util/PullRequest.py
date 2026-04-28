@@ -87,6 +87,7 @@ class PullRequest:
         '''
         # For both public and non-public ones, to return
         self.class_hover_texts = set() # shortest path related classes
+        self.class_hover_texts_dict = {}
 
         # for public changed functions
         # to 'return'
@@ -263,6 +264,7 @@ class PullRequest:
     
     def get_changed_function_names_and_context(self, prompt_base):
         self.changed_function_qualified_names_old = [] # all: public + private + unsure
+        self.changed_function_qualified_names_old_dict = {}
         if Config.context_version != 1: # original Testora does not goes for old version of changed functions
             pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
             # update self.changed_function_qualified_names_old
@@ -273,6 +275,7 @@ class PullRequest:
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
         # update self.changed_function_qualified_names_new
         self.changed_function_qualified_names_new = []
+        self.changed_function_qualified_names_new_dict = {}
         self.changed_function_qualified_names_new_no_public = []
         too_many = self.get_helper(post_commit_cloned_repo, "new", prompt_base)
         if too_many:
@@ -358,7 +361,8 @@ class PullRequest:
                         func_tuple_with_only_name = [func[0] for func in function_names]
                         tmp_filter = [func for func in func_tuple_with_only_name if func.startswith("_") and not func.startswith("__")]
                         if len(tmp_filter) > 10:
-                            append_event(Event(pr_nb=self.number, message=f"Too many changed private functions ({len(function_names)})."))
+                            pri_func_str = ", ".join(tmp_filter)
+                            append_event(Event(pr_nb=self.number, message=f"Too many changed private functions ({len(function_names)}). {pri_func_str}."))
                             return "too many"
                         
                     if type(function_names[0]) == tuple: # our approach
@@ -413,7 +417,9 @@ class PullRequest:
                                     else:
                                         self.changed_function_qualified_names_old_non_public.append(fully_qulified_name)
                                         function_names_to_get_cg_old.append(func_name)
-                                    
+
+                                self.changed_function_qualified_names_old_dict.update({modified_file.path: self.changed_function_qualified_names_old})
+
                                 # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
                                 if function_names_to_get_cg_old:
                                     self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
@@ -457,6 +463,8 @@ class PullRequest:
                                         self.changed_function_qualified_names_new_no_public.append(fully_qulified_name)
                                         function_names_to_get_cg_new.append(func_name)
                                 
+                                self.changed_function_qualified_names_new_dict.update({modified_file.path: self.changed_function_qualified_names_new})
+
                                 if function_names_to_get_cg_new:
                                     self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
                         else:
@@ -764,14 +772,15 @@ class PullRequest:
                             # align with the prompt info preparation part in file RegressionFinder.py. function 'generate_tests'
                             module_endswith_class = imline.split(" import ")[0].split("from ")[1]
                             if module_endswith_class in all_path_relevant_classes:
-                                # self.class_hover_texts.update({module_endswith_class, self.class_hover_texts_all[module_endswith_class]})
                                 self.class_hover_texts.add(nonpublic_hover[module_endswith_class])
+                                self.class_hover_texts_dict.update({module_endswith_class: nonpublic_hover[module_endswith_class]})
                         
                     if label == "common":
                         common_recorded = True
 
         # deduplicate between all the public changed function needed classes and the path relevant classes
         self.class_hover_texts.update(public_hover.values())
+        self.class_hover_texts_dict = self.class_hover_texts_dict | public_hover
 
     def get_call_graph_info(self, server, modified_file, function_names, version):
         append_event(Event(pr_nb=self.number, message=f"Starting to explore call graph paths, only private relevant ({version})."))

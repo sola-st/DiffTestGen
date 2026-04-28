@@ -74,7 +74,7 @@ If multiples examples are generated, do not combine them as a single Python code
 etc.
 """
         template_prefix_str = template_prefix.format(project_name=self.project_name, diff=self.diff)
-        template_postfix_str = template_postfix.format(project_name=self.project_name, diff=self.diff)
+        template_postfix_str = template_postfix.format(project_name=self.project_name)
         current_len = len(template_prefix_str) + len(template_postfix_str)
 
         # template part 1
