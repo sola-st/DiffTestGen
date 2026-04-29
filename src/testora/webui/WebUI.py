@@ -2,6 +2,7 @@ from collections import Counter
 from typing import Dict, List
 from flask import Flask, render_template
 import argparse
+import re
 from datetime import timedelta
 from testora.util.LogParser import PRResult, parse_log_files, parse_time_stamp, pr_results_as_dict
 
@@ -67,6 +68,35 @@ def compute_perf_stats(entries):
     return result
 
 
+def categorize_entry(entry):
+    message = entry.get("message", "")
+    content = entry.get("content", "")
+
+    if message.startswith("Call graph ("):
+        return "Call graph"
+    if message.startswith("Added info about call graph"):
+        return "Added call graph"
+    if message.startswith("Test execution"):
+        return "Test execution"
+    if message.startswith("Fix runtime errors"):
+        return "Fix runtime errors"
+    if message == "Pre-classification":
+        return "Pre-classification"
+    if message.startswith("Different outputs"):
+        return "Different outputs"
+    if message.startswith("Diff coverage, #"):
+        return "Diff coverage"
+    if message.startswith("Querying") or message.startswith("Cached result for querying"):
+        return "Querying"
+    if message.startswith("Compiling"):
+        return "Compiling"
+    if message == "Token usage":
+        return "Token usage"
+    if re.search(r"^(Generated \d+ tests|Generated \d+ more tests|Static error fixed \d+/)", message):
+        return "Generated tests"
+    return "Other"
+
+
 status_colors = {
     "unknown": "#FFFFE0",
     "checked": "#D3D3D3",
@@ -109,7 +139,24 @@ def main_page():
 def pr_page(number):
     pr_result = pr_number_to_result[int(number)]
     perf_stats = compute_perf_stats(pr_result.entries)
-    return render_template('pr.html', pr_result=pr_result, perf_stats=perf_stats)
+
+    entry_groups = [categorize_entry(entry) for entry in pr_result.entries]
+    unique_groups = []
+    for group in entry_groups:
+        if group not in unique_groups:
+            unique_groups.append(group)
+
+    group_counts = Counter(entry_groups)
+    entry_data = list(zip(pr_result.entries, entry_groups))
+
+    return render_template(
+        'pr.html',
+        pr_result=pr_result,
+        perf_stats=perf_stats,
+        entry_data=entry_data,
+        groups=unique_groups,
+        group_counts=group_counts
+    )
 
 
 if __name__ == "__main__":

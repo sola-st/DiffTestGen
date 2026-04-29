@@ -46,6 +46,22 @@
 
         .entries {
             font-size: 11pt;
+            margin-bottom: 16px;
+        }
+
+        .filter-button {
+            border: 1px solid #888;
+            background: #efefef;
+            padding: 8px 12px;
+            margin-right: 6px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .filter-button.active {
+            background: #007acc;
+            color: white;
+            border-color: #005f99;
         }
     </style>
 </head>
@@ -79,10 +95,19 @@
     </table>
 
     <h2>Log</h2>
-    {% for entry in pr_result.entries %}
-    <div class="entries">
+    <div id="group-buttons" style="margin-bottom: 16px;">
+        <button type="button" onclick="filterLogs('All')" class="filter-button active" data-group="All">All</button>
+        {% for group in groups %}
+        <button type="button" onclick="filterLogs('{{ group }}')" class="filter-button" data-group="{{ group }}">{{ group }} ({{ group_counts[group] }})</button>
+        {% endfor %}
+    </div>
+    {% for entry, entry_group in entry_data %}
+    <div class="entries" data-entry-group="{{ entry_group }}">
         <table>
             <thead>
+                <tr>
+                    <th colspan="2">Group: {{ entry_group }}</th>
+                </tr>
                 <tr>
                     <th>Key</th>
                     <th>Value</th>
@@ -99,6 +124,24 @@
         </table>
     </div>
     {% endfor %}
+
+    <script>
+        function filterLogs(group) {
+            const buttons = document.querySelectorAll('#group-buttons button');
+            buttons.forEach(button => {
+                button.classList.toggle('active', button.dataset.group === group);
+            });
+            const entries = document.querySelectorAll('.entries');
+            entries.forEach(entry => {
+                const entryGroup = entry.dataset.entryGroup;
+                entry.style.display = group === 'All' || entryGroup === group ? 'block' : 'none';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            filterLogs('All');
+        });
+    </script>
 </body>
 
 </html>
