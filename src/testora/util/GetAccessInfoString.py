@@ -32,9 +32,11 @@ def prepare_call_info(pr):
                     # From file PullRequest.py
                     special_method = ""
                     for pattern in patterns:
-                        fully_qulaified_name = re.search(pattern, imline)
-                        special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
-                        break
+                        fully_qulaified_name_tmp = re.search(pattern, imline)
+                        if fully_qulaified_name_tmp:
+                            fully_qulaified_name = fully_qulaified_name_tmp.group(1)
+                            special_method = fully_qulaified_name.rsplit(".", 1)[1]
+                            break
                     try: # ideally should always exists, no errors
                         special_method_explaination = offical_special_method_guidelines[special_method]
                         # update imline
@@ -170,16 +172,18 @@ def prepare_selected_call_info(pr, uncovered_changed_ful_qua_funcs_old, uncovere
                 label = ""
                 special_method = ""
                 for pattern in patterns:
-                    fully_qulaified_name = re.search(pattern, imline)
-                    if fully_qulaified_name in uncovered_funcs_common:
-                        label = "common"
-                    elif fully_qulaified_name in uncovered_funcs_only_for_old:
-                        label = "old"
-                    elif fully_qulaified_name in uncovered_funcs_only_for_new:
-                        label = "new"
+                    fully_qulaified_name_tmp = re.search(pattern, imline)
+                    if fully_qulaified_name_tmp:
+                        fully_qulaified_name = fully_qulaified_name_tmp.group(1)
+                        if fully_qulaified_name in uncovered_funcs_common:
+                            label = "common"
+                        elif fully_qulaified_name in uncovered_funcs_only_for_old:
+                            label = "old"
+                        elif fully_qulaified_name in uncovered_funcs_only_for_new:
+                            label = "new"
 
-                    special_method = fully_qulaified_name.group(1).rsplit(".", 1)[1]
-                    break
+                        special_method = fully_qulaified_name.rsplit(".", 1)[1]
+                        break
                 try: # ideally should always exists, no errors
                     if special_method.startswith("__"): 
                         special_method_explaination = offical_special_method_guidelines[special_method]
@@ -286,13 +290,20 @@ def prepare_selected_call_info(pr, uncovered_changed_ful_qua_funcs_old, uncovere
 
     # 3: all relevant classes
     if uncovered_import_lines:
-        info_public_and_private += f"The following shows the signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
-        info_public_and_private += f"Long docstrings are truncated, with an ellipsis (...) indicating omitted content.\n"
+        classes_str = ""
         # add the relevant class hover texts
         uncover_related_classes = set([im.split(" import ")[0].split("from ")[1] for im in uncovered_import_lines])
 
         for c in uncover_related_classes:
-            info_public_and_private += f"\n{pr.class_hover_texts_dict[c]}"
+            try:
+                classes_str += f"\n{pr.class_hover_texts_dict[c]}"
+            except:
+                pass
+        
+        if classes_str:
+            info_public_and_private += f"The following shows the signatures and docstrings of the relevant classes, which can be used as a reference when initializing them.\n"
+            info_public_and_private += f"Long docstrings are truncated, with an ellipsis (...) indicating omitted content.\n"
+            info_public_and_private += f"{classes_str}"
 
     append_event(CallGraphEvent(pr_nb=pr.number, message=f"Selected call graph ({len(info_public_and_private)})", content=info_public_and_private))        
     return info_public_and_private

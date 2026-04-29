@@ -503,7 +503,11 @@ def mark_code_stmt(covered_info:dict, union_uncovered_info:dict, file_path_to_co
         still_uncovered_stmt_nums = uncovered_stmt_nums - covered_stmt_set
         if file_path in all_path_with_code:
             code_list = file_path_to_code[file_path]
-            func_name_list = file_path_to_func_name[file_path]
+            func_name_list = []
+            try: # in case there is no function names in the file, the file is not recorded in dict 'file_path_to_func_name
+                func_name_list = file_path_to_func_name[file_path]
+            except:
+                pass 
             code_block = []
             covered_lines_exist = True
             for code, func_name in zip(code_list, func_name_list):
