@@ -315,7 +315,7 @@ def generate_tests(pr, github_repo, changed_functions):
         if type(generated_tests) != dict: # if it is a dict, empty_answer_filtered_diff = True
             all_tests.extend(generated_tests)
     else:
-        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is too long."))
+        append_event(Event(pr_nb=pr.number, message=f"Filtered diff is too long, or it is the same as the full diff."))
     
     # also return the bool values to not check multiple times in the feedback rounds
     return all_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff
