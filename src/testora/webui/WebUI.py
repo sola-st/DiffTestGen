@@ -19,15 +19,27 @@ pr_number_to_result: Dict[int, PRResult] = {}
 
 def summarize_status():
     summary = Counter()
+    total_time = timedelta(0)
     for pr_result in pr_results:
         summary["total"] += 1
         summary[pr_result.status()] += 1
+        if pr_result.entries:
+            start = parse_time_stamp(pr_result.entries[0]["timestamp"])
+            end = parse_time_stamp(pr_result.entries[-1]["timestamp"])
+            total_time += end - start
 
     # add percentages
     for key in summary:
         if key != "total":
             percentage = (int(summary[key]) / summary['total']) * 100
             summary[key] = f"{summary[key]} ({percentage:.1f}%)"
+
+    # add average execution time
+    if pr_results:
+        average_time = total_time / len(pr_results)
+        summary["avg. time"] = str(average_time)
+    else:
+        summary["avg. time"] = "0:00:00"
 
     return summary
 

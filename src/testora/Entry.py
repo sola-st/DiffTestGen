@@ -11,22 +11,23 @@ model_version = "gpt-5-mini-2025-08-07"
 with open(".target_project", "r") as f:
     target_project = f.read().strip()
 
-subset_mode = True
+subset_mode = False
 pr_files = None
 if subset_mode == True:
     pr_file = join("data", "meta", f"subset_{target_project}.txt")
 else:
     pr_split_num = 1 # could be None, 1, 2, or 3
-    # marshmallow 53, keras 133, pandas 128, scipy 129
-    num = 65
+    # marshmallow 53, keras 133, pandas 128, scipy 129 ==> 443
+    # marshmallow 65, keras 160, pandas 143, scipy 157 ==> 525
+    num = 53
     if target_project == "keras":
-        num = 160
+        num = 133
     elif target_project == "pandas":
-        num = 143
+        num = 128
     elif target_project == "scipy":
-        num = 157
+        num = 129
 
-    pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
+    pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
     if pr_split_num:
         pr_file = pr_file.replace(".txt", f"_{pr_split_num}.txt")
 

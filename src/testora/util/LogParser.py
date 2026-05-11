@@ -398,13 +398,13 @@ def parse_log_files(log_files):
                 current_entries = []
             elif entry["pr_nb"] == current_pr_number:
                 current_entries.append(entry)
-            else:
-                # for chaco test running specific logs, because no start and end event for ignoring PRs, we just ignore it
-                mode = "chaco"
-                if mode == "chaco":
-                    print(entry["pr_nb"])
-                    continue
-                raise Exception(f"Unexpected state during parsing.\n{entry}")
+            # else:
+            #     # for chaco test running specific logs, because no start and end event for ignoring PRs, we just ignore it
+            #     mode = "chaco" # mode only occurs here, does not fit to normal log parsing
+            #     if mode == "chaco":
+            #         print(f"ChaCo: {entry['pr_nb']}")
+            #         continue
+            #     raise Exception(f"Unexpected state during parsing.\n{entry}")
 
     return pr_results, meta_entries
 
