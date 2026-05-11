@@ -40,7 +40,7 @@ if mode == "comparison":
     # initial_prompt, feedback_prompt, context_version, changed_function_body,\
     # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
     config_versions = {
-        "testora": [1, 0, 1, True, None, False, False, False],
+        "testora": [1, 0, 1, False, None, False, False, False],
         "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
         "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
         "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
