@@ -8,7 +8,7 @@ import shutil
 # iterations = [0]
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
-subset_mode = True # to grab only a specific list of PRs.
+subset_mode = False # to grab only a specific list of PRs.
 
 # option 1: for all projects
 target_projects = ["scipy", "marshmallow", "keras", "pandas"]
@@ -19,9 +19,9 @@ target_projects = ["scipy", "marshmallow", "keras", "pandas"]
 # target_projects = [target_project]
 
 config_versions = {
-    "testora": [1, 0, 1, True, None, False, False, False],
+    "testora": [1, 0, 1, False, None, False, False, False],
     "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
-    "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
+    "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
     "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
     "no_runtime": [5, 8, 8, True, 'pr-modified', True, True, False],
     "no_changed_function": [5, 8, 8, False, "pr-modified", True, True, True],
@@ -57,13 +57,13 @@ for target_project in target_projects:
                     if pr_num not in pr_list:
                         continue
 
-                # just for convenience, time-based filter
-                if "03-" in file:
-                    date = int(file.split(" ")[0].split("03-")[1])
-                    if date < 20: 
-                        continue
-                else:
-                    continue
+                # # just for convenience, time-based filter
+                # if "03-" in file:
+                #     date = int(file.split(" ")[0].split("03-")[1])
+                #     if date < 20: 
+                #         continue
+                # else:
+                #     continue
 
                 with open(log_file_path, "r") as f:
                     info = json.load(f) 

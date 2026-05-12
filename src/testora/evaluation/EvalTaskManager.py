@@ -316,6 +316,28 @@ def remove_unfinished_for_project(project, specified_prs=[], table_name="tasks")
 
     connect_and_do(inner)
 
+# def remove_unfinished_for_project(project, specified_prs=[], table_name="tasks"):
+#     def inner(connection, cursor):
+#         if specified_prs:
+#             placeholders = ",".join(["%s"] * len(specified_prs))
+#             delete_query = (
+#                 f"DELETE t1 FROM {table_name} t1 "
+#                 f"INNER JOIN {table_name} t2 ON t1.project = t2.project AND t1.pr = t2.pr "
+#                 f"WHERE t1.project = %s AND t1.pr IN ({placeholders}) AND t1.worker IS NULL AND t2.worker IS NULL "
+#                 f"AND t1.result IS NULL AND t2.result IS NULL AND t1.timestamp > t2.timestamp"
+#             )
+#             cursor.execute(delete_query, (project, *specified_prs))
+#         else:
+#             delete_query = (
+#                 f"DELETE t1 FROM {table_name} t1 "
+#                 f"INNER JOIN {table_name} t2 ON t1.project = t2.project AND t1.pr = t2.pr "
+#                 f"WHERE t1.project = %s AND t1.worker IS NULL AND t2.worker IS NULL "
+#                 f"AND t1.result IS NULL AND t2.result IS NULL AND t1.timestamp > t2.timestamp"
+#             )
+#             cursor.execute(delete_query, (project,))
+
+#     connect_and_do(inner)
+
 
 def show_unfinished(project):
     if project == "all":
@@ -327,14 +349,36 @@ def show_unfinished(project):
 def show_unfinished_for_project(project):
     def inner(connection, cursor):
         check_query = (
-            f"SELECT pr FROM {table_name} "
+            f"SELECT pr, worker FROM {table_name} "
             f"WHERE project = %s AND result IS NULL"
         )
         cursor.execute(check_query, (project,))
         results = cursor.fetchall()
         print(f"Unfinished tasks in {project}:")
         for row in results:
-            print(row[0])  # pr_nb
+            print(f"PR: {row[0]}, Worker: {row[1]}")  # pr_nb and worker_id
+
+    connect_and_do(inner)
+
+def show_assigned(project):
+    if project == "all":
+        for project in project_to_target_prs().keys():
+            show_assigned_for_project(project)
+    else:
+        show_assigned_for_project(project)
+
+def show_assigned_for_project(project):
+    def inner(connection, cursor):
+        check_query = (
+            f"SELECT pr, worker FROM {table_name} "
+            # f"WHERE project = %s AND worker = %s AND result IS NULL"
+            f"WHERE project = %s AND worker IS NOT NULL AND result IS NULL"
+        )
+        cursor.execute(check_query, (project, ))
+        results = cursor.fetchall()
+        print(f"Assigned tasks in {project}:")
+        for row in results:
+            print(f"PR: {row[0]}, Worker: {row[1]}")  # pr_nb and worker_id
 
     connect_and_do(inner)
 
@@ -356,6 +400,8 @@ if __name__ == "__main__":
                         help="Fetch results of finished tasks from the target project")
     parser.add_argument("--show_unfinished", type=str,
                         help="Fetch results of unfinished tasks from the target project")
+    parser.add_argument("--show_assigned", type=str,
+                        help="Show assigned tasks (with worker IDs) for a specific project or 'all'")
 
     args = parser.parse_args()
 
@@ -377,5 +423,7 @@ if __name__ == "__main__":
         remove_unfinished(args.remove_unfinished)
     elif args.show_unfinished:
         show_unfinished(args.show_unfinished)
+    elif args.show_assigned:
+        show_assigned(args.show_assigned)
     else:
         print("Must pass an argument.")
