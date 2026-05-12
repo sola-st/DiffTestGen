@@ -359,7 +359,8 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
                     old_covered_info, union_uncovered_stmts["old"], pr.old_context_with_line_num, pr.changed_function_qualified_names_old_dict)
             new_context, uncovered_changed_ful_qua_funcs_new = mark_code_stmt(
                     new_covered_info, union_uncovered_stmts["new"], pr.new_context_with_line_num, pr.changed_function_qualified_names_new_dict)
-            selected_cg_info = prepare_selected_call_info(pr, uncovered_changed_ful_qua_funcs_old, uncovered_changed_ful_qua_funcs_new)
+            if Config.call_graph == True:
+                selected_cg_info = prepare_selected_call_info(pr, uncovered_changed_ful_qua_funcs_old, uncovered_changed_ful_qua_funcs_new)
         else:
             old_context = pr.old_context_with_line_num # code lines with line numbers marked
             new_context = pr.new_context_with_line_num
