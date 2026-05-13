@@ -100,21 +100,22 @@ def plot_coverages_violin(overall_data, all_version_id, title, result_pdf):
 
 def main():
     iteration = 0
-    subset_mode = True
+    subset_mode = False
    # model_version = "gpt-4o-mini-2024-07-18"
     model_version = "gpt-5-mini-2025-08-07"
-    target_projects = ["marshmallow", "pandas", "scipy"]#, "keras"]
-    config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_changed_function", "no_changed_tests"]
-
+    target_projects = ["scipy"] #, "scipy", "keras", "marshmallow"]#, 
+    config_names = ["testora"]#, "difftestgen", "no_coverage_feedback", "no_cg", "no_runtime", "no_bodies"]
+    # config_names = ["1_0_1_False"]
     results_folder = join("data", "results")
+    output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")  
     across_projects = []
     for i, project in enumerate(target_projects):
         all_data = []
 
-        output_folder = join(results_folder, "table_and_plots", project, f"meta_iter{iteration}")
-        makedirs(output_folder, exist_ok=True)
-
         for name in config_names:
+            output_folder = join(output_base_folder, f"log_{name}")
+            makedirs(output_folder, exist_ok=True)
+
             log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{name}", project)
             if subset_mode == True:
                 log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{name}", project)
@@ -122,10 +123,10 @@ def main():
             init = CoverageComparison(log_folder, name)
             all_from_cur_version = init.get_multiple_pr_coverage_info(project)
             # write a meta file for a version
-            meta_file = join(output_folder, f"coverage_ablation_meta_{name}.json")
+            meta_file = join(output_folder, f"{project}_coverage_meta.json")
             with open(meta_file, "w") as f:
                 json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
-            print(f"Collected coverage information is written to {meta_file}")
+            print(f"Collected coverage information is written to {meta_file}, relevant pr num: {len(all_from_cur_version)}")
 
             all_data.append(all_from_cur_version)
 
@@ -137,7 +138,7 @@ def main():
 
     # for the plot
     overall_data = get_overall_coverage_rates(across_projects)
-    result_pdf = join(results_folder, "table_and_plots", "Comparison_ablation.pdf") 
+    result_pdf = join(output_base_folder, f"Comparison_ablation.pdf") 
     title = "Coverage Comparison (Ablation study)"
     plot_coverages_violin(overall_data, config_names, title, result_pdf)
 

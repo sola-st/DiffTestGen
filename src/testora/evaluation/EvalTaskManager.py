@@ -304,13 +304,13 @@ def remove_unfinished_for_project(project, specified_prs=[], table_name="tasks")
             placeholders = ",".join(["%s"] * len(specified_prs))
             delete_query = (
                 f"DELETE FROM {table_name} "
-                f"WHERE project = %s AND pr IN ({placeholders}) AND result IS NULL"
+                f"WHERE project = %s AND pr IN ({placeholders}) AND worker is NULL AND result IS NULL"
             )
             cursor.execute(delete_query, (project, *specified_prs, ))
         else:
             delete_query = (
                 f"DELETE FROM {table_name} "
-                f"WHERE project = %s AND result IS NULL"
+                f"WHERE project = %s AND worker is NULL AND result IS NULL"
             ) # f"WHERE project = %s AND timestamp LIKE '%2026-%'"
             cursor.execute(delete_query, (project,))
 
@@ -350,7 +350,7 @@ def show_unfinished_for_project(project):
     def inner(connection, cursor):
         check_query = (
             f"SELECT pr, worker FROM {table_name} "
-            f"WHERE project = %s AND result IS NULL"
+            f"WHERE project = %s AND worker IS NOT NULL AND result IS NULL"
         )
         cursor.execute(check_query, (project,))
         results = cursor.fetchall()

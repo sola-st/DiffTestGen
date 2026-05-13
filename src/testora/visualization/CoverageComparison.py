@@ -161,14 +161,14 @@ class CoverageComparison():
         # pr_file = join("data", "meta", "pr_nums", f"{project}_checked.txt")
         num = 53
         if project == "keras":
-            num = 160
+            num = 133
         elif project == "pandas":
             num = 128
         elif project == "scipy":
             num = 129
 
-        # pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
-        pr_file = join("data", "meta", f"subset_{project}.txt")
+        pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
+        # pr_file = join("data", "meta", f"subset_{project}.txt")
 
         with open(pr_file, "r") as f:
             prs = f.readlines()

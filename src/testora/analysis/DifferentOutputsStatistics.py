@@ -146,27 +146,19 @@ class DifferentOutputsStatistics():
 
     def main(self):
         results_folder = join("data", "results")
-        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics")
-        os.makedirs(output_folder, exist_ok=True)
 
         iteration = 0
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
-        config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_runtime"]
-        subset_mode = True
+        config_names = ["testora", "difftestgen", "no_coverage_feedback", "no_cg", "no_runtime", "no_bodies"]
+        subset_mode = False
 
-        # option 1: for all projects
         project_info = {
             "scipy": 129,
             "marshmallow": 53,
             "pandas": 128,
             "keras": 133
         }
-
-        # option 2: for a single project
-        # with open(".target_project", "r") as f:
-        #     target_project = f.read().strip()
-        # target_projects = [target_project]
 
         comparison_str_list = [] # to record the comparison info between the two versions
         baseline_pr_set = None
@@ -177,6 +169,10 @@ class DifferentOutputsStatistics():
             single_iteration = []
 
             for target_project, num in project_info.items():
+
+                output_folder = join("data", "results", "table_and_plots", "different_outputs_statistics", target_project)
+                os.makedirs(output_folder, exist_ok=True)
+
                 self.overall_diff_related_pr_nums.update({target_project: set()})
 
                 log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)

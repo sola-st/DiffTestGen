@@ -4,19 +4,20 @@ from os import listdir
 
 iteration = 0
 model_version = "gpt-5-mini-2025-08-07"
-subset_mode = True
+subset_mode = False
 pr_split_num_max = 3
-version_names = ["testora", "difftestgen", "no_coverage_feedback", "no_cg", "no_runtime", "no_bodies"] # , "no_changed_function", "no_changed_tests"]
+version_names = ["difftestgen", "testora", "no_coverage_feedback", "no_cg", "no_runtime", "no_bodies"]
 for version_name in version_names:
     target_projects = ["marshmallow", "pandas", "scipy", "keras"]
     results_folder = join("data", "results", model_version, f"iter_{iteration}", f"log_{version_name}")
-    # if subset_mode:
-    #     results_folder = join("data", "results", model_version, f"iter_{iteration}_subset", version_name)
+    if subset_mode:
+        results_folder = join("data", "results", model_version, f"iter_{iteration}_subset", version_name)
 
     num = 0
     for project in target_projects:
         if subset_mode:
-            # marshmallow 53, keras 133, pandas 128, scipy 129
+            pr_file = join("data", "meta",  f"subset_{project}.txt")
+        else: # marshmallow 53, keras 133, pandas 128, scipy 129
             num = 53
             if project == "keras":
                 num = 133
@@ -26,8 +27,7 @@ for version_name in version_names:
                 num = 129
             pr_file_base = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
             # pr_file = join("data", "meta", "pr_nums", f"{project}_PRs_all.txt")
-        else:
-            pr_file = join("data", "meta",  f"subset_{project}.txt")
+            # pr_file_base = join("data", "meta",  f"{project}.txt")
 
         for i in range(1, pr_split_num_max + 1):
             if subset_mode:
@@ -41,7 +41,11 @@ for version_name in version_names:
             log_folder = join(results_folder, project)
             log_files = listdir(log_folder)
             for file in log_files:
-                all_checked_prs.add(int(file.split("_")[0]))
+                pr_num = int(file.split("_", 1)[0])
+                if subset_mode == True:
+                    if pr_num not in all_prs:
+                        continue
+                all_checked_prs.add(pr_num)
 
             with open(f"{project}_{version_name}_{i}_checked.txt", "w") as f:
                 f.writelines("\n".join(map(str, all_checked_prs)))
