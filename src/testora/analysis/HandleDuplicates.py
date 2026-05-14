@@ -28,7 +28,8 @@ for config_name, config in config_versions.items():
     single_iteration = []
 
     for target_project, num in project_info.items():
-        pr_file = join("data", "meta", "subset_scipy.txt") # "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
+        pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
+        # pr_file = join("data", "meta", "subset_scipy.txt")
         with open(pr_file, "r") as f:
             prs = f.readlines()
         pr_list = [pr.strip() for pr in prs]

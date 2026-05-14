@@ -164,7 +164,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
 
 
 def is_crash(output):
-    # TODO this now only related to classification task
+    # this now only related to classification task
     return "Traceback (most recent call last)" in output or \
         "error" in output.lower() or \
         "fail" in output.lower()
@@ -909,7 +909,6 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 #     break
 
                 # refine the test by fixing the error
-                # TODO optimize the prompt
                 prompt = RuntimeErrorsFixingPrompt(old_execution.code, old_execution.output) #, new_execution.output)
                 raw_answer = llm.query(prompt, no_cache=True)[0] # no_cache set to true, allow the model to get different answers with the same error message.
                 append_event(LLMEvent(pr_nb=pr.number, message="Raw answer", content=raw_answer))
@@ -952,7 +951,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
         new_executions = []
         all_covered_modified_stmts_old = []
         all_covered_modified_stmts_new = []
-        old_missed = {}
+        old_missed = {} # for current round, across all the executions
         new_missed = {}
         
     old_executions.extend(old_executions_cur_round) # get the executions for all the rounds
@@ -960,8 +959,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     assert None not in [e.output for e in old_executions_cur_round]
 
     # analyze coverage during test execution
-    fail_to_cover_all_indices = []
-    all_uncovered_modified_stmts_info = {"old": [], "new": []}
+    all_uncovered_modified_stmts_info = {"old": [], "new": []} # for current round
     # all_for_further_needs could be all uncovered info, or all covered info
     all_for_further_needs =  {"old": [], "new": []} # Config.context_version = 8
     full_coverage_exists = False # union full coverage, or single test full coverage
@@ -971,11 +969,8 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     pre_round_old_missed = copy.deepcopy(old_missed) # after the update of 'old_missed', it will be the missed info for current round
     pre_round_new_missed = copy.deepcopy(new_missed) # deepcopy to avoid changes in pre_round
 
-    for test_i, (old_execution, new_execution) in enumerate(zip(old_executions_cur_round, new_executions_cur_round)):
-        # Check whether to enter to the feebackloop
-        uncovered_modified_stmts_old_exist = False
-        uncovered_modified_stmts_new_exist = False
-        
+    for old_execution, new_execution in zip(old_executions_cur_round, new_executions_cur_round):
+        ### for both initail and feedback rounds
         if not old_missed: # Record the event only once
             details = f"All executable/coverable modified lines: Old: {old_execution.all_executable_modified_stmt_ranges}, New: {new_execution.all_executable_modified_stmt_ranges}"
             append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, all rounds", details=details))
@@ -985,37 +980,44 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
 
         # Uncovered modified lines are recorded for further checking,
         # Covered modified lines are recorded for later union coverage calculating
+        # here the coverage info is for current test execution, not the union one.
         details = (f"Old: {old_execution.coverage_percentage}, New: {new_execution.coverage_percentage}\n"
                 f"Uncovered modified lines: Old: {old_execution.all_uncovered_exec_modified_stmt_ranges}, New: {new_execution.all_uncovered_exec_modified_stmt_ranges}\n"
                 f"Covered modified lines: Old: {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, {old_execution.code.split(':', 1)[0]}", details=details))
 
-        old_missed, uncovered_modified_stmts_old_exist = check_union_coverage_full_cover_exist(old_missed, old_execution.all_covered_exec_modified_stms_num)
-        new_missed, uncovered_modified_stmts_new_exist = check_union_coverage_full_cover_exist(new_missed, new_execution.all_covered_exec_modified_stms_num)
-
-        if uncovered_modified_stmts_old_exist or uncovered_modified_stmts_new_exist:
-            fail_to_cover_all_indices.append(test_i+1) # keep the index as absolute number (consistency with the test prefix)
-            # deduplicate from all rounds 
-            if (old_execution.all_covered_exec_modified_stmt_ranges not in all_covered_modified_stmts_old or \
-                    new_execution.all_covered_exec_modified_stmt_ranges not in all_covered_modified_stmts_new): 
-                # uncovered_info will be used in feedback prompt.
-                all_uncovered_modified_stmts_info["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
-                all_uncovered_modified_stmts_info["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
-                if Config.context_version == 8: 
-                    all_for_further_needs["old"].append(old_execution)
-                    all_for_further_needs["new"].append(new_execution)
-        
         # to check if all the rounds and executions cover the same statements
         all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # a dict, and each value is a list of ranges
         all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
+        
+        ### for only the feedback rounds
+        if Config.initial_test_generation_prompt_version != 1 and Config.feedback_test_generation_prompt_version != 0: # !=1 to exclude original testora
+            # Check whether to enter to the feebackloop
+            # uncovered_modified_stmts_old_exist = False
+            # uncovered_modified_stmts_new_exist = False
 
-        if Config.feedback_test_generation_prompt_version != 0: # TODO 
-            if not old_missed and not new_missed:
-                # union coverage reaches 100%
+            # old/new_missed format: {file_path: still_missed_stmts_set}, even the set is empty, the file_path will be in the dict
+            old_missed, uncovered_modified_stmts_old_exist = check_union_coverage_full_cover_exist(old_missed, old_execution.all_covered_exec_modified_stms_num)
+            new_missed, uncovered_modified_stmts_new_exist = check_union_coverage_full_cover_exist(new_missed, new_execution.all_covered_exec_modified_stms_num)
+
+            if uncovered_modified_stmts_old_exist or uncovered_modified_stmts_new_exist: # has uncovered stmts for current execution
+                # deduplicate from all rounds 
+                # here all_uncovered_modified_stmts_info is for only current round, and all_covered_modified_stmts_old is for all rounds
+                if (old_execution.all_covered_exec_modified_stmt_ranges not in all_covered_modified_stmts_old or \
+                        new_execution.all_covered_exec_modified_stmt_ranges not in all_covered_modified_stmts_new): 
+                    # uncovered_info will be used in feedback prompt.
+                    # we keep the duplicates of the executions for now, and will deduplicate and unionize in the feedback prompt.
+                    all_uncovered_modified_stmts_info["old"].append(old_execution.all_uncovered_exec_modified_stmts_num)
+                    all_uncovered_modified_stmts_info["new"].append(new_execution.all_uncovered_exec_modified_stmts_num)
+                    if Config.context_version == 8: 
+                        all_for_further_needs["old"].append(old_execution)
+                        all_for_further_needs["new"].append(new_execution)
+
+            if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False: # union coverage reaches 100%
                 full_coverage_exists = True
-                # still keep checking the coverage information
+                # still keep checking the coverage information for the remaining executions
 
-    if Config.feedback_test_generation_prompt_version != 0: # 0 means to run original Testora, which does not have a feedback loop
+    if Config.feedback_test_generation_prompt_version != 0: # 0 means no coverage feedback: original Testora /turn off coverage feedback
         if full_coverage_exists == False: # no full coverage exists in all the tests
             is_coverage_changed = True
             if round > 0: # initial round is 0, and feedback loop starts from 1
@@ -1025,24 +1027,16 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                     append_event(Event(pr_nb=pr.number, message=f"Coverage feedback ends after round {round}, union coverage info does not change anymore."))
             
             # feedback loop to get new tests that are expected to cover more modified lines.
-            if is_coverage_changed == True: # and round < Config.max_round:
-                deduplicated_len = len(all_uncovered_modified_stmts_info["old"])
-                if deduplicated_len > 0:
-                    round+=1
-                    details = f"Tests need to be refined: {fail_to_cover_all_indices}. After deduplicate the uncovered lines, the number of the tests: {deduplicated_len}"
-                    append_event(CoverageEvent(pr_nb=pr.number, 
-                            message=f"Coverage feedback, round {round}, expected to get {len(fail_to_cover_all_indices)} more tests", details=details))
-                    
-                    # here test_msg_pairs_full_diff, test_msg_pairs_filtered_diff only used for round 0
-                    refined_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff = generate_replacement_tests(pr, github_repo, changed_functions, 
-                            all_uncovered_modified_stmts_info, round, all_for_further_needs)
-                    run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, test_msg_pairs_full_diff,
-                            test_msg_pairs_filtered_diff,
-                            old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
-                else:
-                    append_event(Event(pr_nb=pr.number, message=f"Coverage feedback ends after round {round}, union coverage reaches 100%."))
+            if is_coverage_changed == True:
+                round+=1
+                # here test_msg_pairs_full_diff, test_msg_pairs_filtered_diff only used for round 0
+                refined_tests, test_msg_pairs_full_diff, test_msg_pairs_filtered_diff = generate_replacement_tests(pr, github_repo, changed_functions, 
+                        all_uncovered_modified_stmts_info, round, all_for_further_needs)
+                run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functions, refined_tests, test_msg_pairs_full_diff,
+                        test_msg_pairs_filtered_diff,
+                        old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new, round, old_missed, new_missed)
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Coverage feedback ends after round {round}, full coverage exists."))
+            append_event(Event(pr_nb=pr.number, message=f"Coverage feedback ends after round {round}, union coverage reaches 100%."))
 
     return old_executions, new_executions, all_covered_modified_stmts_old, all_covered_modified_stmts_new
 
