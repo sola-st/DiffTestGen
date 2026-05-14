@@ -1,12 +1,10 @@
-import copy
 import shutil
 import subprocess
 from os.path import exists, join, isfile
 from os import makedirs
 import os
 
-iteration = 0
-mode = "comparison" # could be 'comparison' and 'ablation'
+iteration = 1
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
 pr_split_num = 1 # could be None, 1, 2, or 3
@@ -37,59 +35,19 @@ with open(pr_file, "r") as f:
     prs = f.readlines()
 pr_list = [int(pr) for pr in prs]
 
-config_versions = []
-if mode == "comparison":
-    # initial_prompt, feedback_prompt, context_version, \
-    # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
-    config_versions = {
-        "testora": [1, 0, 1, True, None, False, False, False],
-        "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
-        "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
-        "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
-        "no_runtime": [5, 8, 8, True, 'pr-modified', True, True, False],
-        "changed_function_body": [5, 8, 8, False, "pr-modified", True, True, True],
-        "no_changed_tests": [5, 8, 8, True, None, True, True, True], # turn off test function body,
-        "no_bodies": [5, 8, 8, False, None, True, True, True] # turn off both test function body and function body
-    } 
-elif mode == "ablation":
-    # base setting about ablation
-    # about initial prompt
-    initial_prompt = 5 # itself does not change, but inner changes, e.g., 1 and 2
-    changed_function_body = True
-    pr_modified_tests = "pr-modified" # 1
-    use_call_graph = True # in initial prompt # 2
-
-    # outer feedback loop
-    feedback_prompt = 8 # coverage_feedback -> turn off, changed it to 0 # 3
-    context_version = 8 # always the same, no need to turn off
-
-    # inner loop for every round
-    fix_static_error = True # could be only once and multiple attempts # 4
-    runtime_error_feedback = True # inner loop for every round # 5
-
-    our_approach = [initial_prompt, feedback_prompt, context_version, changed_function_body, \
-                    pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback]
-    turn_off_indices_values = {
-        "1": 0,
-        "3": False,
-        "4": None,
-        "5": False,
-        "7": False
-    } # trun off feedback and call graph
-    config_names = ["no_coverage_feedback", "no_cg", "no_runtime"]
-    
-    # {} to only focus on the ablation settings
-    # {"difftestgen": [5, 8, 8, "pr-modified", True, True, True]} # to include our approach
-    config_versions = {} 
-    for (op_idx_str, turn_off_val), name_key in zip(turn_off_indices_values.items(), config_names):
-        turn_off_op = copy.deepcopy(our_approach)
-        turn_off_op[int(op_idx_str)] = turn_off_val 
-        config_versions.update({name_key: turn_off_op})
-        
+# initial_prompt, feedback_prompt, context_version, \
+# pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
+config_versions = {
+    "testora": [1, 0, 1, True, None, False, False, False],
+    "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
+    "only_coverage_feedback": [5, 8, 8, False, None, False, False, False], # testora + coverage feedback (only)
+    "only_cg": [5, 0, 8, False, None, True, False, False], # testora + call graph (only)
+} 
+            
 results_folder = join("data", "results")
 log_folder = join(results_folder, model_version, f"iter_{iteration}")
 
- # the default cache file setting form LLMCache
+# the default cache file setting form LLMCache
 cache_dir = join("data", "llm_cache", model_version, "cache.json")
 
 for config_name, config in config_versions.items():

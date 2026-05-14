@@ -1018,7 +1018,7 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     if Config.feedback_test_generation_prompt_version != 0: # 0 means to run original Testora, which does not have a feedback loop
         if full_coverage_exists == False: # no full coverage exists in all the tests
             is_coverage_changed = True
-            if round > 0: # initail round is 0, and feedback loop starts from 1
+            if round > 0: # initial round is 0, and feedback loop starts from 1
                 # start from the first round of feedback, if the union coverage (round level) does not change, even have not reaches 100%, stop the feedback loop.
                 if pre_round_old_missed == old_missed and pre_round_new_missed == new_missed:
                     is_coverage_changed = False
