@@ -53,8 +53,16 @@ class CoverageComparison():
             project_name = info[1]["url"].split("/")[-3] # for single pr at local mode
 
         pre_round = -1
+        cur_round = 0
+        # event_num = 0
         coverage_exists = False
         for info_block in info:
+            # a reliable way to get the round info, here detects the event that always show how may tests are generated in each round.
+            if "message" in info_block.keys():
+                msg = info_block["message"]
+                if msg.startswith("Generated ") and "before deduplication and cleaning." in msg:
+                    cur_round = int(msg.split("#Round ")[1].split(")")[0])
+
             if "details" in info_block.keys():
                 info_block_details = info_block["details"]
                 if "Old: Coverage:" in info_block_details or \
@@ -81,20 +89,19 @@ class CoverageComparison():
                         new = covered_lines_new_ranges_dict_str.replace("\'", "\"").replace("[", "\"[").replace("]", "]\"")
                         covered_lines_old_ranges_dict = json.loads(old) # from files to lines
                         covered_lines_new_ranges_dict = json.loads(new)
-                        info_block_msg = info_block["message"]
-                        if "Diff coverage, # Round " in info_block_msg:
-                            round = int(info_block_msg.split("# Round ", 1)[1].split(" ", 1)[0])
-                            if pre_round != round: # another round starts, record all the collected info for round {round}
-                                if self.union_covered_lines_single_round["old"].keys():
-                                    self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))
-                                    pre_round = round
-                                elif pre_round == -1:
-                                    self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
-                                    self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
-                                    pre_round = round
-                            else: # update self.union_covered_lines_single_round
-                                self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
-                                self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
+                        
+                        if pre_round != cur_round:  # new round starts
+                            # Save previous round if it has data
+                            if self.union_covered_lines_single_round["old"].keys():
+                                self.union_covered_lines_multiple_rounds.append(copy.deepcopy(self.union_covered_lines_single_round))
+                            # print(f"R: {cur_round}, event: {event_num}")
+                            pre_round = cur_round
+                            # event_num = 0
+
+                        # ALWAYS process current block's data (moved outside the if-else)
+                        self.get_union_numbers_form_dict(covered_lines_old_ranges_dict, "old")
+                        self.get_union_numbers_form_dict(covered_lines_new_ranges_dict, "new")
+                        # event_num += 1
         
         if coverage_exists == False:
             self.outlier_pr = pr_num

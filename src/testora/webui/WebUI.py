@@ -96,7 +96,7 @@ def categorize_entry(entry):
         return "Pre-classification"
     if message.startswith("Different outputs"):
         return "Different outputs"
-    if message.startswith("Diff coverage, #"):
+    if message.startswith("Diff coverage, "):
         return "Diff coverage"
     if message.startswith("Querying") or message.startswith("Cached result for querying"):
         return "Querying"
