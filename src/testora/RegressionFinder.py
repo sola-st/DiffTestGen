@@ -223,10 +223,10 @@ def generate_tests_with_prompt(pr, prompt, model, diff_version, nb_samples=1, ro
 
     postfix = ""
     if test_msg_pairs:
-        postfix = "To fix."
+        postfix = " To fix."
         
     append_event(Event(pr_nb=pr.number,
-            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning. {postfix} #Round {round})"))
+            message=f"Generated {len(generated_tests)} tests ({nb_tests_before_dedup_and_cleaning} before deduplication and cleaning.{postfix} #Round {round})"))
     
     name_formatted_generated_tests = []
     for idx, test in enumerate(generated_tests):
@@ -280,7 +280,7 @@ def generate_tests(pr, github_repo, changed_functions):
         if Config.call_graph == True: 
             info_public_and_private = prepare_call_info(pr)
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled."))
+            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled (initial prompt)."))
 
         prompt_full_diff = None
         # full diff with GPT4, 5
@@ -301,7 +301,7 @@ def generate_tests(pr, github_repo, changed_functions):
             if not info_public_and_private:
                 info_public_and_private = prepare_call_info(pr)
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled."))
+            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled (initial prompt)."))
             
         prompt_filtered_diff = None
         # full diff with GPT4, 5
@@ -359,7 +359,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
                     old_covered_info, union_uncovered_stmts["old"], pr.old_context_with_line_num, pr.changed_function_qualified_names_old_dict)
             new_context, uncovered_changed_ful_qua_funcs_new = mark_code_stmt(
                     new_covered_info, union_uncovered_stmts["new"], pr.new_context_with_line_num, pr.changed_function_qualified_names_new_dict)
-            if Config.call_graph == True:
+            if Config.cg_in_feedback == True:
                 selected_cg_info = prepare_selected_call_info(pr, uncovered_changed_ful_qua_funcs_old, uncovered_changed_ful_qua_funcs_new)
         else:
             old_context = pr.old_context_with_line_num # code lines with line numbers marked
@@ -985,10 +985,6 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
                 f"Uncovered modified lines: Old: {old_execution.all_uncovered_exec_modified_stmt_ranges}, New: {new_execution.all_uncovered_exec_modified_stmt_ranges}\n"
                 f"Covered modified lines: Old: {old_execution.all_covered_exec_modified_stmt_ranges}, New: {new_execution.all_covered_exec_modified_stmt_ranges}")
         append_event(CoverageEvent(pr_nb=pr.number, message=f"Diff coverage, {old_execution.code.split(':', 1)[0]}", details=details))
-
-        # to check if all the rounds and executions cover the same statements
-        all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # a dict, and each value is a list of ranges
-        all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
         
         ### for only the feedback rounds
         if Config.initial_test_generation_prompt_version != 1 and Config.feedback_test_generation_prompt_version != 0: # !=1 to exclude original testora
@@ -1016,6 +1012,10 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
             if uncovered_modified_stmts_old_exist == False and uncovered_modified_stmts_new_exist == False: # union coverage reaches 100%
                 full_coverage_exists = True
                 # still keep checking the coverage information for the remaining executions
+        
+        # to check if all the rounds and executions cover the same statements
+        all_covered_modified_stmts_old.append(old_execution.all_covered_exec_modified_stmt_ranges) # a dict, and each value is a list of ranges
+        all_covered_modified_stmts_new.append(new_execution.all_covered_exec_modified_stmt_ranges)
 
     if Config.feedback_test_generation_prompt_version != 0: # 0 means no coverage feedback: original Testora /turn off coverage feedback
         if full_coverage_exists == False: # no full coverage exists in all the tests
@@ -1248,6 +1248,15 @@ def main():
                 Config.iteration, Config.model_version = args.paras
         if Config.initial_test_generation_prompt_version == 1 or Config.call_graph == False:
             Config.private_call_identification = 1 # to make sure baseline will not call for call paths
+        
+        if Config.feedback_test_generation_prompt_version == 8:
+            Config.cg_in_feedback = True
+            Config.changed_function_in_feedback = True
+            Config.existing_tests_in_feedback = True
+        else:
+            Config.cg_in_feedback = False
+            Config.changed_function_in_feedback = False
+            Config.existing_tests_in_feedback = False
         
     if args.db:
         if args.project or args.pr:

@@ -1,3 +1,4 @@
+from testora import Config
 from testora.util.Logs import Event, append_event
 
 
@@ -10,43 +11,45 @@ class RegressionTestGeneratorPromptV345:
 
         # the following only provide the info when it is available
         self.changed_function_block = ""
-        if old_context or new_context: # at least one of the versions has the function body
-            if old_context:
-                old_context = f"\n\n{old_context}"
-            else:
-                old_context = "<The functions do not exist in the old code version.>"
+        if Config.changed_function_body == True:
+            if old_context or new_context: # at least one of the versions has the function body
+                if old_context:
+                    old_context = f"\n\n{old_context}"
+                else:
+                    old_context = "<The functions do not exist in the old code version.>"
 
-            if new_context:
-                new_context = f"\n\n{new_context}"
-            else:
-                new_context = "<The functions do not exist in the new code version.>"
+                if new_context:
+                    new_context = f"\n\n{new_context}"
+                else:
+                    new_context = "<The functions do not exist in the new code version.>"
 
-            self.changed_function_block = (
-                f"The following are the old and the new versions of these affected functions:\n"
-                f"Old version: {old_context}\nNew version: {new_context}\n"
-            )
+                self.changed_function_block = (
+                    f"The following are the old and the new versions of these affected functions:\n"
+                    f"Old version: {old_context}\nNew version: {new_context}\n"
+                )
 
         self.call_graph_block = ""
         if call_graph_info:
             self.call_graph_block = f"The following provides reference information on how to access or invoke the affected functions:\n{call_graph_info}"
 
         self.test_function_block = ""
-        if old_tests or new_tests:
-            if old_tests:
-                old_tests = f"\n\n{old_tests}"
-            else:
-                old_tests = "<The test functions do not exist in the old code version.>"
+        if Config.use_existing_tests == "pr-modified":
+            if old_tests or new_tests:
+                if old_tests:
+                    old_tests = f"\n\n{old_tests}"
+                else:
+                    old_tests = "<The test functions do not exist in the old code version.>"
 
-            if new_tests:
-                new_tests = f"\n\n{new_tests}"
-            else:
-                new_tests = "<The test functions do not exist in the new code version.>"
+                if new_tests:
+                    new_tests = f"\n\n{new_tests}"
+                else:
+                    new_tests = "<The test functions do not exist in the new code version.>"
 
-            self.test_function_block = (
-                f"The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested."
-                f"The following are the old and the new versions of these test functions:\n"
-                f"Old version: {old_tests}\nNew version: {new_tests}\n"
-            )
+                self.test_function_block = (
+                    f"The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested."
+                    f"The following are the old and the new versions of these test functions:\n"
+                    f"Old version: {old_tests}\nNew version: {new_tests}\n"
+                )
 
         self.use_json_output = False
 
@@ -94,18 +97,18 @@ etc.
         if len(self.changed_function_block) > 0 and (current_len + len(self.changed_function_block) <= default_len_limit):
             template_prompt += f"\n{self.changed_function_block}"
             current_len += len(self.changed_function_block)
-            append_event(Event(pr_nb=0, message=f"Added info about changed function body. Current prompt length: {current_len}."))
+            append_event(Event(pr_nb=0, message=f"Initial prompt. Added info about changed function body. Current prompt length: {current_len}."))
 
         if len(self.call_graph_block) > 0:
             if current_len + len(self.call_graph_block) <= default_len_limit:
                 template_prompt += f"\n{self.call_graph_block}"
                 current_len += len(self.call_graph_block)
-                append_event(Event(pr_nb=0, message=f"Added info about call graph. Current prompt length: {current_len}."))
+                append_event(Event(pr_nb=0, message=f"Initial prompt. Added info about call graph. Current prompt length: {current_len}."))
 
         if len(self.test_function_block) > 0 and (current_len + len(self.test_function_block) <= default_len_limit):
             template_prompt += f"\n{self.test_function_block}"
             current_len += len(self.test_function_block)
-            append_event(Event(pr_nb=0, message=f"Added info about test function body. Current prompt length: {current_len}."))
+            append_event(Event(pr_nb=0, message=f"Initial prompt. Added info about test function body. Current prompt length: {current_len}."))
 
         # template part 3
         template_prompt += template_postfix_str

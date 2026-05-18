@@ -67,13 +67,13 @@ class PullRequest:
         self.old_test_function_code = {}
         self.new_test_function_code = {}
         # to help extract existing tests
-        if Config.use_existing_tests != None:
-            # to extract self.modified_test_python_files
-            self._compute_modified_test_python_files()
+        if Config.use_existing_tests != None or Config.existing_tests_in_feedback == True:
+            # check the feedback prompt to make sure the prompt includes all the needed information
+            self._compute_modified_test_python_files() # to extract self.modified_test_python_files
         else:
             append_event(Event(pr_nb=self.number, message=f"Providing changed test function bodies is disabled."))
 
-        if Config.call_graph == True:
+        if Config.call_graph == True or Config.cg_in_feedback == True:
             self._prepare_to_use_call_graph()
 
     def _prepare_to_use_call_graph(self):
@@ -282,16 +282,16 @@ class PullRequest:
             return "too many"
 
         # get test function code
-        if Config.use_existing_tests == "pr-modified":
+        if Config.use_existing_tests == "pr-modified" or Config.existing_tests_in_feedback == True:
             self.get_test_function_code(pre_commit_cloned_repo, "old") # update self.xxx_test_function_code
-            self.get_test_function_code(post_commit_cloned_repo, "new") # TODO check whether repeated the repo build
+            self.get_test_function_code(post_commit_cloned_repo, "new") 
 
         self.union_changed_function_qualified_names = list(set(set(self.changed_function_qualified_names_old).union(set(self.changed_function_qualified_names_new))))
         return self.union_changed_function_qualified_names
     
     def get_helper(self, cloned_repo, version, prompt_base):
         # update changed_functions for old or new version
-        if Config.call_graph == True:
+        if Config.call_graph == True or Config.cg_in_feedback == True:
             # the server stays alive for the entire workspace
             server = ExtractCallerCallee(cloned_repo.repo.working_dir)
             with server.lsp.start_server(self.target_folder): # start only once, automatic stop, focus on only the given folder
@@ -366,7 +366,7 @@ class PullRequest:
                             return "too many"
                         
                     if type(function_names[0]) == tuple: # our approach
-                        if Config.call_graph == True:
+                        if Config.call_graph == True or Config.cg_in_feedback == True:
                             # to build documentation
                             container_name = cloned_repo.container_name
                             # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
@@ -480,7 +480,7 @@ class PullRequest:
                             self.changed_function_qualified_names_new.append(f"{module_name}.{func_name}")
 
                 else: # no changed functions
-                    if Config.call_graph == True:
+                    if Config.call_graph == True or Config.cg_in_feedback == True:
                         container_name = cloned_repo.container_name
                         # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
                         api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
@@ -505,12 +505,12 @@ class PullRequest:
                                 else:
                                     self.public_apis_union = self.public_apis_new
 
-                if functions_code and Config.changed_function_body == True:
+                if functions_code and (Config.changed_function_body == True or Config.changed_function_in_feedback == True):
                     code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
                     code_context += "\n\n".join(functions_code)
                     code_context += "\n"
 
-        if Config.call_graph == True and version == "new" \
+        if (Config.call_graph == True or Config.cg_in_feedback == True) and version == "new" \
                 and (self.call_graph_paths_old or self.call_graph_paths_new or self.public_func_imports_old or self.public_func_imports_new):
             self.get_union_call_graph()
             self.get_shortest_path_each_entry()
@@ -518,7 +518,7 @@ class PullRequest:
             self.get_top_k_shortest_across_different_entries()
             self.update_class_hover_text()
 
-        if Config.changed_function_body == True:
+        if Config.changed_function_body == True or Config.changed_function_in_feedback == True:
             if version == "old":
                 self.old_context = code_context
             else:
