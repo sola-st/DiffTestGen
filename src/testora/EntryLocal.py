@@ -4,7 +4,7 @@ from os.path import exists, join, isfile
 from os import makedirs
 import os
 
-iteration = 1
+iteration = 0 # exactly the iteration number, not the border of a range.
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
 pr_split_num = 1 # could be None, 1, 2, or 3

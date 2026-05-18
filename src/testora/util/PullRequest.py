@@ -86,7 +86,7 @@ class PullRequest:
             For the one without '_all"      it stores the shortest call graph path related information
         '''
         # For both public and non-public ones, to return
-        self.class_hover_texts = set() # shortest path related classes
+        self.class_hover_texts = [] # shortest path related classes
         self.class_hover_texts_dict = {}
 
         # for public changed functions
@@ -286,7 +286,7 @@ class PullRequest:
             self.get_test_function_code(pre_commit_cloned_repo, "old") # update self.xxx_test_function_code
             self.get_test_function_code(post_commit_cloned_repo, "new") 
 
-        self.union_changed_function_qualified_names = list(set(set(self.changed_function_qualified_names_old).union(set(self.changed_function_qualified_names_new))))
+        self.union_changed_function_qualified_names = list(dict.fromkeys(self.changed_function_qualified_names_old + self.changed_function_qualified_names_new))
         return self.union_changed_function_qualified_names
     
     def get_helper(self, cloned_repo, version, prompt_base):
@@ -538,20 +538,22 @@ class PullRequest:
                 self.new_context_with_line_num = code_context_with_line_num_str 
     
     def get_union_call_graph(self):
-        # for public functions
-        common_in_both = self.public_func_imports_old.intersection(self.public_func_imports_new)
-        unique_in_old = self.public_func_imports_old.difference(self.public_func_imports_new)
-        unique_in_new = self.public_func_imports_new.difference(self.public_func_imports_old)
+        # !!! to fix all the orders, to make sure the cache is reusable
+
+        common_in_both = sorted(self.public_func_imports_old.intersection(self.public_func_imports_new))
+        unique_in_old = sorted(self.public_func_imports_old.difference(self.public_func_imports_new))
+        unique_in_new = sorted(self.public_func_imports_new.difference(self.public_func_imports_old))
 
         self.public_func_imports = {
-            "common": list(common_in_both),
-            "old": list(unique_in_old),
-            "new": list(unique_in_new)
+            "common": common_in_both,
+            "old": unique_in_old,
+            "new": unique_in_new
         }
         
         non_checked_new_indices = list(range(len(self.changed_function_qualified_names_new_no_public)))
         for qualified_func, old_cg_func_level_list, old_sig_doc_func_level_list, old_imports_func_level_list in \
                 zip(self.changed_function_qualified_names_old_non_public, self.call_graph_paths_old, self.signatures_docstrings_old, self.imports_old):
+            # all these zipped four are lists. in a fixed order
             self.all_call_graph_paths.update(
                 {qualified_func: {
                     "common": [],
@@ -576,7 +578,7 @@ class PullRequest:
                 try:
                     new_cg_func_level_list = self.call_graph_paths_new[idx]
                     new_sig_doc_func_level_list = self.signatures_docstrings_new[idx]
-                    new_imports_func_level_list = self.imports_old[idx] 
+                    new_imports_func_level_list = self.imports_new[idx] 
                     non_checked_new_indices.remove(idx)
                 except:
                     continue
@@ -713,7 +715,12 @@ class PullRequest:
             
         value = sum(cg_path_len['all']) / len(cg_path_len['all']) if cg_path_len['all'] else 0
         cg_path_len['all_avg'] = round(value, 3) if value != 0 else 0
-        append_event(CallGraphEvent(pr_nb=self.number, message=f"Call graph length information", content=json.dumps(cg_path_len)))
+        postfix = ""
+        if Config.call_graph == True:
+            postfix += "Initial."
+        if Config.cg_in_feedback == True:
+            postfix += "Feedback."
+        append_event(CallGraphEvent(pr_nb=self.number, message=f"Call graph length information ({postfix})", content=json.dumps(cg_path_len)))
 
     def get_top_k_shortest_across_different_entries(self):
         # get top k entry for each changed private function
@@ -772,14 +779,15 @@ class PullRequest:
                             # align with the prompt info preparation part in file RegressionFinder.py. function 'generate_tests'
                             module_endswith_class = imline.split(" import ")[0].split("from ")[1]
                             if module_endswith_class in all_path_relevant_classes:
-                                self.class_hover_texts.add(nonpublic_hover[module_endswith_class])
-                                self.class_hover_texts_dict.update({module_endswith_class: nonpublic_hover[module_endswith_class]})
+                                if module_endswith_class not in self.class_hover_texts_dict.keys():
+                                    self.class_hover_texts.append(nonpublic_hover[module_endswith_class])
+                                    self.class_hover_texts_dict.update({module_endswith_class: nonpublic_hover[module_endswith_class]})
                         
                     if label == "common":
                         common_recorded = True
 
         # deduplicate between all the public changed function needed classes and the path relevant classes
-        self.class_hover_texts.update(public_hover.values())
+        self.class_hover_texts.extend(public_hover.values())
         self.class_hover_texts_dict = self.class_hover_texts_dict | public_hover
 
     def get_call_graph_info(self, server, modified_file, function_names, version):
