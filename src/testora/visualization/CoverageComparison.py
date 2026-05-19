@@ -170,9 +170,9 @@ class CoverageComparison():
         if project == "keras":
             num = 133
         elif project == "pandas":
-            num = 128
+            num = 127
         elif project == "scipy":
-            num = 129
+            num = 126
 
         pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
         # pr_file = join("data", "meta", f"subset_{project}.txt")

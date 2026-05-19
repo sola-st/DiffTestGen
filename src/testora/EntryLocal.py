@@ -18,14 +18,14 @@ if subset_mode == True:
     pr_file = join("data", "meta", f"subset_{target_project}.txt")
 else:
     pr_split_num = 1 # could be None, 1, 2, or 3
-    # marshmallow 53, keras 133, pandas 128, scipy 129
-    num = 65
+    # marshmallow 53, keras 133, pandas 127, scipy 126 ==> 439
+    num = 53
     if target_project == "keras":
-        num = 160
+        num = 133
     elif target_project == "pandas":
-        num = 143
+        num = 127
     elif target_project == "scipy":
-        num = 157
+        num = 126
 
 pr_file = join("data", "meta", "pr_nums", f"{target_project}_PRs_subset{num}.txt")
 if pr_split_num:
