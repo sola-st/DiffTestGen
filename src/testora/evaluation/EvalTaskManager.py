@@ -169,7 +169,7 @@ def show_status():
             # *** Self added, to get the the results from 2026 only ***
             year = 2026
             month = "05"
-            day = "04"
+            day = "18"
             start = f"{year}-{month}-{day} 00:00:00"
             end   = f"{year+1}-01-01 00:00:00"
 
@@ -252,7 +252,7 @@ def fetch_results(is_classification, fetch_single_project=False):
                 f"SELECT pr, timestamp FROM {table_name} "
                 f"WHERE project = %s AND result IS NOT NULL AND timestamp >= %s"
             )
-            cursor.execute(done_prs_and_timestamps_query, (project, '2026-05-04 00:00:00'))
+            cursor.execute(done_prs_and_timestamps_query, (project, '2026-05-18 00:00:00'))
             done_prs_and_timestamps = [[str(row[0]), str(row[1])] for row in cursor.fetchall()]
 
             nb_new_results = 0
@@ -310,8 +310,9 @@ def remove_unfinished_for_project(project, specified_prs=[], table_name="tasks")
         else:
             delete_query = (
                 f"DELETE FROM {table_name} "
-                f"WHERE project = %s AND worker is NULL AND result IS NULL"
+                f"WHERE project = %s AND result IS NULL"
             ) # f"WHERE project = %s AND timestamp LIKE '%2026-%'"
+            # f"WHERE project = %s AND worker is NULL AND result IS NULL"
             cursor.execute(delete_query, (project,))
 
     connect_and_do(inner)

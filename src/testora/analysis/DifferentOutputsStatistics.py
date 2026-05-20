@@ -150,19 +150,19 @@ class DifferentOutputsStatistics():
         iteration = 0
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
-        config_names = ["testora", "difftestgen", "no_coverage_feedback", "no_cg", "no_runtime", "no_bodies"]
+        config_names = ["testora", "difftestgen", "only_coverage_feedback", "only_cg"]
         subset_mode = False
 
         project_info = {
-            "scipy": 129,
+            "scipy": 126,
             "marshmallow": 53,
-            "pandas": 128,
+            "pandas": 127,
             "keras": 133
         }
 
-        comparison_str_list = [] # to record the comparison info between the two versions
-        baseline_pr_set = None
-        our_approach_pr_set = None
+        # comparison_str_list = [] # to record the comparison info between the two versions
+        # baseline_pr_set = None
+        # our_approach_pr_set = None
 
         for i, version_name in enumerate(config_names):
             project_level = []

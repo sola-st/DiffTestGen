@@ -104,8 +104,7 @@ def main():
    # model_version = "gpt-4o-mini-2024-07-18"
     model_version = "gpt-5-mini-2025-08-07"
     target_projects = ["scipy"] #, "scipy", "keras", "marshmallow"]#, 
-    config_names = ["testora"]#, "difftestgen", "no_coverage_feedback", "no_cg", "no_runtime", "no_bodies"]
-    # config_names = ["1_0_1_False"]
+    config_names = ["testora", "difftestgen", "only_coverage_feedback", "only_cg"]
     results_folder = join("data", "results")
     output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")  
     across_projects = []

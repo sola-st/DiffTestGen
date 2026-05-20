@@ -14,10 +14,8 @@ target_projects = ["scipy", "pandas", "marshmallow", "keras"]
 config_versions = {
     "testora": [1, 0, 1, False, None, False, False, False],
     "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
-    "no_coverage_feedback": [5, 0, 8, True, 'pr-modified', True, True, True], 
-    "no_cg": [5, 8, 8, True, 'pr-modified', False, True, True],
-    "no_runtime": [5, 8, 8, True, 'pr-modified', True, True, False],
-    "no_bodies": [5, 8, 8, False, None, True, True, True]
+    "only_coverage_feedback": [5, 8, 8, False, None, False, False, False],
+    "only_cg": [5, 0, 8, False, None, True, False, False],
 }
 
 base_folder = join("data", "results")
