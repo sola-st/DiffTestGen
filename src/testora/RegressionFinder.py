@@ -622,7 +622,7 @@ def check_pr(github_repo, cloned_repo_manager, pr):
      * if Config.call_graph == True:
         this function will also return the callers and callees of the changed functions 
     '''
-    changed_functions = pr.get_changed_function_names_and_context(Config.initial_test_generation_prompt_version) 
+    changed_functions = pr.get_changed_function_names_and_context() 
     if changed_functions == "too many":
         append_event(Event(pr_nb=pr.number, message="Ignoring because too many changed functions"))
         return

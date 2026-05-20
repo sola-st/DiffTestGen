@@ -262,14 +262,14 @@ class PullRequest:
         result = list(dict.fromkeys(result))
         return result
     
-    def get_changed_function_names_and_context(self, prompt_base):
+    def get_changed_function_names_and_context(self):
         self.changed_function_qualified_names_old = [] # all: public + private + unsure
         self.changed_function_qualified_names_old_dict = {}
         if Config.context_version != 1: # original Testora does not goes for old version of changed functions
             pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
             # update self.changed_function_qualified_names_old
             self.changed_function_qualified_names_old_non_public = []
-            too_many = self.get_helper(pre_commit_cloned_repo, "old", prompt_base) # target on getting old context
+            too_many = self.get_helper(pre_commit_cloned_repo, "old") # target on getting old context
             if too_many:
                 return "too many"
         post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
@@ -277,7 +277,7 @@ class PullRequest:
         self.changed_function_qualified_names_new = []
         self.changed_function_qualified_names_new_dict = {}
         self.changed_function_qualified_names_new_no_public = []
-        too_many = self.get_helper(post_commit_cloned_repo, "new", prompt_base)
+        too_many = self.get_helper(post_commit_cloned_repo, "new")
         if too_many:
             return "too many"
 
@@ -289,21 +289,21 @@ class PullRequest:
         self.union_changed_function_qualified_names = list(dict.fromkeys(self.changed_function_qualified_names_old + self.changed_function_qualified_names_new))
         return self.union_changed_function_qualified_names
     
-    def get_helper(self, cloned_repo, version, prompt_base):
+    def get_helper(self, cloned_repo, version):
         # update changed_functions for old or new version
         if Config.call_graph == True:
             # the server stays alive for the entire workspace
             server = ExtractCallerCallee(cloned_repo.repo.working_dir)
             with server.lsp.start_server(self.target_folder): # start only once, automatic stop, focus on only the given folder
-                too_many = self.helper_inner(cloned_repo, version, prompt_base, server)
+                too_many = self.helper_inner(cloned_repo, version, server)
                 if too_many:
                     return "too many"
         else:
-            too_many = self.helper_inner(cloned_repo, version, prompt_base)
+            too_many = self.helper_inner(cloned_repo, version)
             if too_many:
                 return "too many"
 
-    def helper_inner(self, cloned_repo, version, prompt_base, server=None):
+    def helper_inner(self, cloned_repo, version, server=None):
         code_context = ""
         code_context_with_line_num_str = ""
         code_context_with_line_num = {}
@@ -350,10 +350,15 @@ class PullRequest:
                     function_names, functions_code, functions_code_with_line_num = get_function_names_code_to_with_mark(file_content, patch_ranges)
                     code_context_with_line_num.update({modified_file.path: functions_code_with_line_num})
 
-                    if Config.context_version in [4, 6] or prompt_base == 4:
+                    if Config.context_version in [4, 6] or Config.initial_test_generation_prompt_version == 4:
                         code_context_with_line_num_str += f"The following are the affected functions from file <{modified_file.path}>:\n"
                         code_context_with_line_num_str += "\n\n".join(functions_code_with_line_num)
                         code_context_with_line_num_str += "\n"
+                
+                if functions_code and (Config.changed_function_body == True or Config.feedback_test_generation_prompt_version == 8):
+                    code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
+                    code_context += "\n\n".join(functions_code)
+                    code_context += "\n"
 
                 if function_names:
                     func_tuple_with_only_name = None
@@ -365,7 +370,6 @@ class PullRequest:
                             append_event(Event(pr_nb=self.number, message=f"Too many changed private functions ({len(function_names)}). {pri_func_str}."))
                             return "too many"
                         
-                    if type(function_names[0]) == tuple: # our approach
                         if Config.call_graph == True:
                             # to build documentation
                             container_name = cloned_repo.container_name
@@ -388,38 +392,10 @@ class PullRequest:
                                 # get public apis: self.public_apis_old, self.full_names_old, self.abbr_names_old
                                 self.public_apis_old = get_apis(api_file)
 
-                                function_names_to_get_cg_old = []
-                                for func_name in function_names:
-                                    function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-
-                                    check_parent_class = True
-                                    if parent_class:
-                                        if parent_class in checked_parent_class: # check the class hover text only once
-                                            check_parent_class = False
-                                        else:
-                                            checked_parent_class.append(parent_class)
-                                    else: # the cases with no parent class
-                                        check_parent_class = False
-
-                                    import_line, adjusted_module, class_hover_text = is_public(server, modified_file.path, module_name, 
-                                            parent_class, function_name, self.public_apis_old, check_parent_class) # , is_changed_func=True)
-                                    if class_hover_text:
-                                        # here adjusted_module ends with class name
-                                        self.public_class_hover_text_old.update({adjusted_module: class_hover_text})
-
-                                    fully_qulified_name = f"{adjusted_module}.{function_name}"
-                                    self.changed_function_qualified_names_old.append(fully_qulified_name)
-                                    if import_line: # public and special methods
-                                        if function_name.startswith("__") and function_name.endswith("__"):
-                                            self.public_func_imports_old.add(f"* To trigger changed method '{fully_qulified_name}', which is a special method of the class '{adjusted_module}', access the class with: {import_line}")
-                                        else:
-                                            self.public_func_imports_old.add(f"* To access changed function '{fully_qulified_name}': {import_line}")
-                                    else:
-                                        self.changed_function_qualified_names_old_non_public.append(fully_qulified_name)
-                                        function_names_to_get_cg_old.append(func_name)
-
-                                self.changed_function_qualified_names_old_dict.update({modified_file.path: self.changed_function_qualified_names_old})
-
+                                self.public_class_hover_text_old, self.changed_function_qualified_names_old, self.public_func_imports_old, \
+                                        self.changed_function_qualified_names_old_non_public, function_names_to_get_cg_old = \
+                                        self.check_func_name_details(function_names, checked_parent_class, server, modified_file.path, module_name, self.public_apis_old)
+                                
                                 # update "self.all_call_graph_paths", "self.all_signatures_docstrings", and self.all_imports
                                 if function_names_to_get_cg_old:
                                     self.get_call_graph_info(server, modified_file, function_names_to_get_cg_old, version)
@@ -434,36 +410,9 @@ class PullRequest:
                                     else:
                                         self.public_apis_union = self.public_apis_new
 
-                                function_names_to_get_cg_new = []
-                                for func_name in function_names:
-                                    function_name, start_line_0_based, start_col_0_based, parent_class = func_name
-                                        
-                                    check_parent_class = True
-                                    if parent_class:
-                                        if parent_class in checked_parent_class:
-                                            check_parent_class = False
-                                        else:
-                                            checked_parent_class.append(parent_class)
-                                    else: # the cases with no parent class
-                                        check_parent_class = False
-
-                                    import_line, adjusted_module, class_hover_text = is_public(server, modified_file.path, module_name, 
-                                            parent_class, function_name, self.public_apis_new, check_parent_class) # , is_changed_func=True)
-                                    if class_hover_text:
-                                        self.public_class_hover_text_new.update({adjusted_module: class_hover_text})
-                                    
-                                    fully_qulified_name = f"{adjusted_module}.{function_name}"
-                                    self.changed_function_qualified_names_new.append(fully_qulified_name)
-                                    if import_line: # public
-                                        if function_name.startswith("__") and function_name.endswith("__"):
-                                            self.public_func_imports_new.add(f"* To trigger changed method '{fully_qulified_name}', which is a special method of the class '{adjusted_module}', access the class with: {import_line}")
-                                        else:
-                                            self.public_func_imports_new.add(f"* To access changed function '{fully_qulified_name}': {import_line}")
-                                    else:
-                                        self.changed_function_qualified_names_new_no_public.append(fully_qulified_name)
-                                        function_names_to_get_cg_new.append(func_name)
-                                
-                                self.changed_function_qualified_names_new_dict.update({modified_file.path: self.changed_function_qualified_names_new})
+                                self.public_class_hover_text_new, self.changed_function_qualified_names_new, self.public_func_imports_new, \
+                                        self.changed_function_qualified_names_new_non_public, function_names_to_get_cg_new = \
+                                        self.check_func_name_details(function_names, checked_parent_class, server, modified_file.path, module_name, self.public_apis_new)
 
                                 if function_names_to_get_cg_new:
                                     self.get_call_graph_info(server, modified_file, function_names_to_get_cg_new, version)
@@ -478,6 +427,11 @@ class PullRequest:
                     else: # original Testora
                         for func_name in function_names:
                             self.changed_function_qualified_names_new.append(f"{module_name}.{func_name}")
+
+                    if version == "old":
+                        self.changed_function_qualified_names_old_dict.update({modified_file.path: self.changed_function_qualified_names_old})
+                    else:
+                        self.changed_function_qualified_names_new_dict.update({modified_file.path: self.changed_function_qualified_names_new})
 
                 else: # no changed functions
                     if Config.call_graph == True:
@@ -505,11 +459,6 @@ class PullRequest:
                                 else:
                                     self.public_apis_union = self.public_apis_new
 
-                if functions_code and Config.changed_function_body == True:
-                    code_context += f"The following are the affected functions from file <{modified_file.path}>:\n"
-                    code_context += "\n\n".join(functions_code)
-                    code_context += "\n"
-
         if Config.call_graph == True and version == "new" \
                 and (self.call_graph_paths_old or self.call_graph_paths_new or self.public_func_imports_old or self.public_func_imports_new):
             self.get_union_call_graph()
@@ -518,7 +467,7 @@ class PullRequest:
             self.get_top_k_shortest_across_different_entries()
             self.update_class_hover_text()
 
-        if Config.changed_function_body == True:
+        if Config.changed_function_body == True or Config.feedback_test_generation_prompt_version == 8:
             if version == "old":
                 self.old_context = code_context
             else:
@@ -526,16 +475,55 @@ class PullRequest:
         else:
             append_event(Event(pr_nb=self.number, message=f"Providing changed function bodies is disabled ({version})."))
 
-        if Config.context_version == 5 or prompt_base == 5:
+        if Config.context_version == 5 or Config.initial_test_generation_prompt_version == 5:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num 
             else:
                 self.new_context_with_line_num = code_context_with_line_num 
-        elif Config.context_version in [4, 6] or prompt_base == 4:
+        elif Config.context_version in [4, 6] or Config.initial_test_generation_prompt_version == 4:
             if version == "old":
                 self.old_context_with_line_num = code_context_with_line_num_str 
             else:
                 self.new_context_with_line_num = code_context_with_line_num_str 
+
+    def check_func_name_details(self, function_names, checked_parent_class, server, modified_file_path, module_name, public_apis):
+        # the following could be old and new, depends on the version
+        public_class_hover_text = {}
+        changed_function_qualified_names = []
+        public_func_imports = set()
+        changed_function_qualified_names_non_public = []
+        function_names_to_get_cg = []
+
+        for func_name in function_names:
+            function_name, start_line_0_based, start_col_0_based, parent_class = func_name
+            check_parent_class = True
+            if parent_class:
+                if parent_class in checked_parent_class: # check the class hover text only once
+                    check_parent_class = False
+                else:
+                    checked_parent_class.append(parent_class)
+            else: # the cases with no parent class
+                check_parent_class = False
+            
+            import_line, adjusted_module, class_hover_text = is_public(server, modified_file_path, module_name, 
+                    parent_class, function_name, public_apis, check_parent_class)
+            if class_hover_text:
+                # here adjusted_module ends with class name
+                public_class_hover_text.update({adjusted_module: class_hover_text})
+
+            fully_qulified_name = f"{adjusted_module}.{function_name}"
+            changed_function_qualified_names.append(fully_qulified_name)
+            if import_line: # public and special methods
+                if function_name.startswith("__") and function_name.endswith("__"):
+                    public_func_imports.add(f"* To trigger changed method '{fully_qulified_name}', which is a special method of the class '{adjusted_module}', access the class with: {import_line}")
+                else:
+                    public_func_imports.add(f"* To access changed function '{fully_qulified_name}': {import_line}")
+            else:
+                changed_function_qualified_names_non_public.append(fully_qulified_name)
+                function_names_to_get_cg.append(func_name)
+
+        return public_class_hover_text, changed_function_qualified_names, public_func_imports, changed_function_qualified_names_non_public, function_names_to_get_cg
+
     
     def get_union_call_graph(self):
         # !!! to fix all the orders, to make sure the cache is reusable
