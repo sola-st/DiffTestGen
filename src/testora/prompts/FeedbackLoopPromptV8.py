@@ -1,3 +1,4 @@
+from testora import Config
 from testora.util.Logs import Event, append_event
 
 
@@ -32,26 +33,27 @@ class FeedbackTestGeneratorPromptV8:
             )
 
         self.call_graph_block = ""
-        if selected_cg_info:
+        if Config.call_graph == True and selected_cg_info:
             self.call_graph_block = f"The following provides reference information on how to access or invoke the uncovered affected functions:\n{selected_cg_info}"
 
         self.test_function_block = ""
-        if old_tests or new_tests:
-            if old_tests:
-                old_tests = f"\n\n{old_tests}"
-            else:
-                old_tests = "<The test functions do not exist in the old code version.>"
+        if Config.use_existing_tests == "pr-modified":
+            if old_tests or new_tests:
+                if old_tests:
+                    old_tests = f"\n\n{old_tests}"
+                else:
+                    old_tests = "<The test functions do not exist in the old code version.>"
 
-            if new_tests:
-                new_tests = f"\n\n{new_tests}"
-            else:
-                new_tests = "<The test functions do not exist in the new code version.>"
+                if new_tests:
+                    new_tests = f"\n\n{new_tests}"
+                else:
+                    new_tests = "<The test functions do not exist in the new code version.>"
 
-            self.test_function_block = (
-                f"The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested."
-                f"The following are the old and the new versions of these test functions:\n"
-                f"Old version: {old_tests}\nNew version: {new_tests}\n"
-            )
+                self.test_function_block = (
+                    f"The diff includes some changed test functions, which may highly related to how the affected functions are accessed and tested."
+                    f"The following are the old and the new versions of these test functions:\n"
+                    f"Old version: {old_tests}\nNew version: {new_tests}\n"
+                )
 
         self.use_json_output = False
 

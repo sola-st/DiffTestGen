@@ -42,12 +42,6 @@ initial_test_generation_prompt_version = 5
 # different prompts for feedback rounds (1th - {max_round}th) test generation
 # 0 indicates no feedback loop (original version Testora)
 feedback_test_generation_prompt_version = 8
-# here are three related configurations for the feedback loop prompt version 8,
-# will be aytomatically set the needed information in the prompt based on feedback_test_generation_prompt_version
-# set to 8 and with all these ture, to get a full feedback prompt
-cg_in_feedback = True
-changed_function_in_feedback = True
-existing_tests_in_feedback = True
 
 # different versions of contexts
 # it follows a similar version above, but versions 2 and 3 are from the same implementation

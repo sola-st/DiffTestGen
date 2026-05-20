@@ -280,7 +280,7 @@ def generate_tests(pr, github_repo, changed_functions):
         if Config.call_graph == True: 
             info_public_and_private = prepare_call_info(pr)
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled (initial prompt)."))
+            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled"))
 
         prompt_full_diff = None
         # full diff with GPT4, 5
@@ -301,7 +301,7 @@ def generate_tests(pr, github_repo, changed_functions):
             if not info_public_and_private:
                 info_public_and_private = prepare_call_info(pr)
         else:
-            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled (initial prompt)."))
+            append_event(Event(pr_nb=pr.number, message=f"Call graph disabled"))
             
         prompt_filtered_diff = None
         # full diff with GPT4, 5
@@ -359,7 +359,7 @@ def generate_replacement_tests(pr, github_repo, changed_functions, all_uncovered
                     old_covered_info, union_uncovered_stmts["old"], pr.old_context_with_line_num, pr.changed_function_qualified_names_old_dict)
             new_context, uncovered_changed_ful_qua_funcs_new = mark_code_stmt(
                     new_covered_info, union_uncovered_stmts["new"], pr.new_context_with_line_num, pr.changed_function_qualified_names_new_dict)
-            if Config.cg_in_feedback == True:
+            if Config.call_graph == True:
                 selected_cg_info = prepare_selected_call_info(pr, uncovered_changed_ful_qua_funcs_old, uncovered_changed_ful_qua_funcs_new)
         else:
             old_context = pr.old_context_with_line_num # code lines with line numbers marked
@@ -1248,15 +1248,6 @@ def main():
                 Config.iteration, Config.model_version = args.paras
         if Config.initial_test_generation_prompt_version == 1 or Config.call_graph == False:
             Config.private_call_identification = 1 # to make sure baseline will not call for call paths
-        
-        if Config.feedback_test_generation_prompt_version == 8:
-            Config.cg_in_feedback = True
-            Config.changed_function_in_feedback = True
-            Config.existing_tests_in_feedback = True
-        else:
-            Config.cg_in_feedback = False
-            Config.changed_function_in_feedback = False
-            Config.existing_tests_in_feedback = False
         
     if args.db:
         if args.project or args.pr:
