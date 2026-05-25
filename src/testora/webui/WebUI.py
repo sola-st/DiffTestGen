@@ -98,9 +98,9 @@ def categorize_entry(entry):
         return "Pre-classification"
     if message.startswith("Different outputs"):
         return "Different outputs"
-    if message.startswith("Same ouput"):
+    if message.startswith("Same output"):
         return "Same output"
-    if message.startswith("Both tests failed with"):
+    if message.startswith("Both tests failed"):
         return "Both tests failed"
     if message.startswith("Diff coverage, "):
         return "Diff coverage"

@@ -82,7 +82,9 @@ def clean_output(output):
             result[2] == "To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.":
         result = result[3:]
 
-    if result[-1] == 'self._warn("No data was collected.", slug="no-data-collected")':
+    if not result[-1].strip():
+        result = result[:-1]
+    if result[-1].strip() == 'self._warn("No data was collected.", slug="no-data-collected")':
         result = result[:-1]
 
     return "\n".join(result)
