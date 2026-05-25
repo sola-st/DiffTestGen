@@ -76,6 +76,15 @@ def clean_output(output):
                 line[5] == " ":
             continue
         result.append(line)
+
+    # keras specific cleaning (to remove warnings about TensorFlow and GPU)   
+    if result[0] == "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR" and \
+            result[2] == "To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.":
+        result = result[3:]
+
+    if result[-1] == 'self._warn("No data was collected.", slug="no-data-collected")':
+        result = result[:-1]
+
     return "\n".join(result)
 
 
@@ -700,12 +709,12 @@ def check_pr(github_repo, cloned_repo_manager, pr):
         for flaky_change_found, idx in zip(flaky_change_found_list, flaky_indices):
             if flaky_change_found == False: # flaky test gets the same output as before
                 append_event(ComparisonEvent(pr_nb=pr.number, 
-                        message=f"Same output\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
+                        message=f"Same output (after re-execution)\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                         test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
                 continue
 
             append_event(ComparisonEvent(pr_nb=pr.number,
-                    message=f"Different outputs\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
+                    message=f"Different outputs (after re-execution)\nCovered lines in old: {all_covered_modified_stmts_old[idx]}, Covered lines in new: {all_covered_modified_stmts_new[idx]}",
                     test_code=old_executions[idx].code, old_output=old_executions[idx].output, new_output=new_executions[idx].output))
 
             if Config.phase_selection == "all": # run the entire workflow, including test genration and classification. 

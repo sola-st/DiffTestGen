@@ -89,13 +89,19 @@ def categorize_entry(entry):
     if message.startswith("Added info about call graph"):
         return "Added call graph"
     if message.startswith("Test execution"):
-        return "Test execution"
+        if "flaky" in message:
+            return "Test execution flaky"
+        return "Test execution normal"
     if message.startswith("Fix runtime errors"):
         return "Fix runtime errors"
     if message == "Pre-classification":
         return "Pre-classification"
     if message.startswith("Different outputs"):
         return "Different outputs"
+    if message.startswith("Same ouput"):
+        return "Same output"
+    if message.startswith("Both tests failed with"):
+        return "Both tests failed"
     if message.startswith("Diff coverage, "):
         return "Diff coverage"
     if message.startswith("Querying") or message.startswith("Cached result for querying"):
