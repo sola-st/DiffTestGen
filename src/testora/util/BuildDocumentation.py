@@ -59,18 +59,16 @@ class BuildDocumentation:
         # copy the bash script to the container home/kreas directory
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode='w') as tar:
-            tar.add("src/testora/util/keras_sphinx.sh", arcname="home/keras/keras_sphinx.sh")
+            tar.add("src/testora/util/GetKerasApis.py", arcname="home/keras/GetKerasApis.py")
         tar_stream.seek(0)
         self.container.put_archive("/", tar_stream.read())
 
         # run the build script
         # results = 
-        self.container.exec_run("bash keras_sphinx.sh", workdir='/home/keras')
+        self.container.exec_run("python GetKerasApis.py", workdir='/home/keras')
         # print(results.output)
 
         # copy the api files to outer container
-        self.copy_file_from_container(
-                f"/home/{self.project_name}/docs/build/html/objects.inv", f"apis/api_{self.container.name}_{self.pr_num}")
         self.copy_file_from_container(
                 f"/home/{self.project_name}/keras_objects.txt", f"apis/api_{self.container.name}_{self.pr_num}")
 

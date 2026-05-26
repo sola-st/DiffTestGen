@@ -18,15 +18,21 @@ class SphinxOnlyPR:
 
 
     def sphnix_build_only(self, cloned_repo, version):
+        api_suffix_1 = "bulid sphinx documentation"
+        api_suffix_2 = "sphinx documentation"
         container_name = cloned_repo.container_name
-        # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
-        api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
+        api_file_name = "objects.inv"
+        if self.cloned_repo_manager.repo_name == "keras":
+            api_file_name = "keras_objects.txt"
+            api_suffix_1 = "extract public APIs"
+            api_suffix_2 = "extracted APIs"
+        api_file = f"apis/api_{container_name}_{self.number}/{api_file_name}"
         if not exists(api_file): # write it to local for quick repetition
             # to build only once per version
             # project_name = self.cloned_repo_manager.repo_name
             # generate and copy it from container: a file f"api_{container_name}.inv" which includes all public apis
-            append_event(Event(pr_nb=self.number, message=f"Starting to bulid sphinx documentation ({version})."))
+            append_event(Event(pr_nb=self.number, message=f"Starting to {api_suffix_1} ({version})."))
             BuildDocumentation(container_name, self.cloned_repo_manager.repo_name, self.number).build()
-            append_event(Event(pr_nb=self.number, message=f"Done with sphinx bulid ({version})."))
+            append_event(Event(pr_nb=self.number, message=f"Done with {api_suffix_2} ({version})."))
         else:
-            append_event(Event(pr_nb=self.number, message=f"Exist, sphinx bulid ({version})."))
+            append_event(Event(pr_nb=self.number, message=f"Exist, {api_suffix_2} ({version})."))

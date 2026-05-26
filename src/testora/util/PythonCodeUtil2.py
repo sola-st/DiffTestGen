@@ -192,7 +192,11 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             # caller_func_info = "\n".join(collector.imports) + "\n" + module_with_node.code
 
             # # option 2: return the signature
-            current_module = relativePath.replace("src/", "", 1).replace(".py", "").replace("/", ".")
+            # current_module = ""
+            if "keras" in relativePath:
+                current_module = relativePath.replace(".py", "").replace("/", ".")
+            else:
+                current_module = relativePath.replace("src/", "", 1).replace(".py", "").replace("/", ".")
             import_line, adjusted_module, class_hover_text = is_public(server, relativePath, current_module, parent_class, call_function_name, public_apis_list, check_parent_class)
             if import_line:
                 # option 1: using cst to get signature and docstrings

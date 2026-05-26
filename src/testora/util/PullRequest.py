@@ -120,7 +120,7 @@ class PullRequest:
         project_name = self.cloned_repo_manager.repo_name
         if project_name == "marshmallow":
             self.target_folder = "src"
-        elif project_name in ["scipy", "pandas"]:
+        elif project_name in ["scipy", "pandas", "keras"]:
             self.target_folder = project_name
 
         # for private functions, update the following three:
@@ -168,8 +168,12 @@ class PullRequest:
 
         # Python files only
         self.modified_python_files = [f for f in self.patch.modified_files if f.path.endswith(".py")] # [cython issue Sept.11] or f.path.endswith(".pyx")]
-        self.non_test_modified_python_files = [f.path for f in self.modified_python_files 
-                if "test" not in f.path and (f.path.startswith(self.module_name) or f.path.startswith(f"src/{self.module_name}"))]
+        if self.cloned_repo_manager.repo_name == "keras":
+            self.non_test_modified_python_files = [f.path for f in self.modified_python_files 
+                    if "test" not in f.path and f.path.startswith(self.module_name)]
+        else:
+            self.non_test_modified_python_files = [f.path for f in self.modified_python_files 
+                    if "test" not in f.path and (f.path.startswith(self.module_name) or f.path.startswith(f"src/{self.module_name}"))]
 
         # Python and other PLs
         modified_code_files = [
@@ -180,8 +184,12 @@ class PullRequest:
             f.path.endswith(".cpp") or
             f.path.endswith(".h")
         ]
-        self.non_test_modified_code_files = [f.path for f in modified_code_files 
-                if "test" not in f.path and (f.path.startswith(self.module_name) or f.path.startswith(f"src/{self.module_name}"))]
+        if self.cloned_repo_manager.repo_name == "keras":
+            self.non_test_modified_code_files = [f.path for f in modified_code_files 
+                    if "test" not in f.path and f.path.startswith(self.module_name)]
+        else:
+            self.non_test_modified_code_files = [f.path for f in modified_code_files 
+                    if "test" not in f.path and (f.path.startswith(self.module_name) or f.path.startswith(f"src/{self.module_name}"))]
 
     def get_modified_files(self):
         if Config.code_change_pl == "python":
@@ -314,7 +322,11 @@ class PullRequest:
                     file_content = f.read()
                 # module_name = modified_file.path.replace("/", ".").replace(".pyx", "").replace(".py", "")
                 # fully dotted path, not always the same as actual module
-                module_name = modified_file.path.replace("src/", "", 1).replace(".py", "").replace("/", ".")
+                module_name = None
+                if "keras" in cloned_repo.container_name:
+                    module_name = modified_file.path.replace(".py", "").replace("/", ".")
+                else:
+                    module_name = modified_file.path.replace("src/", "", 1).replace(".py", "").replace("/", ".")
                 
                 patch_ranges = []
                 if Config.context_version == 1: # original Testora
@@ -436,8 +448,11 @@ class PullRequest:
                 else: # no changed functions
                     if Config.call_graph == True:
                         container_name = cloned_repo.container_name
-                        # if (version == "old" and not self.public_apis_old) or (version == "new" and not self.public_apis_new):
-                        api_file = f"apis/api_{container_name}_{self.number}/objects.inv"
+                        api_file_name = "objects.inv"
+                        if self.cloned_repo_manager.repo_name == "keras":
+                            api_file_name = "keras_objects.txt"
+                        api_file = f"apis/api_{container_name}_{self.number}/{api_file_name}"
+                        
                         if not exists(api_file): # write it to local for quick repetition
                             # to build only once per version
                             # project_name = self.cloned_repo_manager.repo_name
