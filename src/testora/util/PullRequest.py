@@ -16,7 +16,8 @@ from testora.util.PythonCodeUtil2 import (
         get_function_names_code_with_line_num,
         get_function_names_code_to_with_mark,
         get_test_function_names_code_imports,
-        is_public
+        is_public,
+        is_public_keras
 )
 from testora.util.ExtractCallerCallee import ExtractCallerCallee
 from collections import deque
@@ -324,9 +325,9 @@ class PullRequest:
                 # fully dotted path, not always the same as actual module
                 module_name = None
                 if "keras" in cloned_repo.container_name:
-                    module_name = modified_file.path.replace(".py", "").replace("/", ".")
+                    module_name = modified_file.path.replace(".py", "").replace("/", ".").rstrip(".__init__")
                 else:
-                    module_name = modified_file.path.replace("src/", "", 1).replace(".py", "").replace("/", ".")
+                    module_name = modified_file.path.replace("src/", "", 1).replace(".py", "").replace("/", ".").rstrip(".__init__")
                 
                 patch_ranges = []
                 if Config.context_version == 1: # original Testora
@@ -520,8 +521,13 @@ class PullRequest:
             else: # the cases with no parent class
                 check_parent_class = False
             
-            import_line, adjusted_module, class_hover_text = is_public(server, modified_file_path, module_name, 
-                    parent_class, function_name, public_apis, check_parent_class)
+            if self.cloned_repo_manager.repo_name == "keras":
+                import_line, adjusted_module, class_hover_text = is_public_keras(server, modified_file_path, module_name, \
+                        parent_class, function_name, public_apis, check_parent_class)
+            else:
+                import_line, adjusted_module, class_hover_text = is_public(server, modified_file_path, module_name, \
+                        parent_class, function_name, public_apis, check_parent_class)
+                
             if class_hover_text:
                 # here adjusted_module ends with class name
                 public_class_hover_text.update({adjusted_module: class_hover_text})

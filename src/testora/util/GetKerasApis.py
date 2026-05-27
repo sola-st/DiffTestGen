@@ -60,7 +60,11 @@ def parse_imports_from_init(init_file: Path, package_root: Path):
 
 def extract_public_apis(api_root: Path):
     public_mappings = set()
+    api_subdir = api_root / "api"
     for init_file in api_root.rglob("__init__.py"):
+        # Skip files in the keras/api subdirectory
+        if api_subdir in init_file.parents or init_file.parent == api_subdir:
+            continue
         try:
             discovered = parse_imports_from_init(init_file, api_root)
             public_mappings.update(discovered)

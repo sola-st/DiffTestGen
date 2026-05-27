@@ -5,7 +5,7 @@ import tarfile
 import libcst as cst
 from libcst.metadata import MetadataWrapper, PositionProvider, ParentNodeProvider
 from testora.util.ExtractCalleesInTestCode import ExtractCalleesInTestCode
-from testora.util.PythonCodeUtil2 import CallerFunctionCollector, is_public
+from testora.util.PythonCodeUtil2 import CallerFunctionCollector, is_public, is_public_keras
 
 
 # option 1: without using lsp, but the parent class in the module is not clear/reliable so far
@@ -215,13 +215,21 @@ def check_callees(callees, container_repo_path, public_apis_union):
     for callee in callees: # includes callee functions and attributes
         if not callee["callee_name"].startswith("_"): # may be public
             range_starts_at1 = range(callee["line"]+1, callee["line"]+2) # +1 to start at 1, +1 to be a right-open range
-            module = callee["relative"].replace("src/", "", 1).replace(".py", "").replace("/", ".")
+            
             parent_class = get_callee_function_parent_class(join(container_repo_path, callee["relative"]), range_starts_at1)
             if callee["callee_name"].startswith("__") and callee["callee_name"].endswith("__"): # special methods
                 private_callees.append(callee["callee_name"])
-            elif is_public(None, None, module, parent_class, callee["callee_name"], public_apis_union, None, return_bool=True) == False: 
-                # private function and protected attribution = not in api list + startswith "_"
-                private_callees.append(callee["callee_name"])
+            else:
+                if "keras" in container_repo_path:
+                    module = callee["relative"].replace(".py", "").replace("/", ".")
+                    if is_public_keras(None, None, module, parent_class, callee["callee_name"], public_apis_union, None, return_bool=True) == False: 
+                        # private function and protected attribution = not in api list + startswith "_"
+                        private_callees.append(callee["callee_name"])
+                else:
+                    module = callee["relative"].replace("src/", "", 1).replace(".py", "").replace("/", ".")
+                    if is_public(None, None, module, parent_class, callee["callee_name"], public_apis_union, None, return_bool=True) == False: 
+                        # private function and protected attribution = not in api list + startswith "_"
+                        private_callees.append(callee["callee_name"])
                     
                     # return True, static_error_msg # if there is one private function, does not goes for checking other callees.
     return private_callees # to mention all called private functions

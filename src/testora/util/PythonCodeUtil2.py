@@ -195,9 +195,13 @@ def get_caller_function_names(relativePath: str, code: str, check_range, public_
             # current_module = ""
             if "keras" in relativePath:
                 current_module = relativePath.replace(".py", "").replace("/", ".")
+                import_line, adjusted_module, class_hover_text = is_public_keras(
+                        server, relativePath, current_module, parent_class, call_function_name, public_apis_list, check_parent_class)
             else:
                 current_module = relativePath.replace("src/", "", 1).replace(".py", "").replace("/", ".")
-            import_line, adjusted_module, class_hover_text = is_public(server, relativePath, current_module, parent_class, call_function_name, public_apis_list, check_parent_class)
+                import_line, adjusted_module, class_hover_text = is_public(
+                        server, relativePath, current_module, parent_class, call_function_name, public_apis_list, check_parent_class)
+            
             if import_line:
                 # option 1: using cst to get signature and docstrings
                 # signature = get_function_signature(func_node)
@@ -307,14 +311,72 @@ def is_public(server, file_path, module, parent_class, func_name, public_apis_li
         
     return import_line, module_to_import, class_hover_text_to_return
 
-# def whether_module_is_public(public_apis_list, modules):
-#     in_public_list = False
-#     for module in modules:
-#         found = [api for api in public_apis_list if api.startswith(module)]
-#         if found:
-#             in_public_list = True
-#             break
-#     return in_public_list
+def is_public_keras(server, file_path, module, parent_class, func_name, public_apis_list_triple, check_parent_class, return_bool=False):
+    if return_bool == True and func_name.startswith("__") and func_name.endswith("__"):
+        return False # do not allow to explicitly call special methods.
+
+    # default
+    target_fullqua_name_to_find_in_api = f"{module}.{func_name}" 
+    target_base_module = module # fully dotted module
+    
+    # check more accurate module, parent class
+    parent_class_name = None
+    if parent_class:
+        parent_class_name, class_name_start_line_0base, class_name_start_col_0base = parent_class
+        long_class_end_module = f"{module}.{parent_class_name}" # accurate module
+
+        if func_name.startswith("__") and func_name.endswith("__"):
+            target_fullqua_name_to_find_in_api = module
+        else:
+            target_fullqua_name_to_find_in_api = f"{long_class_end_module}.{func_name}"
+            target_base_module = long_class_end_module
+
+    public_apis_list, implementation_paths, __ = public_apis_list_triple
+    # 1: return_bool only used when identify the private functions in the generated code
+    if return_bool == True: 
+        if target_fullqua_name_to_find_in_api in implementation_paths: 
+            return True
+        else: # fall back to name conventions
+            if func_name.startswith("_"): # not allowed to call both "_" and "__" leading 'functions'. 
+                return False
+            else:
+                return True
+    
+    # 2: for the general changed function and caller function check 
+    import_line = ""
+    class_hover_text_to_return = ""
+    if func_name.startswith("__") and func_name.endswith("__") and parent_class_name:
+        import_line = f"from {target_base_module} import {parent_class_name}"
+
+    elif target_fullqua_name_to_find_in_api in implementation_paths or target_base_module in implementation_paths:
+        idx = None
+        try:
+            idx = implementation_paths.index(target_fullqua_name_to_find_in_api)
+        except:
+            idx = implementation_paths.index(target_base_module)
+        
+        target_base_module = public_apis_list[idx]
+        if parent_class_name:
+            if func_name.startswith("__") and func_name.endswith("__"):
+                # with this only, we do not separate the __init__ and other special methods
+                import_line = f"from {target_base_module} import {parent_class_name}"
+            else: # normal function from a class
+                import_line = f"from {target_base_module} import {func_name}"
+        else:
+            import_line = f"from {target_base_module} import {func_name}" # import the function
+    else: # fall back to name conventions
+        if func_name.startswith("__") and func_name.endswith("__") and parent_class_name:
+            import_line = f"from {target_base_module} import {parent_class_name}"
+        elif not func_name.startswith("_"):
+            import_line = f"from {target_base_module} import {func_name}" # import the function
+    
+    if import_line and check_parent_class == True and parent_class:
+        class_hover_text_tmp = server.get_hover_text(file_path, class_name_start_line_0base, class_name_start_col_0base)
+        class_hover_text = class_hover_text_tmp.replace("```python\n", "", 1).replace("```\n", "", 1)
+        class_hover_text_to_return = f"#### For class '{target_base_module}'\n{class_hover_text}:\n"
+        
+    return import_line, target_base_module, class_hover_text_to_return
+
 
 def get_function_signature(node: cst.FunctionDef) -> str:
     """
