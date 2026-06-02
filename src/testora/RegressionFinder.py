@@ -84,8 +84,11 @@ def clean_output(output):
 
     if not result[-1].strip():
         result = result[:-1]
-    if result[-1].strip() == 'self._warn("No data was collected.", slug="no-data-collected")':
-        result = result[:-1]
+    try:
+        if result[-1].strip() == 'self._warn("No data was collected.", slug="no-data-collected")':
+            result = result[:-1]
+    except:
+        append_event(ErrorEvent(pr_nb=-1, message="Output cleaning error", details=cleaned_output))
 
     return "\n".join(result)
 
