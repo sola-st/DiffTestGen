@@ -1,5 +1,4 @@
 import argparse
-import json
 from os.path import join, exists
 from os import listdir
 from chaco.ChaCoCustomizedPullRequest import ChaCoCustomizedPullRequest

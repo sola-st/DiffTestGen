@@ -7,19 +7,20 @@ import os
 
 # To run our approach on ChaCo-PRs.
 iteration = 0
-model_versions = ["gpt-4o-mini-2024-07-18"] # ["gpt-4o-mini-2024-07-18", "gpt-5-mini-2025-08-07"]
+model_versions = ["gpt-4o-mini-2024-07-18", "gpt-5-mini-2025-08-07"]
 config_name = "difftestgen"
-config = [5, 8, 8, "pr-modified", True, True, True]
+config = [5, 8, 8, True, "pr-modified", True, True, True]
+
 results_folder = join("data", "results")
 
 with open(".target_project", "r") as f:
         target_project = f.read().strip()
 
-num = 16
+num = 8
 if target_project == "scipy":
-    num = 18
+    num = 16
 
-pr_file = join("data", "meta", f"chaco_{target_project}_unique_{num}.txt")
+pr_file = join("data", "meta", "chaco_prs", "chaco", f"{target_project}_common_{num}.txt")
 with open(pr_file, "r") as f:
     prs = f.readlines()
     pr_list = [int(pr) for pr in prs]

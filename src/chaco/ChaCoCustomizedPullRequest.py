@@ -140,7 +140,7 @@ class ChaCoCustomizedPullRequest:
             if modified_file.path in self._get_relevant_changed_files():
                 with open(f"{cloned_repo.repo.working_dir}/{modified_file.path}", "r") as f:
                     file_content = f.read()
-                module_name = modified_file.path.replace("src/", "", 1).replace(".py", "").replace("/", ".")
+                module_name = modified_file.path.replace("src/", "", 1).replace(".py", "").replace("/", ".").rstrip(".__init__")
                 
                 patch_ranges = []
                 for hunk in modified_file:
