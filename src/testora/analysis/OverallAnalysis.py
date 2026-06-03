@@ -1,4 +1,3 @@
-import ast
 from collections import Counter
 import json
 from os.path import exists, join, isfile
@@ -9,15 +8,13 @@ import shutil
 iteration = 0
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
-projects = ["marshmallow", "pandas", "scipy"]#, "keras"] ["scipy"] # 
+projects = ["keras", "marshmallow", "pandas", "scipy"]
     
-# marshmallow 53, keras 133, pandas 128, scipy 129
 config_versions = {
-    # "testora": [1, 0, 1, None, False, False, False],
-    "difftestgen": [5, 8, 8, "pr-modified", True, True, True],
-    "no_coverage_feedback": [5, 0, 8, 'pr-modified', True, True, True], 
-    "no_cg": [5, 8, 8, 'pr-modified', False, True, True],
-    "no_runtime": [5, 8, 8, 'pr-modified', True, True, False]
+    "testora": [1, 0, 1, False, None, False, False, False], 
+    "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
+    "only_coverage_feedback": [5, 8, 8, False, None, False, False, False],
+    "only_cg": [5, 0, 8, False, None, True, False, False], 
 }
         
 results_folder = join("data", "results")

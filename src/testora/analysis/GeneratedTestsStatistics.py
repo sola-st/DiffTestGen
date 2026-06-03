@@ -92,22 +92,22 @@ class DifferentOutputsStatistics():
 
 
     def main(self):
+        iteration = 0
         results_folder = join("data", "results")
-        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics")
+        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}", "generated_tests_meta")
         os.makedirs(output_folder, exist_ok=True)
 
-        iteration = 0
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
-        config_names = ["difftestgen", "no_coverage_feedback", "no_cg", "no_runtime"]
-        subset_mode = True
+        config_names = ["testora", "only_coverage_feedback", "only_cg", "difftestgen"]
+        subset_mode = False
 
         # option 1: for all projects
         project_info = {
-            "scipy": 129,
+            "keras": 133,
             "marshmallow": 53,
-            "pandas": 128,
-            # "keras": 133
+            "pandas": 127,
+            "scipy": 126,
         }
 
         # option 2: for a single project

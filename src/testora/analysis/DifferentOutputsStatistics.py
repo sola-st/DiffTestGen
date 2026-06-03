@@ -231,7 +231,7 @@ class DifferentOutputsStatistics():
         }
 
         for iteration in range(iteration_max):
-            output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}")
+            output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}", "differ_outputs_meta")
             os.makedirs(output_folder, exist_ok=True)
 
             versions_summary = []

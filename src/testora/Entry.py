@@ -37,8 +37,8 @@ pr_list = [int(pr) for pr in prs]
 # initial_prompt, feedback_prompt, context_version, changed_function_body,\
 # pr_modified_tests, use_call_graph, fix_static_error, runtime_error_feedback
 config_versions = {
-    "testora": [1, 0, 1, False, None, False, False, False], # all thurned off
-    "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True], # all thurned on
+    "testora": [1, 0, 1, False, None, False, False, False], # all turned off
+    "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True], # all turned on
     "only_coverage_feedback": [5, 8, 8, False, None, False, False, False], # testora + coverage feedback (only)
     "only_cg": [5, 0, 8, False, None, True, False, False], # testora + call graph (only)
 } 
