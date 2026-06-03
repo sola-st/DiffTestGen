@@ -9,7 +9,7 @@ import shutil
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
 subset_mode = False # to grab only a specific list of PRs.
-target_projects = ["scipy", "pandas", "marshmallow", "keras"]
+target_projects = ["keras", "marshmallow", "scipy", "pandas"]
 
 config_versions = {
     "testora": [1, 0, 1, False, None, False, False, False],
@@ -27,7 +27,6 @@ for target_project in target_projects:
             prs = f.readlines()
         pr_list = [int(pr) for pr in prs]
 
-    # version_ids = ['_'.join(map(str, config)) + f"_{name}" for config in config_versions for name in config_versions_names]
     version_ids = ['_'.join(map(str, config)) for config in config_versions.values()]
     config_names = list(config_versions.keys())
 
@@ -47,10 +46,12 @@ for target_project in target_projects:
                         continue
 
                 # # just for convenience, time-based filter
-                # if "03-" in file:
-                #     date = int(file.split(" ")[0].split("03-")[1])
-                #     if date < 20: 
-                #         continue
+                # if "06" in file:
+                #     print(file)
+                #     pass
+                #     # date = int(file.split(" ")[0].split("06-")[1])
+                #     # if date < 31: 
+                #     #     continue
                 # else:
                 #     continue
 

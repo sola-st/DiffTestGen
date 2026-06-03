@@ -1,8 +1,8 @@
 import json
-from os import listdir, makedirs
-from os.path import join, isdir
+from os import makedirs
+from os.path import join, exists
 import numpy as np
-from scipy.stats import gmean
+# from scipy.stats import gmean
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from testora.visualization.CoverageComparison import CoverageComparison
@@ -41,7 +41,7 @@ def get_overall_coverage_rates(all_data):
     return overall_data
             
 
-def plot_coverages_violin(overall_data, all_version_id, title, result_pdf):
+def plot_coverages_violin(overall_data, all_version_id, result_pdf):
     # Convert percentage strings to floats
     cleaned_data = [
         [float(cov.strip('%')) for cov in pr_level_rates]
@@ -82,17 +82,18 @@ def plot_coverages_violin(overall_data, all_version_id, title, result_pdf):
     # Label the x-axis
     ax.set_xticks(range(1, len(all_version_id) + 1))
     ax.set_xticklabels(all_version_id)
+    ax.set_xlim(0.5, len(all_version_id) + 0.6)  # add space after last bar
 
     # Add labels and title
-    ax.set_ylabel("Coverage (%)")
-    ax.set_title(title)
+    ax.set_ylabel("Union Coverage (%)")
+    # ax.set_title(title)
 
     # Add legend
     legend_elements = [
         Line2D([0], [0], marker='x', color='blue', label='Arithmetic Mean', linestyle='None'),
         # Line2D([0], [0], marker='o', color='orange', label='Geometric Mean', linestyle='None'),
     ]
-    ax.legend(handles=legend_elements, loc='lower right')
+    ax.legend(handles=legend_elements, loc='center right')
     
     plt.grid(True)
     plt.savefig(result_pdf)
@@ -103,8 +104,9 @@ def main():
     subset_mode = False
    # model_version = "gpt-4o-mini-2024-07-18"
     model_version = "gpt-5-mini-2025-08-07"
-    target_projects = ["scipy"] #, "scipy", "keras", "marshmallow"]#, 
-    config_names = ["testora", "difftestgen", "only_coverage_feedback", "only_cg"]
+    target_projects = ["keras", "pandas", "marshmallow", "scipy"]
+    config_names = ["testora", "only_coverage_feedback", "only_cg", "difftestgen"]
+    axis_names = ["Testora", "Only Coverage\nFeedback", "Only Access\nInformation", "DiffTestGen"]
     results_folder = join("data", "results")
     output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")  
     across_projects = []
@@ -118,16 +120,26 @@ def main():
             log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{name}", project)
             if subset_mode == True:
                 log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{name}", project)
-               
-            init = CoverageComparison(log_folder, name)
-            all_from_cur_version = init.get_multiple_pr_coverage_info(project)
-            # write a meta file for a version
+            
             meta_file = join(output_folder, f"{project}_coverage_meta.json")
-            with open(meta_file, "w") as f:
-                json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
-            print(f"Collected coverage information is written to {meta_file}, relevant pr num: {len(all_from_cur_version)}")
+            all_from_cur_version = []
+            if exists(meta_file):
+                print(f"Meta file {meta_file} already exists. Skipping processing for {name} on {project}.")
+                with open(meta_file, "r") as f:
+                    all_from_cur_version = json.load(f)
+            else:
+                init = CoverageComparison(log_folder, name)
+                all_from_cur_version = init.get_multiple_pr_coverage_info(project)
+                # write a meta file for a version
+                with open(meta_file, "w") as f:
+                    json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
+                print(f"Collected coverage information is written to {meta_file}, relevant pr num: {len(all_from_cur_version)}")
 
             all_data.append(all_from_cur_version)
+
+        overall_data = get_overall_coverage_rates(all_data)
+        result_pdf = join(output_base_folder, f"coverage_comparison_ablation_{project}.pdf") 
+        plot_coverages_violin(overall_data, axis_names, result_pdf)
 
         if i == 0:
             across_projects.extend(all_data)
@@ -137,9 +149,9 @@ def main():
 
     # for the plot
     overall_data = get_overall_coverage_rates(across_projects)
-    result_pdf = join(output_base_folder, f"Comparison_ablation.pdf") 
-    title = "Coverage Comparison (Ablation study)"
-    plot_coverages_violin(overall_data, config_names, title, result_pdf)
+    result_pdf = join(output_base_folder, f"coverage_comparison_ablation.pdf") 
+    # title = "Coverage Comparison (Ablation study)"
+    plot_coverages_violin(overall_data, axis_names, result_pdf)
 
 
 if __name__=="__main__":

@@ -23,17 +23,14 @@ def rename_log_file(file, file_folder):
         else:
             unfinshed_file = file.replace(".json", "_unfinished.json")
             new_file_name = f"{pr}_{unfinshed_file}"
-        rename(log_file, join(file_folder, new_file_name))
+        rename(log_file, join(file_folder, new_file_name.replace("logs_", "")))
     
     return new_file_name
     
 
 if __name__ == "__main__":
     # to rename logs in folder
-    # projects = ["marshmallow","scipy", "pandas", "keras"]
-    folder = "."
-    with open(".target_project", "r") as f:
-        project = f.read().strip()
+    folder = "data/results/ori_chaco_execution/pandas" # gpt-4o-mini-2024-07-18
     files = listdir(folder)
     for file in files:
         if file.startswith("logs_"):

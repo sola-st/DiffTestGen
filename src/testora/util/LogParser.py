@@ -110,11 +110,14 @@ class PRResult:
                 self.time_taken_classification += time_taken
 
         ignored_reason_note = ""
+        too_long_full_diff = False
         for i, entry in enumerate(self.entries):
             if entry["message"].startswith("Starting to check PR"):
                 self.title = entry["title"]
                 self.url = entry["url"]
             elif "Full diff is too long" in entry["message"]:
+                too_long_full_diff = True
+            elif "Filtered diff is too long" in entry["message"] and too_long_full_diff:
                 ignored_reason_note = "Diff is too long"
             elif "Too many changed functions" in entry["message"]:
                 ignored_reason_note = entry["message"]
@@ -190,7 +193,6 @@ class PRResult:
                 new_diff_coverages.append(new_diff_coverage)
 
             # keep track of phase we're in and update time taken for each phase
-            # TODO maybe also for newly added phases
             elif entry["message"].startswith("Querying") or entry["message"].startswith("Cached result for querying"):
                 # to show whether the approach detects the changed function (not always all the changes at the function-level)
                 if not self.some_changes_at_fun_level:
@@ -198,18 +200,18 @@ class PRResult:
                         self.some_changes_at_fun_level = "Partial/all changes at the func-level"
                     else:
                         self.some_changes_at_fun_level = "No func-level changes"
-                        
-                # if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
-                
-                if ("has an undefined reference" in entry["content"] and "Fix it" in entry["content"]) or \
-                        "lists the Python code and its runtime errors, fix the errors." in entry["content"] or \
-                        "to refine the given code to ensure that" in entry["content"]:
-                    # to include static feedback and runtime error feedback time
-                    # static: to refine the given code to ensure that
-                    # runtime: The following lists the Python code and its runtime errors, fix the errors.
-                    update_time_taken(entry)
-                    phase = "test_refinement"
-                    test_refinemement_start_time = parse_time_stamp(entry["timestamp"])
+
+                if entry["message"].startswith("Querying"):
+                    # if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
+                    if ("has an undefined reference" in entry["content"] and "Fix it" in entry["content"]) or \
+                            "lists the Python code and its runtime errors, fix the errors." in entry["content"] or \
+                            "to refine the given code to ensure that" in entry["content"]:
+                        # to include static feedback and runtime error feedback time
+                        # static: to refine the given code to ensure that
+                        # runtime: The following lists the Python code and its runtime errors, fix the errors.
+                        update_time_taken(entry)
+                        phase = "test_refinement"
+                        test_refinemement_start_time = parse_time_stamp(entry["timestamp"])
             elif entry["message"].startswith("Compiling"):
                 update_time_taken(entry)
                 phase = "test_exec"
@@ -392,19 +394,11 @@ def parse_log_files(log_files):
                     meta_entries.append(entry)
             elif entry["message"] == "Done with PR":
                 current_entries.append(entry)
-                pr_results.append(
-                    PRResult(current_pr_number, current_entries))
+                pr_results.append(PRResult(current_pr_number, current_entries))
                 current_pr_number = None
                 current_entries = []
             elif entry["pr_nb"] == current_pr_number:
                 current_entries.append(entry)
-            # else:
-            #     # for chaco test running specific logs, because no start and end event for ignoring PRs, we just ignore it
-            #     mode = "chaco" # mode only occurs here, does not fit to normal log parsing
-            #     if mode == "chaco":
-            #         print(f"ChaCo: {entry['pr_nb']}")
-            #         continue
-            #     raise Exception(f"Unexpected state during parsing.\n{entry}")
 
     return pr_results, meta_entries
 
