@@ -1,4 +1,4 @@
-from os.path import join
+from os.path import exists, join
 import json
 import os
 
@@ -50,6 +50,74 @@ class DifferentOutputsStatistics():
         self.project_max_rounds = 0
         self.project_from_rounds = [0]
 
+    def _format_summary_table_headers(self, project_names, include_version=False):
+        group_count = len(project_names) + 1
+        col_format = ("l|" if include_version else "") + "|".join(["rrr"] * group_count) 
+
+        header1_cells = [f"\\multicolumn{{3}}{{c|}}{{{project}}}" for project in project_names]
+        header1_cells.append("\\multicolumn{3}{c}{Total}")
+        header1 = (" & " if include_version else "") + " & ".join(header1_cells) + " \\\\"
+
+        header2_cells = ["\\multirow{2}{*}{\\makecell{Avg.\\\\Uni. cov}}", "\\multicolumn{2}{c|}{Differ. Outputs}"] * (group_count - 1)
+        header2_cells.append("\\multirow{2}{*}{\\makecell{Avg.\\\\Uni. cov}}")
+        header2_cells.append("\\multicolumn{2}{c}{Differ. Outputs}")
+        print("new")
+        header2 = ("" if not include_version else "" ) + " & ".join(([""] if include_version else []) + header2_cells) + " \\\\"
+        break_line = "\\cmidrule(lr){" + "}\\cmidrule(lr){".join(f"{i*3}-{i*3 + 1}" for i in range(1, group_count + 1)) + "}"
+
+        header3_cells = ["", "PRs", "Tests"] * group_count
+        header3 = ("" if not include_version else "" ) + " & ".join(([""] if include_version else []) + header3_cells) + " \\\\"
+
+        return header1, header2, break_line, header3, col_format
+
+    def _format_all_versions_summary_table_latex(self, versions_summary, project_names):
+        header1, header2, break_line, header3, col_format = self._format_summary_table_headers(project_names, include_version=True)
+
+        rows = []
+        for version_data in versions_summary:
+            row = [version_data["version"]]
+            for project in project_names:
+                proj_data = next((item for item in version_data["project_data"] if item["project"] == project), None)
+                row.extend([
+                    "",
+                    str(proj_data["project_diff_related_pr_num"]),
+                    str(proj_data["project_different_outputs"])
+                ])
+            row.extend([
+                "",
+                str(version_data["total"]["overall_diff_related_pr_num"]),
+                str(version_data["total"]["overall_different_outputs"])
+            ])
+            rows.append(" & ".join(row) + " \\\\\n")
+
+        table_lines = [
+            "\\begin{table*}[ht]",
+            "\\centering",
+            "\\caption{Different outputs summary for all versions}",
+            "\\label{tab:diff_outputs_summary_all_versions}",
+            "\\setlength{\\tabcolsep}{3pt}",
+            f"\\begin{{tabular}}{{{col_format}}}",
+            "\\hline",
+            header1,
+            "\\hline",
+            header2,
+            break_line,
+            header3,
+            "\\hline",
+        ]
+        table_lines.extend(rows)
+        table_lines.extend([
+            "\\hline",
+            "\\end{tabular}",
+            "\\end{table*}",
+        ])
+        return "\n".join(table_lines)
+
+    def _write_all_versions_summary_table_file(self, output_folder, versions_summary, project_names):
+        latex_file = join(output_folder, "all_versions_summary_table.tex")
+        with open(latex_file, "w") as f:
+            f.write(self._format_all_versions_summary_table_latex(versions_summary, project_names))
+
     def analyze_single_pr(self, info, target_project, pr):
         # current pr level
         diff_nb = 0
@@ -86,7 +154,10 @@ class DifferentOutputsStatistics():
 
                     if "# Round " in test_name:
                         round_num = int(test_name.split("# Round ", 1)[1].split(" ", 1)[0])
-                        from_rounds[round_num] += 1
+                        try:
+                            from_rounds[round_num] += 1
+                        except IndexError:
+                            from_uncertain_round += 1
                     else:
                         from_uncertain_round += 1
 
@@ -146,157 +217,126 @@ class DifferentOutputsStatistics():
 
     def main(self):
         results_folder = join("data", "results")
-
-        iteration = 0
+        iteration_max = 1
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
-        config_names = ["testora", "difftestgen", "only_coverage_feedback", "only_cg"]
+        config_names = ["testora", "only_coverage_feedback", "only_cg", "difftestgen"]
+        approach_names = ["Testora", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"]
         subset_mode = False
-
         project_info = {
-            "scipy": 126,
+            "keras": 133,
             "marshmallow": 53,
             "pandas": 127,
-            "keras": 133
+            "scipy": 126,
         }
 
-        # comparison_str_list = [] # to record the comparison info between the two versions
-        # baseline_pr_set = None
-        # our_approach_pr_set = None
+        for iteration in range(iteration_max):
+            output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}")
+            os.makedirs(output_folder, exist_ok=True)
 
-        for i, version_name in enumerate(config_names):
-            project_level = []
-            single_iteration = []
+            versions_summary = []
+            for version_name, approach_name in zip(config_names, approach_names):
+                project_level = []
+                single_iteration = []
 
-            for target_project, num in project_info.items():
+                for target_project, num in project_info.items():
+                    self.overall_diff_related_pr_nums.update({target_project: set()})
 
-                output_folder = join("data", "results", "table_and_plots", "different_outputs_statistics", target_project)
-                os.makedirs(output_folder, exist_ok=True)
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
+                    if subset_mode == True:
+                        log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
+                    
+                    pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
+                    if subset_mode == True:
+                        pr_file = join("data", "meta", f"subset_{target_project}.txt")
 
-                self.overall_diff_related_pr_nums.update({target_project: set()})
+                    with open(pr_file, "r") as f:
+                        prs = f.readlines()
+                    pr_list = [int(pr) for pr in prs]
+                    
+                    for pr in pr_list:
+                        log_file_path = None
+                        for fname in os.listdir(log_folder):
+                            if str(pr) in fname:
+                                log_file_path = join(log_folder, fname)
+                                break
+                        if log_file_path is None:
+                            print(f"Iteration {iteration}: No log file found for PR {pr} in {log_folder}")
+                            single_iteration.append({"pr_num": pr}) 
+                        else:
+                            try:
+                                with open(log_file_path, "r") as f:
+                                    info = json.load(f)
+                                single_pr_json = self.analyze_single_pr(info, target_project, pr)
+                                single_pr_json["project"] = target_project
+                                single_pr_json["pr_num"] = pr
+                                single_iteration.append(single_pr_json)
+                            except json.JSONDecodeError:
+                                print(f"Iteration {iteration}: Error reading log file for PR {pr} in {log_folder}")
+                                continue
 
-                log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
-                if subset_mode == True:
-                    log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
-
-                pr_file = join("data", "meta", "pr_nums_checks", f"{target_project}_PRs_subset{num}.txt")
-                if subset_mode == True:
-                    pr_file = join("data", "meta", f"subset_{target_project}.txt")
-
-                with open(pr_file, "r") as f:
-                    prs = f.readlines()
-                pr_list = [int(pr) for pr in prs]
-                
-                for pr in pr_list:
-                    log_file_path = None
-                    for fname in os.listdir(log_folder):
-                        if str(pr) in fname:
-                            log_file_path = join(log_folder, fname)
-                            break
-                    if log_file_path is None:
-                        print(f"Iteration {iteration}: No log file found for PR {pr} in {log_folder}")
-                        single_iteration.append({"pr_num": pr}) 
-                    else:
-                        with open(log_file_path, "r") as f:
-                            info = json.load(f) 
-                        single_pr_json = self.analyze_single_pr(info, target_project, pr)
-                        single_pr_json["project"] = target_project
-                        single_pr_json["pr_num"] = pr
-                        single_iteration.append(single_pr_json)
-
-                # add project level summaries
-                project_str = {
-                    "project": target_project,
-                    "project_pr_num" : len(pr_list),
-                    "project_diff_related_pr_num": self.project_diff_related_pr,
-                    "project_different_outputs": self.project_diff_nb,
-                    "details": {
-                        "project_from_full_diff": self.project_from_full_diff,
-                        "project_from_filtered_diff": self.project_from_filtered_diff,
-                        "project_from_uncertain_diff": self.project_from_uncertain_diff,
-                        "project_from_uncertain_round": self.project_from_uncertain_round
+                    # add project level summaries
+                    project_str = {
+                        "project": target_project,
+                        "project_pr_num" : len(pr_list),
+                        "project_diff_related_pr_num": self.project_diff_related_pr,
+                        "project_different_outputs": self.project_diff_nb,
+                        "details": {
+                            "project_from_full_diff": self.project_from_full_diff,
+                            "project_from_filtered_diff": self.project_from_filtered_diff,
+                            "project_from_uncertain_diff": self.project_from_uncertain_diff,
+                            "project_from_uncertain_round": self.project_from_uncertain_round
+                        }
                     }
+
+                    for idx, num in enumerate(self.project_from_rounds):
+                        project_str["details"].update({f"project_from_round_{idx}": num})
+
+                    project_level.append(project_str)
+                    self.clear_project_level()
+                
+                # overall summary
+                overall_str = {
+                    "repetition_num" : iteration,
+                    "overall_pr_num" : len(single_iteration),
+                    "overall_diff_related_pr_num": self.overall_diff_related_pr,
+                    "overall_different_outputs": self.overall_diff_nb,
+                    "details": {
+                        "overall_from_full_diff": self.overall_from_full_diff,
+                        "overall_from_filtered_diff": self.overall_from_filtered_diff,
+                        "overall_from_uncertain_diff": self.overall_from_uncertain_diff,
+                        "overall_from_uncertain_round": self.overall_from_uncertain_round
+                    },
+                    "related_prs": f"{self.overall_diff_related_pr_nums}"
                 }
 
-                for idx, num in enumerate(self.project_from_rounds):
-                    project_str["details"].update({f"project_from_round_{idx}": num})
+                for idx, num in enumerate(self.overall_from_rounds):
+                    overall_str["details"].update({f"overall_from_round_{idx}": num})
 
-                project_level.append(project_str)
-                self.clear_project_level()
-            
-            # overall summary
-            overall_str = {
-                "repetition_num" : iteration,
-                "overall_pr_num" : len(single_iteration),
-                "overall_diff_related_pr_num": self.overall_diff_related_pr,
-                "overall_different_outputs": self.overall_diff_nb,
-                "details": {
-                    "overall_from_full_diff": self.overall_from_full_diff,
-                    "overall_from_filtered_diff": self.overall_from_filtered_diff,
-                    "overall_from_uncertain_diff": self.overall_from_uncertain_diff,
-                    "overall_from_uncertain_round": self.overall_from_uncertain_round
-                },
-                "related_prs": f"{self.overall_diff_related_pr_nums}"
-            }
+                to_write = [overall_str] + project_level + single_iteration
+                result_file = join(output_folder, f"{version_name}.json")
+                with open(result_file, "w") as f:
+                    json.dump(to_write, f, indent=4)
 
-            for idx, num in enumerate(self.overall_from_rounds):
-                overall_str["details"].update({f"overall_from_round_{idx}": num})
+                versions_summary.append({
+                    "version": approach_name,
+                    "project_data": [
+                        {
+                            "project": data["project"],
+                            "project_diff_related_pr_num": data["project_diff_related_pr_num"],
+                            "project_different_outputs": data["project_different_outputs"]
+                        }
+                        for data in project_level
+                    ],
+                    "total": {
+                        "overall_diff_related_pr_num": overall_str["overall_diff_related_pr_num"],
+                        "overall_different_outputs": overall_str["overall_different_outputs"]
+                    }
+                })
 
-            to_write = [overall_str] + project_level + single_iteration
+                self.clear_overall()
 
-            
-            result_file = join(output_folder, f"{version_name}.json")
-            with open(result_file, "w") as f:
-                json.dump(to_write, f, indent=4)
-
-            # if len(config_versions) > 1: # hard code 1, assue the two versions are baseline and our approach
-            #     # create a comparison file to check whether the diff_related_prs are unique.
-            #     comparison_str_list.append({version_name: overall_str})
-            #     if i == 0:
-            #         baseline_pr_set = self.overall_diff_related_pr_nums
-            #     elif i == 1:
-            #         our_approach_pr_set = self.overall_diff_related_pr_nums
-
-            self.clear_overall()
-
-        # if len(config_versions) > 1:
-        #     # comparison, # hard code 2
-        #     unique_prs_by_baseline = {"unique_prs_by_baseline_num": 0}
-        #     unique_prs_by_our_approach = {"unique_prs_by_our_approach_num": 0}
-        #     unique_prs_by_baseline_num = 0
-        #     unique_prs_by_our_approach_num = 0
-
-        #     for project, prs_base in baseline_pr_set.items():
-        #         prs_our_approach = our_approach_pr_set[project]
-        #         # focus on baseline
-        #         unique_prs_by_baseline_sub = prs_base.difference(prs_our_approach)
-        #         unique_prs_by_baseline_sub_num = len(unique_prs_by_baseline_sub)
-        #         unique_prs_by_baseline_num += unique_prs_by_baseline_sub_num
-        #         unique_prs_by_baseline.update({project: {
-        #                 "num": unique_prs_by_baseline_sub_num,
-        #                 "prs": f"{unique_prs_by_baseline_sub}"
-        #                 }})
-                
-        #         # focus on our approach
-        #         unique_prs_by_our_approach_sub = prs_our_approach.difference(prs_base)
-        #         unique_prs_by_our_approach_sub_num = len(unique_prs_by_our_approach_sub)
-        #         unique_prs_by_our_approach_num += unique_prs_by_our_approach_sub_num
-        #         unique_prs_by_our_approach.update({project: {
-        #                 "num": unique_prs_by_our_approach_sub_num,
-        #                 "prs": f"{unique_prs_by_our_approach_sub}"
-        #                 }})
-            
-        #     # update the overall unique numbers
-        #     unique_prs_by_baseline["unique_prs_by_baseline_num"] = unique_prs_by_baseline_num
-        #     unique_prs_by_our_approach["unique_prs_by_our_approach_num"] = unique_prs_by_our_approach_num
-            
-        #     # integrate to a big str
-        #     comparison_str_list.append({"unique_prs_by_baseline": unique_prs_by_baseline})
-        #     comparison_str_list.append({"unique_prs_by_our_approach": unique_prs_by_our_approach})
-
-        #     result_file = join(results_folder, "table_and_plots", model_version, f"Different_outputs_statistics_comparison.json")
-        #     with open(result_file, "w") as f:
-        #         json.dump(comparison_str_list, f, indent=4)
+            self._write_all_versions_summary_table_file(output_folder, versions_summary, list(project_info.keys()))
 
 
 if __name__=="__main__":
