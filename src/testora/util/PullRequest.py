@@ -381,7 +381,7 @@ class PullRequest:
                         if len(tmp_filter) > 10:
                             pri_func_str = ", ".join(tmp_filter)
                             append_event(Event(pr_nb=self.number, message=f"Too many changed private functions ({len(function_names)}). {pri_func_str}."))
-                            return "too many"
+                            # return "too many" # right go through even it may cost longer time to extract call grapg information
                         
                         if Config.call_graph == True:
                             # to build documentation
