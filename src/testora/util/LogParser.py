@@ -202,6 +202,7 @@ class PRResult:
                         self.some_changes_at_fun_level = "No func-level changes"
 
                 if entry["message"].startswith("Querying"):
+                    phase = "test_gen"
                     # if "has an undefined reference" in entry["content"] and "Fix it" in entry["content"]:
                     if ("has an undefined reference" in entry["content"] and "Fix it" in entry["content"]) or \
                             "lists the Python code and its runtime errors, fix the errors." in entry["content"] or \
