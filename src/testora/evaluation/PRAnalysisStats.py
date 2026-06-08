@@ -9,14 +9,22 @@ from testora.util.Logs import List
 import matplotlib.pyplot as plt
 
 # PR ranges used for RQ2 (test generation) and RQ4 (costs)
-project_to_pr_range = {
-    "keras": [20264, 20856],
-    "marshmallow": [2277, 2809],
-    "pandas": [59908, 60843],
-    "scipy": [21652, 22457],
+# project_to_pr_range = {
+#     "keras": [20264, 20856],
+#     "marshmallow": [2277, 2809],
+#     "pandas": [59908, 60843],
+#     # "scipy": [21652, 22457],
+# }
+
+
+project_info = {
+    "keras": 133,
+    "marshmallow": 53,
+    "pandas": 127,
+    "scipy": 126,
 }
 
-name = "testora" # "difftestgen"
+name = "testora" # "testora" # "difftestgen"
 base_dir = f"data/results/gpt-5-mini-2025-08-07/iter_0/log_{name}/"
 output_folder = f"data/results/table_and_plots/costs/{name}"
 makedirs(output_folder, exist_ok=True)
@@ -36,7 +44,7 @@ class Costs:
         )
 
 
-def parse_pr_results(project, pr_range):
+def parse_pr_results(project, pr_list):
     # list all .json files in base_dir/project
     path = join(base_dir, project, "*.json")
     json_files = glob.glob(path)
@@ -45,7 +53,7 @@ def parse_pr_results(project, pr_range):
     filtered_files = []
     for json_file in json_files:
         pr_number = int(json_file.split('/')[-1].split('_')[0])
-        if pr_range[0] <= pr_number <= pr_range[1]:
+        if pr_number in pr_list:
             filtered_files.append(json_file)
 
     # parse the log files
@@ -203,9 +211,18 @@ if __name__ == "__main__":
     input_token_costs = Costs()
     output_token_costs = Costs()
     time_costs = Costs()
-    for project, pr_range in project_to_pr_range.items():
+    for project, num in project_info.items():
         print(f"\n-------------- {project} -------------")
-        pr_results = parse_pr_results(project, pr_range)
+        pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
+        with open(pr_file, "r") as f:
+            prs = f.readlines()
+        pr_list = [int(pr) for pr in prs]
+        if project == "keras":
+            pr_list = pr_list[:67]
+        elif project == "pandas":
+            pr_list = pr_list[:65]
+
+        pr_results = parse_pr_results(project, pr_list)
 
         row = compute_general_stats(pr_results)
         general_table_rows.append(f"{project} & {row} \\\\")
