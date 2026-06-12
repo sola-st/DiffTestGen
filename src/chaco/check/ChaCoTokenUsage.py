@@ -53,17 +53,17 @@ for project in projects:
                 "total_tokens": total_tokens
             }})
     
-    # update project level overall
-    project_level_usage["overall"].update({"input_tokens": input})
-    project_level_usage["overall"].update({"output_tokens": output})
-    project_level_usage["overall"].update({"total_tokens": total})
+        # update project level overall
+        project_level_usage["overall"].update({"input_tokens": input})
+        project_level_usage["overall"].update({"output_tokens": output})
+        project_level_usage["overall"].update({"total_tokens": total})
 
-    # update project level average
-    num_checked_prs = len(project_level_usage.keys()) - 2
-    project_level_usage["avg"].update({"input_tokens": input / num_checked_prs})
-    project_level_usage["avg"].update({"output_tokens": output / num_checked_prs})
-    project_level_usage["avg"].update({"total_tokens": total / num_checked_prs})
+        # update project level average
+        num_checked_prs = len(project_level_usage.keys()) - 2
+        project_level_usage["avg"].update({"input_tokens": input / num_checked_prs})
+        project_level_usage["avg"].update({"output_tokens": output / num_checked_prs})
+        project_level_usage["avg"].update({"total_tokens": total / num_checked_prs})
 
-    result_file = f"{project}_token_usage_{num_checked_prs}.json"
-    with open(result_file, "w") as f:
-        json.dump(project_level_usage, f, indent=4)
+        result_file = f"{project}_token_usage_{num_checked_prs}.json"
+        with open(result_file, "w") as f:
+            json.dump(project_level_usage, f, indent=4)

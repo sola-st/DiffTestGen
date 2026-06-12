@@ -46,7 +46,7 @@ for target_project in target_projects:
                         continue
 
                 # # just for convenience, time-based filter
-                # if "06" in file:
+                # if "06-" in file:
                 #     print(file)
                 #     pass
                 #     # date = int(file.split(" ")[0].split("06-")[1])

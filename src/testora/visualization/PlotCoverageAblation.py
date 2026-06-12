@@ -99,6 +99,76 @@ def plot_coverages_violin(overall_data, all_version_id, result_pdf):
     plt.savefig(result_pdf)
 
 
+def plot_coverages_violin_subplot(overall_data, all_version_id, result_pdf, title=None):
+    """Create a single subplot for violin plot (used in multi-subplot figures)"""
+    # Convert percentage strings to floats
+    cleaned_data = [
+        [float(cov.strip('%')) for cov in pr_level_rates]
+        for pr_level_rates in overall_data
+    ]
+    
+    return cleaned_data
+
+
+def plot_all_coverages_combined(all_project_data, project_names, all_version_id, result_pdf):
+    """Plot all projects + overall in a single figure with shared y-axis and legend"""
+    # all_project_data: dict with project names as keys and cleaned_data as values
+    # all_project_data should also include 'overall' key
+    
+    num_plots = len(all_project_data)
+    # Arrange as 2 rows: first 4 subplots in row 1, overall in row 2
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharey=True)
+    axes = axes.flatten()
+    
+    for idx, (project_name, cleaned_data) in enumerate(all_project_data.items()):
+        ax = axes[idx]
+        
+        # violin plot
+        ax.violinplot(cleaned_data, showmeans=False)
+        
+        # arithmetic means
+        arith_means = [np.mean(group) for group in cleaned_data]
+        ax.scatter(
+            range(1, len(arith_means) + 1),
+            arith_means,
+            color='blue',
+            marker='x',
+            zorder=3,
+            s=100
+        )
+        
+        # Add mean labels
+        for i, arith in enumerate(arith_means, start=1):
+            ax.text(i + 0.1, arith + 0.5, f"{arith:.1f}%", color='blue', fontsize=7)
+        
+        # Set x-axis
+        ax.set_xticks(range(1, len(all_version_id) + 1))
+        ax.set_xticklabels(all_version_id, fontsize=9)
+        ax.set_xlim(0.5, len(all_version_id) + 0.6)
+        
+        # Set title for each subplot
+        ax.set_title(project_name, fontsize=11, fontweight='bold')
+        
+        # Only add y-label to leftmost subplots
+        if idx % 3 == 0:
+            ax.set_ylabel("Union Coverage (%)", fontsize=10)
+        
+        ax.grid(True, alpha=0.3)
+    
+    # Hide the empty subplot
+    axes[num_plots].set_visible(False)
+    
+    # Add shared legend at the top
+    legend_elements = [
+        Line2D([0], [0], marker='x', color='blue', label='Arithmetic Mean', linestyle='None', markersize=8)
+    ]
+    fig.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=1, fontsize=10)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(result_pdf, dpi=150, bbox_inches='tight')
+    plt.close()
+
+
 def main():
     iteration = 0
     subset_mode = False
@@ -110,6 +180,10 @@ def main():
     results_folder = join("data", "results")
     output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")  
     across_projects = []
+    
+    # For combined plot
+    all_project_cleaned_data = {}
+    
     for i, project in enumerate(target_projects):
         all_data = []
 
@@ -140,6 +214,13 @@ def main():
         overall_data = get_overall_coverage_rates(all_data)
         result_pdf = join(output_base_folder, f"coverage_comparison_ablation_{project}.pdf") 
         plot_coverages_violin(overall_data, axis_names, result_pdf)
+        
+        # Store cleaned data for combined plot
+        cleaned_data = [
+            [float(cov.strip('%')) for cov in pr_level_rates]
+            for pr_level_rates in overall_data
+        ]
+        all_project_cleaned_data[project.capitalize()] = cleaned_data
 
         if i == 0:
             across_projects.extend(all_data)
@@ -149,6 +230,18 @@ def main():
 
     # for the plot
     overall_data = get_overall_coverage_rates(across_projects)
+    cleaned_overall = [
+        [float(cov.strip('%')) for cov in pr_level_rates]
+        for pr_level_rates in overall_data
+    ]
+    all_project_cleaned_data['Overall'] = cleaned_overall
+    
+    # Create combined plot with all subplots
+    result_pdf_combined = join(output_base_folder, f"coverage_comparison_ablation_combined.pdf")
+    plot_all_coverages_combined(all_project_cleaned_data, target_projects, axis_names, result_pdf_combined)
+    print(f"Combined plot saved to {result_pdf_combined}")
+    
+    # Also keep individual overall plot for backward compatibility
     result_pdf = join(output_base_folder, f"coverage_comparison_ablation.pdf") 
     # title = "Coverage Comparison (Ablation study)"
     plot_coverages_violin(overall_data, axis_names, result_pdf)

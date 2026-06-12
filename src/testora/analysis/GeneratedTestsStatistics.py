@@ -130,13 +130,13 @@ class GeneratedTestsStatistics():
     def main(self):
         iteration = 0
         results_folder = join("data", "results")
-        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}", "generated_tests_meta_exclude_static_fixed_round_each")
+        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}", "generated_tests_meta_100")
         os.makedirs(output_folder, exist_ok=True)
 
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
-        config_names = ["testora", "only_coverage_feedback", "only_cg", "difftestgen"]
-        approach_names = ["Testora", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"]
+        config_names = ["testora"]#, "only_coverage_feedback", "only_cg", "difftestgen"]
+        approach_names = ["Testora"]#, "Only Coverage Feedback", "Only Access Information", "DiffTestGen"]
         subset_mode = False
 
         project_info = {
@@ -171,7 +171,7 @@ class GeneratedTestsStatistics():
                 pr_list = [int(pr) for pr in prs]
                 
                 for pr in pr_list:
-                    log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}_100", f"log_{version_name}", target_project)
                     if subset_mode == True:
                         log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
                     log_file_path = None

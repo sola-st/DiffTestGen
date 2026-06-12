@@ -1,6 +1,8 @@
 from os.path import exists, join
 import json
 import os
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class DifferentOutputsStatistics():
@@ -117,6 +119,60 @@ class DifferentOutputsStatistics():
         latex_file = join(output_folder, "all_versions_summary_table.tex")
         with open(latex_file, "w") as f:
             f.write(self._format_all_versions_summary_table_latex(versions_summary, project_names))
+
+    def _generate_bar_plots(self, output_folder, versions_summary, project_names):
+        # Define metrics to plot
+        metrics = [
+            ('project_diff_related_pr_num', 'Num. of Different Output Related PRs'),
+            ('project_different_outputs', 'Num. of Different Output Related Tests')
+        ]
+        colors = ["#4F8A8B", "#EA907A", "#FFCB74", "#E36387"]
+        plt.rcParams.update({'font.size': 12})
+        
+        for metric_key, metric_label in metrics:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            
+            x = np.arange(len(project_names) + 0.6)  # +1 for overall
+            width = 0.2  # width of each bar
+            
+            for i, version_data in enumerate(versions_summary):
+                values = []
+                
+                # Get values for each project
+                for project in project_names:
+                    proj_data = next((item for item in version_data["project_data"] if item["project"] == project), None)
+                    values.append(proj_data[metric_key] if proj_data else 0)
+                
+                # Add overall value
+                overall_key =  metric_key.replace("project_", "overall_")
+                values.append(version_data["total"][overall_key])
+                
+                # Plot bars with offset for grouping
+                offset = width * (i - len(versions_summary) / 2 + 0.1)
+                bars = ax.bar(x + offset, values, width, label=version_data["version"], color=colors[i])
+                
+                # Add value labels on top of bars
+                for bar in bars:
+                    height = bar.get_height()
+                    if height > 0:  # Only show label if value > 0
+                        ax.text(bar.get_x() + bar.get_width() / 2., height,
+                               f'{int(height)}',
+                               ha='center', va='bottom', fontsize=10)
+            
+            # Customize plot
+            ax.set_ylabel(metric_label)
+            ax.set_xticks(x)
+            ax.set_xticklabels(list(project_names) + ['Overall'])
+            ax.legend(fontsize=10)
+            ax.grid(axis='y', alpha=0.3)
+            
+            # Save figure
+            plot_file = join(output_folder, f"{metric_key}_comparison.pdf")
+            plt.tight_layout()
+            plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            print(f"Saved plot: {plot_file}")
 
     def analyze_single_pr(self, info, target_project, pr):
         # current pr level
@@ -337,6 +393,7 @@ class DifferentOutputsStatistics():
                 self.clear_overall()
 
             self._write_all_versions_summary_table_file(output_folder, versions_summary, list(project_info.keys()))
+            self._generate_bar_plots(output_folder, versions_summary, list(project_info.keys()))
 
 
 if __name__=="__main__":

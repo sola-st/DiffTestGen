@@ -1,7 +1,7 @@
 from collections import Counter
 from dataclasses import dataclass, field
 import glob
-from os import makedirs
+from os import listdir, makedirs
 from os.path import join
 from statistics import mean
 from testora.util.LogParser import parse_log_files
@@ -217,10 +217,17 @@ if __name__ == "__main__":
         with open(pr_file, "r") as f:
             prs = f.readlines()
         pr_list = [int(pr) for pr in prs]
-        if project == "keras":
-            pr_list = pr_list[:67]
-        elif project == "pandas":
-            pr_list = pr_list[:65]
+        # if project == "keras":
+        #     pr_list = pr_list[:23]
+        # elif project == "pandas":
+        #     pr_list = pr_list[:22]
+
+        # log_folder = join("data/results/gpt-5-mini-2025-08-07/iter_0_100/log_testora", project)
+        # pr_list = []
+        # log_files = listdir(log_folder)
+        # for file in log_files:
+        #     pr_num = int(file.split("_", 1)[0])
+        #     pr_list.append(pr_num)
 
         pr_results = parse_pr_results(project, pr_list)
 
