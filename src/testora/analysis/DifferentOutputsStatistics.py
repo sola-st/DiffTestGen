@@ -124,32 +124,38 @@ class DifferentOutputsStatistics():
         # Define metrics to plot
         metrics = [
             ('project_diff_related_pr_num', 'Num. of Different Output Related PRs'),
-            ('project_different_outputs', 'Num. of Different Output Related Tests')
+            # ('project_different_outputs', 'Num. of Different Output Related Tests')
         ]
-        colors = ["#4F8A8B", "#EA907A", "#FFCB74", "#E36387"]
+        colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
         plt.rcParams.update({'font.size': 12})
         
         for metric_key, metric_label in metrics:
-            fig, ax = plt.subplots(figsize=(8, 5))
-            
-            x = np.arange(len(project_names) + 0.6)  # +1 for overall
+            fig, ax = plt.subplots(figsize=(10, 5))
+            num_versions = len(versions_summary)
             width = 0.2  # width of each bar
-            
+            group_width = width * num_versions
+            gap = 0.3 # gap between groups
+            step = group_width + gap
+
+            # x positions for each group (projects + overall)
+            x = np.arange(len(project_names) + 1) * step
+
+            # offsets for each version within a group, centered around group x
+            offsets = (np.arange(num_versions) - (num_versions - 1) / 2.0) * width
+
             for i, version_data in enumerate(versions_summary):
                 values = []
-                
                 # Get values for each project
                 for project in project_names:
                     proj_data = next((item for item in version_data["project_data"] if item["project"] == project), None)
                     values.append(proj_data[metric_key] if proj_data else 0)
                 
                 # Add overall value
-                overall_key =  metric_key.replace("project_", "overall_")
+                overall_key = metric_key.replace("project_", "overall_")
                 values.append(version_data["total"][overall_key])
                 
                 # Plot bars with offset for grouping
-                offset = width * (i - len(versions_summary) / 2 + 0.1)
-                bars = ax.bar(x + offset, values, width, label=version_data["version"], color=colors[i])
+                bars = ax.bar(x + offsets[i], values, width, label=version_data["version"], color=colors[i])
                 
                 # Add value labels on top of bars
                 for bar in bars:
@@ -276,8 +282,8 @@ class DifferentOutputsStatistics():
         iteration_max = 1
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
-        config_names = ["testora", "only_coverage_feedback", "only_cg", "difftestgen"]
-        approach_names = ["Testora", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"]
+        config_names = ["testora", "testora_100", "only_coverage_feedback", "only_cg", "difftestgen"]
+        approach_names = ["Testora", "Testora++", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"]
         subset_mode = False
         project_info = {
             "keras": 133,
@@ -299,6 +305,8 @@ class DifferentOutputsStatistics():
                     self.overall_diff_related_pr_nums.update({target_project: set()})
 
                     log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
+                    if version_name == "testora_100":
+                        log_folder = join(results_folder, model_version, f"iter_{iteration}_100", f"log_testora", target_project)
                     if subset_mode == True:
                         log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
                     
