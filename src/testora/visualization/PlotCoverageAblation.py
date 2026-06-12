@@ -174,9 +174,9 @@ def main():
     subset_mode = False
    # model_version = "gpt-4o-mini-2024-07-18"
     model_version = "gpt-5-mini-2025-08-07"
-    target_projects = ["keras", "pandas", "marshmallow", "scipy"]
-    config_names = ["testora", "only_coverage_feedback", "only_cg", "difftestgen"]
-    axis_names = ["Testora", "Only Coverage\nFeedback", "Only Access\nInformation", "DiffTestGen"]
+    target_projects = ["keras", "marshmallow", "pandas", "scipy"]
+    config_names = ["testora", "testora_100", "only_coverage_feedback", "only_cg", "difftestgen"]
+    axis_names = ["Testora", "Testora++", "Only Coverage\nFeedback", "Only Access\nInformation", "DiffTestGen"]
     results_folder = join("data", "results")
     output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")  
     across_projects = []
@@ -192,6 +192,8 @@ def main():
             makedirs(output_folder, exist_ok=True)
 
             log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{name}", project)
+            if name == "testora_100":
+                log_folder = join(results_folder, model_version, f"iter_{iteration}_100", f"log_testora", project)
             if subset_mode == True:
                 log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{name}", project)
             
