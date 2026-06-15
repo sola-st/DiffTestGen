@@ -2,7 +2,7 @@ import json
 from os import makedirs
 from os.path import join, exists
 import numpy as np
-# from scipy.stats import gmean
+
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from testora.visualization.CoverageComparison import CoverageComparison
@@ -109,62 +109,115 @@ def plot_coverages_violin_subplot(overall_data, all_version_id, result_pdf, titl
     
     return cleaned_data
 
-
 def plot_all_coverages_combined(all_project_data, project_names, all_version_id, result_pdf):
-    """Plot all projects + overall in a single figure with shared y-axis and legend"""
+    """Plot all projects + overall in a single figure with grouped violins for each approach"""
     # all_project_data: dict with project names as keys and cleaned_data as values
-    # all_project_data should also include 'overall' key
+    # Each value is a list of lists: [approach1_data, approach2_data, ..., approach5_data]
+    # For each approach, we have coverage data for each project
     
-    num_plots = len(all_project_data)
-    # Arrange as 2 rows: first 4 subplots in row 1, overall in row 2
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharey=True)
-    axes = axes.flatten()
+    # Define colors for each approach
+    colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
     
-    for idx, (project_name, cleaned_data) in enumerate(all_project_data.items()):
-        ax = axes[idx]
+    fig, ax = plt.subplots(figsize=(9, 4))
+    plt.rcParams.update({'font.size': 11})
+    
+    # Get the number of approaches (should be 5)
+    num_approaches = len(list(all_project_data.values())[0])
+    num_projects = len(all_project_data)
+    
+    # Positions for each project group on x-axis
+    project_positions = np.arange(num_projects)
+    
+    # Width and offsets updated to bring the violin bars closer together
+    violin_width = 0.15
+    offset_positions = np.linspace(-0.3, 0.3, num_approaches)
+    
+    # Plot violins for each approach
+    for approach_idx in range(num_approaches):
+        approach_data = []
+        positions = []
         
-        # violin plot
-        ax.violinplot(cleaned_data, showmeans=False)
+        for proj_idx, (project_name, cleaned_data) in enumerate(all_project_data.items()):
+            # cleaned_data[approach_idx] contains coverage data for this approach in this project
+            approach_data.append(cleaned_data[approach_idx])
+            positions.append(proj_idx + offset_positions[approach_idx])
         
-        # arithmetic means
-        arith_means = [np.mean(group) for group in cleaned_data]
-        ax.scatter(
-            range(1, len(arith_means) + 1),
-            arith_means,
-            color='blue',
-            marker='x',
-            zorder=3,
-            s=100
+        # Create violin plot for this approach with custom positions
+        parts = ax.violinplot(
+            approach_data,
+            positions=positions,
+            widths=violin_width,
+            showmeans=False,
+            showmedians=False
         )
         
-        # Add mean labels
-        for i, arith in enumerate(arith_means, start=1):
-            ax.text(i + 0.1, arith + 0.5, f"{arith:.1f}%", color='blue', fontsize=7)
+        # Color the violins
+        for pc in parts['bodies']:
+            pc.set_facecolor(colors[approach_idx])
+            pc.set_alpha(1)
+
+        # # Set the "middle bone" (extrema lines and caps) to gray
+        # for partname in ('cbars', 'cmins', 'cmaxes'):
+        #     if partname in parts:
+        #         parts[partname].set_edgecolor('gray')
         
-        # Set x-axis
-        ax.set_xticks(range(1, len(all_version_id) + 1))
-        ax.set_xticklabels(all_version_id, fontsize=9)
-        ax.set_xlim(0.5, len(all_version_id) + 0.6)
+        # Plot arithmetic means as markers
+        arith_means = [np.mean(data) for data in approach_data]
+        ax.scatter(
+            positions,
+            arith_means,
+            color='black',
+            marker='x',
+            zorder=3,
+        )
         
-        # Set title for each subplot
-        ax.set_title(project_name, fontsize=11, fontweight='bold')
-        
-        # Only add y-label to leftmost subplots
-        if idx % 3 == 0:
-            ax.set_ylabel("Union Coverage (%)", fontsize=10)
-        
-        ax.grid(True, alpha=0.3)
+        # Annotate the arithmetic mean values keeping 1 digit after decimal point
+        for pos, mean_val in zip(positions, arith_means):
+            ax.text(
+                pos,
+                mean_val + 1.2,  # Adjust this offset if needed depending on your y-scale
+                f'{mean_val:.1f}',
+                ha='center',
+                va='bottom',
+                fontsize=9,
+                color='black',
+                zorder=3
+            )
     
-    # Hide the empty subplot
-    axes[num_plots].set_visible(False)
+    # Set x-axis
+    ax.set_xticks(project_positions)
+    ax.set_xticklabels([name for name in all_project_data.keys()])
+    ax.set_xlim(-0.5, num_projects - 0.5)
     
-    # Add shared legend at the top
+    # Labels and title
+    ax.set_ylabel("Union Coverage (%)")
+    
+    # Create custom legend
     legend_elements = [
-        Line2D([0], [0], marker='x', color='blue', label='Arithmetic Mean', linestyle='None', markersize=8)
+        Line2D([0], [0], color=colors[i], lw=8, label=all_version_id[i]) # , alpha=0.7
+        for i in range(num_approaches)
     ]
-    fig.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=1, fontsize=10)
+    # Add arithmetic mean marker to legend
+    legend_elements.append(
+        Line2D([0], [0], marker='x', color='w', markerfacecolor='black', 
+               markeredgecolor='black', markersize=8, markeredgewidth=2,
+               label='Arithmetic Mean', linestyle='None')
+    )
     
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    # Place legend inside the figure box, centered horizontally under group 2 (index 1)
+    # Relative coordinate: (target_index - xmin) / total_range = (1 - (-0.5)) / num_projects
+    legend_x = 1.5 / num_projects
+    ax.legend(
+        handles=legend_elements, 
+        loc='lower center', 
+        bbox_to_anchor=(legend_x, 0.05), 
+        fontsize=9, 
+        borderpad=1
+    )
+    
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    plt.tight_layout()
     plt.savefig(result_pdf, dpi=150, bbox_inches='tight')
     plt.close()
 
@@ -176,7 +229,7 @@ def main():
     model_version = "gpt-5-mini-2025-08-07"
     target_projects = ["keras", "marshmallow", "pandas", "scipy"]
     config_names = ["testora", "testora_100", "only_coverage_feedback", "only_cg", "difftestgen"]
-    axis_names = ["Testora", "Testora++", "Only Coverage\nFeedback", "Only Access\nInformation", "DiffTestGen"]
+    axis_names = ["Testora", "Testora++", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"]
     results_folder = join("data", "results")
     output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")  
     across_projects = []
@@ -222,7 +275,7 @@ def main():
             [float(cov.strip('%')) for cov in pr_level_rates]
             for pr_level_rates in overall_data
         ]
-        all_project_cleaned_data[project.capitalize()] = cleaned_data
+        all_project_cleaned_data[project] = cleaned_data
 
         if i == 0:
             across_projects.extend(all_data)
