@@ -864,7 +864,10 @@ def run_tests_and_feedback(github_repo, cloned_repo_manager, pr, changed_functio
     if Config.fix_undefined_refs:
         fixed_tests = []
         for test in generated_tests:
-            undefined_refs = get_undefined_references(test)
+            try:
+                undefined_refs = get_undefined_references(test)
+            except:
+                pass # discard, do not add to the fixed_tests, not parsable
             if undefined_refs:
                 prompt = UndefinedRefsFixingPrompt(test, undefined_refs)
                 raw_answer = llm.query(prompt)[0]
