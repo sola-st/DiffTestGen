@@ -652,6 +652,7 @@ class PullRequest:
                 }})
 
     def get_shortest_path_each_entry(self):
+        # get the shortest path for the same single entry function
         for func_name, cg_path_func_level in self.all_call_graph_paths.items():
             if cg_path_func_level:
                 self.call_graph_paths.update(
@@ -828,8 +829,14 @@ class PullRequest:
                     func_level_imports.append(ref_import)
                     func_level_signatures.append(signature_docstring)
                     all_explored_paths += "Path: " + ", ".join(map(str, path_detailed)) + "\n"
-                    # break # this gets the only one shortest
-                    continue # this ends the current path, and goes for other paths
+                    
+                    # Stop early once we have found the top-k shortest complete paths
+                    if len(unique_entry_funcs) >= Config.top_k_entries:
+                        append_event(Event(pr_nb=self.number, 
+                            message=f"Stopping call graph exploration for '{func_name}' after top-{Config.top_k_entries} shortest paths each with unique entry function were found."))
+                        break
+                    else:
+                        continue # this ends the current path, and goes for other paths
                 
                 callers = server.get_function_callers(curr_rel_file_path, curr_line, curr_col)
 
