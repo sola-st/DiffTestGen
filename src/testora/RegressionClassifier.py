@@ -1,14 +1,55 @@
 import argparse
 import json
 import time
-from testora.RegressionFinder import check_if_present_in_main, classify_regression, get_repo, reduce_test, select_expected_behavior
+from testora import Config
+from testora.llms.LLMCache import LLMCache, LLMEvent
+from testora.RegressionFinder import check_if_present_in_main, classify_regression, get_repo, is_crash, reduce_test, select_expected_behavior
 from testora.evaluation import EvalTaskManager
 from testora.execution.TestExecution import TestExecution
+from testora.llms.OpenAIGPT import OpenAIGPT
+from testora.util.ClassificationResult import Classification
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
-from testora.util.Logs import ErrorEvent, Event, PREvent, append_event, get_logs_as_json, reset_logs, start_logging, store_logs
+from testora.util.Logs import ClassificationEvent, ErrorEvent, Event, PREvent, PreClassificationEvent, append_event, get_logs_as_json, reset_logs, start_logging, store_logs
 from testora.util.PullRequest import PullRequest
+from testora.prompts.RegressionClassificationPromptV7 import RegressionClassificationPromptV7 as RegressionClassificationPrompt
 
+
+def classify_regression(project_name, pr, changed_functions, docstrings, old_execution, new_execution, no_cache=False, nb_samples=1):
+    append_event(PreClassificationEvent(pr_nb=pr.number,
+                                        message="Pre-classification",
+                                        test_code=old_execution.code,
+                                        old_output=old_execution.output,
+                                        new_output=new_execution.output))
+
+    prompt = RegressionClassificationPrompt(
+        project_name, pr, changed_functions, docstrings, old_execution.code, old_execution.output, new_execution.output)
+    raw_answer = llm.query(prompt,
+                           temperature=Config.classification_temp,
+                           no_cache=no_cache,
+                           nb_samples=nb_samples)
+    append_event(LLMEvent(pr_nb=pr.number,
+                          message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+    assert (nb_samples == len(raw_answer))
+
+    all_results = []
+    for raw_answer_sample in raw_answer:
+        classification_result = prompt.parse_answer([raw_answer_sample])
+
+        append_event(ClassificationEvent(pr_nb=pr.number,
+                                         message="Classification",
+                                         test_code=old_execution.code,
+                                         old_output=old_execution.output,
+                                         new_output=new_execution.output,
+                                         classification=classification_result.classification,
+                                         classification_explanation=classification_result.classification_explanation,
+
+                                         old_is_crash=is_crash(
+                                             old_execution.output),
+                                         new_is_crash=is_crash(new_execution.output)))
+        result = classification_result.classification == Classification.REGRESSION
+        all_results.append(result)
+    return all_results
 
 def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file):
     '''Record changed functions and test executions to restart/continue the classification phase.'''
@@ -43,6 +84,9 @@ def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file):
 
 
 def check_single_pr(project, pr_nb, log_file):
+    global llm
+    llm = LLMCache(OpenAIGPT())
+
     # reproduce the cloned_repo_manager, git_repo, and pr
     start = time.time()
     github_repo, cloned_repo_manager = get_repo(project)
@@ -62,7 +106,6 @@ def check_single_pr(project, pr_nb, log_file):
 
 
 def fetch_and_check_prs():
-    # TODO handle the database overwritten issue
     project, pr_nb = EvalTaskManager.fetch_task()
     while project and pr_nb:
         try:
@@ -86,7 +129,7 @@ def get_stored_info(log_file):
     with open(log_file, "r") as f:
         data = json.load(f)
     loaded_data = data[-2] # breakpoint info
-    if breakpoint["message"] == "Breakpoint data":
+    if loaded_data["message"] == "Breakpoint data":
         changed_functions = loaded_data["changed_functions"] # a list of fully qualified function names
         # Make TestExecution available in eval scope
         old_executions_differ_relevant = eval(loaded_data["old_executions_differ_relevant"], {"TestExecution": TestExecution}) # a list of TestExecution objects.

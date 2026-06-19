@@ -35,6 +35,7 @@ from testora.prompts.RegressionClassificationPromptV4 import RegressionClassific
 from testora.prompts.RegressionClassificationPromptV5 import RegressionClassificationPromptV5
 from testora.prompts.RegressionClassificationPromptV6 import RegressionClassificationPromptV6
 from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorPrompt
+from testora.util.ClassificationResult import Classification
 from testora.util.ClonedRepoManager import ClonedRepoManager
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
@@ -178,6 +179,7 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
 
 
 def is_crash(output):
+    # TODO
     # this now only related to classification task
     return "Traceback (most recent call last)" in output or \
         "error" in output.lower() or \
@@ -541,28 +543,20 @@ def classify_regression(project_name, pr, changed_functions, docstrings, old_exe
 
     all_results = []
     for raw_answer_sample in raw_answer:
-        attempts_left = 3
-        while attempts_left > 0:
-            try:
-                classification_result = prompt.parse_answer([raw_answer_sample])
-                break
-            except TestoraException as e:
-                attempts_left -= 1
-                append_event(Event(pr_nb=pr.number,
-                                   message=f"Error parsing classification answer: {e}"))
-                if attempts_left == 0:
-                    raise e
+        classification_result = prompt.parse_answer([raw_answer_sample])
+
         append_event(ClassificationEvent(pr_nb=pr.number,
                                          message="Classification",
                                          test_code=old_execution.code,
                                          old_output=old_execution.output,
                                          new_output=new_execution.output,
-                                         classification=classification_result.classification, # type: ignore
-                                         classification_explanation=classification_result.classification_explanation, # type: ignore
+                                         classification=classification_result.classification,
+                                         classification_explanation=classification_result.classification_explanation,
+
                                          old_is_crash=is_crash(
                                              old_execution.output),
                                          new_is_crash=is_crash(new_execution.output)))
-        result = classification_result.classification == Classification.REGRESSION # type: ignore
+        result = classification_result.classification == Classification.REGRESSION
         all_results.append(result)
     return all_results
 
