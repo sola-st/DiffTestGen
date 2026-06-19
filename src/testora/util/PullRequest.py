@@ -830,13 +830,13 @@ class PullRequest:
                     func_level_signatures.append(signature_docstring)
                     all_explored_paths += "Path: " + ", ".join(map(str, path_detailed)) + "\n"
                     
-                    # Stop early once we have found the top-k shortest complete paths
-                    if len(unique_entry_funcs) >= Config.top_k_entries:
-                        append_event(Event(pr_nb=self.number, 
-                            message=f"Stopping call graph exploration for '{func_name}' after top-{Config.top_k_entries} shortest paths each with unique entry function were found."))
-                        break
-                    else:
-                        continue # this ends the current path, and goes for other paths
+                    # # Stop early once we have found the top-k shortest complete paths
+                    # if len(unique_entry_funcs) >= Config.top_k_entries:
+                    #     append_event(Event(pr_nb=self.number, 
+                    #         message=f"Stopping call graph exploration for '{func_name}' after top-{Config.top_k_entries} shortest paths each with unique entry function were found."))
+                    #     break
+                    # else:
+                    continue # this ends the current path, and goes for other paths
                 
                 callers = server.get_function_callers(curr_rel_file_path, curr_line, curr_col)
 
