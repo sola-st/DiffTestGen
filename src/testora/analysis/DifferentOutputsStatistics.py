@@ -123,14 +123,14 @@ class DifferentOutputsStatistics():
     def _generate_bar_plots(self, output_folder, versions_summary, project_names):
         # Define metrics to plot
         metrics = [
-            ('project_diff_related_pr_num', 'Num. of Different Output Related PRs'),
+            ('project_diff_related_pr_num', 'Number of PRs involving behavioral changes'),
             # ('project_different_outputs', 'Num. of Different Output Related Tests')
         ]
         colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
-        plt.rcParams.update({'font.size': 12})
+        plt.rcParams.update({'font.size': 11})
         
         for metric_key, metric_label in metrics:
-            fig, ax = plt.subplots(figsize=(10, 5))
+            fig, ax = plt.subplots(figsize=(10, 4))
             num_versions = len(versions_summary)
             width = 0.2  # width of each bar
             group_width = width * num_versions

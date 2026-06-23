@@ -118,7 +118,7 @@ def plot_all_coverages_combined(all_project_data, project_names, all_version_id,
     # Define colors for each approach
     colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
     
-    fig, ax = plt.subplots(figsize=(9, 4))
+    fig, ax = plt.subplots(figsize=(9, 3.5))
     plt.rcParams.update({'font.size': 11})
     
     # Get the number of approaches (should be 5)
@@ -212,7 +212,7 @@ def plot_all_coverages_combined(all_project_data, project_names, all_version_id,
         loc='lower center', 
         bbox_to_anchor=(legend_x, 0.05), 
         fontsize=9, 
-        borderpad=1
+        borderpad=0.6
     )
     
     ax.grid(True, alpha=0.3, axis='y')
@@ -253,7 +253,7 @@ def main():
             meta_file = join(output_folder, f"{project}_coverage_meta.json")
             all_from_cur_version = []
             if exists(meta_file):
-                print(f"Meta file {meta_file} already exists. Skipping processing for {name} on {project}.")
+                # print(f"Meta file {meta_file} already exists. Skipping processing for {name} on {project}.")
                 with open(meta_file, "r") as f:
                     all_from_cur_version = json.load(f)
             else:
