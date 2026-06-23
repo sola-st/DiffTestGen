@@ -5,15 +5,14 @@ from os import makedirs, listdir
 import os
 
 iteration = 0
-mode = "ablation" # could be 'comparison' and 'ablation'
 # model_version = "gpt-4o-mini-2024-07-18"
 model_version = "gpt-5-mini-2025-08-07"
 
 config_versions = {
-    "testora": [1, 0, 1, False, None, False, False, False], # all turned off
+    # "testora": [1, 0, 1, False, None, False, False, False], # all turned off
     "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True], # all turned on
-    "only_coverage_feedback": [5, 8, 8, False, None, False, False, False], # testora + coverage feedback (only)
-    "only_cg": [5, 0, 8, False, None, True, False, False], # testora + call graph (only)
+    # "only_coverage_feedback": [5, 8, 8, False, None, False, False, False], # testora + coverage feedback (only)
+    # "only_cg": [5, 0, 8, False, None, True, False, False], # testora + call graph (only)
 }
 
 results_folder = join("data", "results")
@@ -31,12 +30,11 @@ for config_name, config in config_versions.items():
         # print(pr_num)
         subprocess.run(["python", "-m", "testora.RegressionClassifier", 
                 "--project", target_project, "--pr", pr_num, "--log_file", join(version_folder, b_file)])
-        break
     
     # move the classification data to a desired folder
     classification_cur_version = join(classification_folder, f"classification_{config_name}", target_project)
     makedirs(classification_cur_version, exist_ok=True)
     for f in os.listdir('.'):
         if isfile(f):
-            if f.endswith(".json"): # add another condition to distinguish log and classification if needed
+            if f.startswith("logs_"):
                 shutil.move(f, classification_cur_version)

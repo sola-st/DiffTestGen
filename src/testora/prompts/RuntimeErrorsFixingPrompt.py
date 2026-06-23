@@ -123,7 +123,7 @@ def extract_error_type_2_kinds(test_code, execution_output):
     return error_type
 
 def extract_error_type(execution_output):
-    # only focus on tracback reported errors.
+    # focus on only traceback reported errors.
     error_type = None
 
     # if error exists, extract the error message

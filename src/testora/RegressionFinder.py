@@ -179,11 +179,8 @@ def execute_tests_on_commit(cloned_repo_manager, pr, test_executions, commit, ve
 
 
 def is_crash(output):
-    # TODO
-    # this now only related to classification task
-    return "Traceback (most recent call last)" in output or \
-        "error" in output.lower() or \
-        "fail" in output.lower()
+    # this only relates to classification task
+    return "Traceback (most recent call last)" in output 
 
 def de_dup_tests_with_name(tests):
     pure_test_code_list = []
@@ -520,8 +517,23 @@ def reduce_test(cloned_repo_manager, pr, old_execution, new_execution):
 def check_if_present_in_main(cloned_repo_manager, pr, new_execution):
     main_execution = TestExecution(new_execution.code)
     execute_tests_on_commit(cloned_repo_manager, pr, [main_execution], "main", "main")
-    # TODO NOT just matching the output strings
-    return main_execution.output == new_execution.output
+    main_error_type = extract_error_type(main_execution.output)
+    new_error_type = extract_error_type(new_execution.output)
+    '''
+    *1. if the type differ, further changes happens to main, inlucing type a -> type b, type a -> None
+    *2. if both with None, we do not have re-execution here, we check the string matching, if differ, we consider it with further changes
+    '''
+    is_present = True
+    if main_error_type == new_error_type:
+        if main_error_type == None: # case 2
+            if main_execution.output != new_execution.output:
+                is_present = False
+    else: # case 1
+        is_present = False
+
+    return is_present
+
+    # return main_execution.output == new_execution.output
 
 
 def classify_regression(project_name, pr, changed_functions, docstrings, old_execution, new_execution, no_cache=False, nb_samples=1):

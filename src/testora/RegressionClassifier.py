@@ -1,6 +1,6 @@
 import argparse
+import ast
 import json
-import time
 from testora import Config
 from testora.llms.LLMCache import LLMCache, LLMEvent
 from testora.RegressionFinder import check_if_present_in_main, classify_regression, get_repo, is_crash, reduce_test, select_expected_behavior
@@ -34,20 +34,27 @@ def classify_regression(project_name, pr, changed_functions, docstrings, old_exe
 
     all_results = []
     for raw_answer_sample in raw_answer:
-        classification_result = prompt.parse_answer([raw_answer_sample])
-
+        attempts_left = 3
+        while attempts_left > 0:
+            try:
+                classification_result = prompt.parse_answer([raw_answer_sample])
+                break
+            except TestoraException as e:
+                attempts_left -= 1
+                append_event(Event(pr_nb=pr.number,
+                                   message=f"Error parsing classification answer: {e}"))
+                if attempts_left == 0:
+                    raise e
         append_event(ClassificationEvent(pr_nb=pr.number,
                                          message="Classification",
                                          test_code=old_execution.code,
                                          old_output=old_execution.output,
                                          new_output=new_execution.output,
-                                         classification=classification_result.classification,
-                                         classification_explanation=classification_result.classification_explanation,
-
-                                         old_is_crash=is_crash(
-                                             old_execution.output),
+                                         classification=classification_result.classification, # type: ignore
+                                         classification_explanation=classification_result.classification_explanation, # type: ignore
+                                         old_is_crash=is_crash(old_execution.output),
                                          new_is_crash=is_crash(new_execution.output)))
-        result = classification_result.classification == Classification.REGRESSION
+        result = classification_result.classification == Classification.REGRESSION # type: ignore
         all_results.append(result)
     return all_results
 
@@ -59,13 +66,13 @@ def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file):
         for old_execution, new_execution in zip(old_executions_differ_relevant, new_executions_differ_relevant):
             '''The following are exactly the remaining steps from RegressionFinder.'''
 
-            # if difference found, reduce the test while still observing a difference
-            old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
-            assert old_execution.output != new_execution.output
+            # # if difference found, reduce the test while still observing a difference
+            # old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
+            # assert old_execution.output != new_execution.output
 
-            # check if new output is still present in head of current main branch
-            if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
-                append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
+            # # check if new output is still present in head of current main branch
+            # if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
+            #     append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
 
             # find docstrings
             cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
@@ -73,8 +80,7 @@ def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file):
 
             # if difference found, classify regression
             assert old_execution.code == new_execution.code
-            is_regression_bug = classify_regression(
-                github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
+            is_regression_bug = classify_regression(github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
 
             # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
             if is_regression_bug:
@@ -88,11 +94,9 @@ def check_single_pr(project, pr_nb, log_file):
     llm = LLMCache(OpenAIGPT())
 
     # reproduce the cloned_repo_manager, git_repo, and pr
-    start = time.time()
     github_repo, cloned_repo_manager = get_repo(project)
     github_pr = github_repo.get_pull(pr_nb)
     pr = PullRequest(github_pr, github_repo, cloned_repo_manager)
-    print(f"Duration: {((time.time() - start) * 1000):.2f}")
 
     append_event(PREvent(pr_nb=pr_nb,
                          message="Starting to Reduce and Classify Tests",
@@ -130,7 +134,7 @@ def get_stored_info(log_file):
         data = json.load(f)
     loaded_data = data[-2] # breakpoint info
     if loaded_data["message"] == "Breakpoint data":
-        changed_functions = loaded_data["changed_functions"] # a list of fully qualified function names
+        changed_functions = ast.literal_eval(loaded_data["changed_functions"]) # a list of fully qualified function names
         # Make TestExecution available in eval scope
         old_executions_differ_relevant = eval(loaded_data["old_executions_differ_relevant"], {"TestExecution": TestExecution}) # a list of TestExecution objects.
         new_executions_differ_relevant = eval(loaded_data["new_executions_differ_relevant"], {"TestExecution": TestExecution})

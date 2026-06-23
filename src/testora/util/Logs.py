@@ -1,10 +1,10 @@
 import json
 import os
-import fnmatch
 from datetime import datetime, timedelta
 import atexit
 from typing import List, Optional
 from pydantic import BaseModel
+from testora.util.ClassificationResult import Classification
 
 
 class Event(BaseModel):
@@ -45,12 +45,11 @@ class PreClassificationEvent(Event):
 
 
 class ClassificationEvent(Event):
-    is_relevant_change: Optional[bool]
-    is_deterministic: Optional[bool]
-    is_public: Optional[bool]
-    is_legal: Optional[bool]
-    is_surprising: Optional[bool]
-    correct_output: Optional[int]
+    test_code: str
+    old_output: str
+    new_output: str
+    classification: Classification
+    classification_explanation: str
     old_is_crash: bool
     new_is_crash: bool
 

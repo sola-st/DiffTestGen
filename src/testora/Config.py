@@ -34,7 +34,7 @@ classification_temp = 1.0
 iteration = 0
 
 # different prompts for classification task
-classification_prompt_version = 4
+classification_prompt_version = 7
 
 # different prompts for initial round (0th) test generation
 initial_test_generation_prompt_version = 5
