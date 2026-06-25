@@ -439,8 +439,8 @@ class DifferentOutputsStatistics():
 
                 self.clear_overall()
 
-            # self._write_all_versions_summary_table_file(output_folder, versions_summary, list(project_info.keys()))
-            # self._generate_bar_plots(output_folder, versions_summary, list(project_info.keys()))
+            self._write_all_versions_summary_table_file(output_folder, versions_summary, list(project_info.keys()))
+            self._generate_bar_plots(output_folder, versions_summary, list(project_info.keys()))
             
             # clear before next iteration
             self.pr_tracking = {
