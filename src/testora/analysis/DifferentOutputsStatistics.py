@@ -31,6 +31,8 @@ class DifferentOutputsStatistics():
         self.project_max_rounds = 0
         self.project_from_rounds = [0]
 
+        self.pr_tracking = {}
+
     def clear_overall(self):
         self.overall_diff_related_pr = 0
         self.overall_diff_related_pr_nums = {}
@@ -63,7 +65,6 @@ class DifferentOutputsStatistics():
         header2_cells = ["\\multirow{2}{*}{\\makecell{Avg.\\\\Uni. cov}}", "\\multicolumn{2}{c|}{Differ. Outputs}"] * (group_count - 1)
         header2_cells.append("\\multirow{2}{*}{\\makecell{Avg.\\\\Uni. cov}}")
         header2_cells.append("\\multicolumn{2}{c}{Differ. Outputs}")
-        print("new")
         header2 = ("" if not include_version else "" ) + " & ".join(([""] if include_version else []) + header2_cells) + " \\\\"
         break_line = "\\cmidrule(lr){" + "}\\cmidrule(lr){".join(f"{i*3}-{i*3 + 1}" for i in range(1, group_count + 1)) + "}"
 
@@ -124,7 +125,7 @@ class DifferentOutputsStatistics():
         # Define metrics to plot
         metrics = [
             ('project_diff_related_pr_num', 'Number of PRs involving behavioral changes'),
-            # ('project_different_outputs', 'Num. of Different Output Related Tests')
+            ('project_different_outputs', 'Number. of Different Output Related Tests')
         ]
         colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
         plt.rcParams.update({'font.size': 11})
@@ -180,7 +181,7 @@ class DifferentOutputsStatistics():
             
             print(f"Saved plot: {plot_file}")
 
-    def analyze_single_pr(self, info, target_project, pr):
+    def analyze_single_pr(self, info, target_project, pr, version_name):
         # current pr level
         diff_nb = 0
 
@@ -274,6 +275,10 @@ class DifferentOutputsStatistics():
             for j, num in enumerate(from_rounds):
                 self.project_from_rounds[j] += num
 
+            # update pr_tracking
+            if version_name in self.pr_tracking:
+                self.pr_tracking[version_name][target_project].add(pr)
+
         return single_pr_json
 
 
@@ -295,6 +300,12 @@ class DifferentOutputsStatistics():
         for iteration in range(iteration_max):
             output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}", "differ_outputs_meta")
             os.makedirs(output_folder, exist_ok=True)
+
+            self.pr_tracking = {
+                "testora": {project: set() for project in project_info.keys()},
+                "testora_100": {project: set() for project in project_info.keys()},
+                "difftestgen": {project: set() for project in project_info.keys()}
+            }
 
             versions_summary = []
             for version_name, approach_name in zip(config_names, approach_names):
@@ -331,7 +342,7 @@ class DifferentOutputsStatistics():
                             try:
                                 with open(log_file_path, "r") as f:
                                     info = json.load(f)
-                                single_pr_json = self.analyze_single_pr(info, target_project, pr)
+                                single_pr_json = self.analyze_single_pr(info, target_project, pr, version_name)
                                 single_pr_json["project"] = target_project
                                 single_pr_json["pr_num"] = pr
                                 single_iteration.append(single_pr_json)
@@ -374,6 +385,34 @@ class DifferentOutputsStatistics():
                     "related_prs": f"{self.overall_diff_related_pr_nums}"
                 }
 
+                # Add keys for unique PRs at overall level
+                if version_name == "difftestgen":
+                    unique_in_difftestgen = {}
+                    for project in project_info.keys():
+                        project_prs = self.pr_tracking["difftestgen"][project] - (self.pr_tracking["testora"][project] | self.pr_tracking["testora_100"][project])
+                        if project_prs:
+                            unique_in_difftestgen[project] = sorted(list(project_prs))
+                    if unique_in_difftestgen:
+                        overall_str["only_in_difftestgen"] = f"{unique_in_difftestgen}"
+                        total_count = sum(len(v) for v in unique_in_difftestgen.values())
+                        print(f"Add {total_count} uniques to difftestgen by project.")
+                    else:
+                        print("No unique PRs in DiffTestGen.")
+
+                    for v_name in ["testora", "testora_100"]:
+                        unique_in_version = {}
+                        for project in project_info.keys():
+                            project_prs = self.pr_tracking[v_name][project] - self.pr_tracking["difftestgen"][project]
+                            if project_prs:
+                                unique_in_version[project] = sorted(list(project_prs))
+                        if unique_in_version:
+                            key_name = f"in_{v_name}_not_dtg"
+                            overall_str[key_name] = f"{unique_in_version}"
+                            total_count = sum(len(v) for v in unique_in_version.values())
+                            print(f"Add {total_count} uniques to {v_name} by project.")
+                        else:
+                            print(f"No unique PRs in {v_name}.")
+
                 for idx, num in enumerate(self.overall_from_rounds):
                     overall_str["details"].update({f"overall_from_round_{idx}": num})
 
@@ -400,8 +439,15 @@ class DifferentOutputsStatistics():
 
                 self.clear_overall()
 
-            self._write_all_versions_summary_table_file(output_folder, versions_summary, list(project_info.keys()))
-            self._generate_bar_plots(output_folder, versions_summary, list(project_info.keys()))
+            # self._write_all_versions_summary_table_file(output_folder, versions_summary, list(project_info.keys()))
+            # self._generate_bar_plots(output_folder, versions_summary, list(project_info.keys()))
+            
+            # clear before next iteration
+            self.pr_tracking = {
+                "testora": {},
+                "testora_100": {},
+                "difftestgen": {}
+            }
 
 
 if __name__=="__main__":
