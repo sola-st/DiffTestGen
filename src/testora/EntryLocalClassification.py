@@ -25,6 +25,7 @@ with open(".target_project", "r") as f:
 for config_name, config in config_versions.items():
     version_folder = join(log_folder, f"log_{config_name}", target_project)
     log_files = listdir(version_folder)
+    sorted(log_files)
     for b_file in log_files:
         pr_num = b_file.split("_", 1)[0]
         # print(pr_num)
