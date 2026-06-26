@@ -1,19 +1,46 @@
 import argparse
 import ast
 import json
+import random
+from os.path import exists
 from testora import Config
 from testora.llms.LLMCache import LLMCache, LLMEvent
-from testora.RegressionFinder import check_if_present_in_main, classify_regression, get_repo, is_crash, reduce_test, select_expected_behavior
+from testora.RegressionFinder import classify_regression, get_repo, is_crash
 from testora.evaluation import EvalTaskManager
 from testora.execution.TestExecution import TestExecution
 from testora.llms.OpenAIGPT import OpenAIGPT
+from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorPrompt
 from testora.util.ClassificationResult import Classification
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
-from testora.util.Logs import ClassificationEvent, ErrorEvent, Event, PREvent, PreClassificationEvent, append_event, get_logs_as_json, reset_logs, start_logging, store_logs
+from testora.util.Logs import ClassificationEvent, ErrorEvent, Event, PREvent, PreClassificationEvent, SelectBehaviorEvent, append_event, get_logs_as_json, reset_logs, start_logging, store_logs
 from testora.util.PullRequest import PullRequest
 from testora.prompts.RegressionClassificationPromptV7 import RegressionClassificationPromptV7 as RegressionClassificationPrompt
 
+
+def select_expected_behavior(project_name, pr, old_execution, new_execution, docstrings):
+    """Ask LLM which of two possible outputs is the expected behavior."""
+
+    attempts_left = 3
+    while attempts_left > 0:
+        try:
+            prompt = SelectExpectedBehaviorPrompt(
+            project_name, old_execution.code, old_execution.output, new_execution.output, docstrings)
+            raw_answer = llm.query(prompt, temperature=Config.classification_temp)
+            append_event(LLMEvent(pr_nb=pr.number,
+                                message="Raw answer", content="\n---(next sample)---".join(raw_answer)))
+            expected_behavior = prompt.parse_answer(raw_answer)
+            append_event(SelectBehaviorEvent(pr_nb=pr.number,
+                                                message="Selected expected behavior",
+                                                expected_output=expected_behavior))
+            return expected_behavior
+
+        except TestoraException as e:
+            attempts_left -= 1
+            append_event(Event(pr_nb=pr.number,
+                               message=f"Error selecting expected behavior: {e}"))
+            if attempts_left == 0:
+                raise e
 
 def classify_regression(project_name, pr, changed_functions, docstrings, old_execution, new_execution, no_cache=False, nb_samples=1):
     append_event(PreClassificationEvent(pr_nb=pr.number,
@@ -58,38 +85,47 @@ def classify_regression(project_name, pr, changed_functions, docstrings, old_exe
         all_results.append(result)
     return all_results
 
-def reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file):
-    '''Record changed functions and test executions to restart/continue the classification phase.'''
+def classify_tests(github_repo, cloned_repo_manager, pr, log_file, checked_indices_file):
+    '''Read the recorded changed functions and test executions to continue the classification phase.'''
 
     changed_functions, old_executions_differ_relevant, new_executions_differ_relevant = get_stored_info(log_file)
-    if changed_functions:
-        for old_execution, new_execution in zip(old_executions_differ_relevant, new_executions_differ_relevant):
-            '''The following are exactly the remaining steps from RegressionFinder.'''
+    if old_executions_differ_relevant:
+        valid_indices = set(range(0, len(old_executions_differ_relevant)))
 
-            # # if difference found, reduce the test while still observing a difference
-            # old_execution, new_execution = reduce_test(cloned_repo_manager, pr, old_execution, new_execution)
-            # assert old_execution.output != new_execution.output
+        # exclude the previous checked indices
+        checked_indices = set()
+        if exists(checked_indices_file):
+            with open(checked_indices_file, "r") as f:
+                idxs = f.readlines()
+            checked_indices = {int(pr) for pr in idxs}
+            valid_indices = valid_indices - checked_indices
+        
+        # use a seed to random get a pair of execution
+        reproduce = random.Random(42)  # Fixed seed
+        idx = reproduce.choice(list(valid_indices))
+        old_execution = old_executions_differ_relevant[idx]
+        new_execution = new_executions_differ_relevant[idx]
 
-            # # check if new output is still present in head of current main branch
-            # if not check_if_present_in_main(cloned_repo_manager, pr, new_execution):
-            #     append_event(Event(pr_nb=pr.number, message="Difference not present in main anymore"))
+        # write the newly selected one to file
+        with open(checked_indices_file, "a") as f:
+            f.writelines(f"{idx}\n")
 
-            # find docstrings
-            cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
-            docstrings = retrieve_relevant_docstrings(cloned_repo_of_new_commit, new_execution.code)
+        # find docstrings
+        cloned_repo_of_new_commit = cloned_repo_manager.get_cloned_repo(pr.post_commit)
+        docstrings = retrieve_relevant_docstrings(cloned_repo_of_new_commit, new_execution.code)
 
-            # if difference found, classify regression
-            assert old_execution.code == new_execution.code
-            is_regression_bug = classify_regression(github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
+        # if difference found, classify regression
+        assert old_execution.code == new_execution.code
+        is_regression_bug = classify_regression(github_repo.name, pr, changed_functions, docstrings, old_execution, new_execution)[0]
 
-            # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
-            if is_regression_bug:
-                select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
+        # if classified as regression bug, ask LLM which behavior is expected (to handle coincidental bug fixes)
+        if is_regression_bug:
+            select_expected_behavior(github_repo.name, pr, old_execution, new_execution, docstrings)
     else:
-        append_event(Event(pr_nb=pr.number, message="No tests expose differences from the previous phase."))
+        append_event(Event(pr_nb=pr.number, message="No tests expose differences from the test generation phase."))
 
 
-def check_single_pr(project, pr_nb, log_file):
+def check_single_pr(project, pr_nb, log_file, checked_indices_file):
     global llm
     llm = LLMCache(OpenAIGPT())
 
@@ -102,7 +138,7 @@ def check_single_pr(project, pr_nb, log_file):
                          message="Starting to Reduce and Classify Tests",
                          title=pr.github_pr.title, url=pr.github_pr.html_url))
 
-    reduce_and_classify_tests(github_repo, cloned_repo_manager, pr, log_file)
+    classify_tests(github_repo, cloned_repo_manager, pr, log_file, checked_indices_file)
 
     append_event(PREvent(pr_nb=pr_nb,
                          message="Done with Reduction and Classification",
@@ -149,7 +185,8 @@ def main():
                         choices=["keras", "marshmallow", "pandas", "scipy"])
     parser.add_argument("--pr", type=int, help="PR number to analyze")
     parser.add_argument("--log_file", type=str, help="The parent folder of breakpoint files")
-    args = parser.parse_args()
+    parser.add_argument("--checked_indices_file", type=str, help="The file which records the checked tests")
+    args = parser.parse_args()  
 
     start_logging()
     '''
@@ -158,7 +195,7 @@ def main():
     '''
     if not args.project or not args.pr:
         raise ValueError("Must specify --project and --pr")
-    check_single_pr(args.project, args.pr, args.log_file)
+    check_single_pr(args.project, args.pr, args.log_file, args.checked_indices_file)
     store_logs()
 
 
