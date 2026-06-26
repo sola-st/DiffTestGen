@@ -395,7 +395,7 @@ class DifferentOutputsStatistics():
                     if unique_in_difftestgen:
                         overall_str["only_in_difftestgen"] = f"{unique_in_difftestgen}"
                         total_count = sum(len(v) for v in unique_in_difftestgen.values())
-                        print(f"Add {total_count} uniques to difftestgen by project.")
+                        print(f"Overall add {total_count} uniques to difftestgen.")
                     else:
                         print("No unique PRs in DiffTestGen.")
 
@@ -409,7 +409,7 @@ class DifferentOutputsStatistics():
                             key_name = f"in_{v_name}_not_dtg"
                             overall_str[key_name] = f"{unique_in_version}"
                             total_count = sum(len(v) for v in unique_in_version.values())
-                            print(f"Add {total_count} uniques to {v_name} by project.")
+                            print(f"Overall add {total_count} uniques to {v_name}.")
                         else:
                             print(f"No unique PRs in {v_name}.")
 
