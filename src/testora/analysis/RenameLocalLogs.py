@@ -16,9 +16,8 @@ def rename_log_file(file, file_folder):
     call_graph_block = info[-1]
     pr = call_graph_block["pr_nb"]
     # # !!! rename only once
-    pr = call_graph_block["pr_nb"]
     if not str(pr) in file:
-        if call_graph_block["message"] == "Done with PR":
+        if call_graph_block["message"].startswith("Done with"):
             new_file_name = f"{pr}_{file}"
         else:
             unfinshed_file = file.replace(".json", "_unfinished.json")
@@ -30,7 +29,11 @@ def rename_log_file(file, file_folder):
 
 if __name__ == "__main__":
     # to rename logs in folder
-    folder = "data/results/ori_chaco_execution/pandas" # gpt-4o-mini-2024-07-18
+    folder = ""
+    # projects = ["keras", "marshmallow", "pandas", "scipy"]
+    # for pro in projects:
+        # project_folder = join(folder, pro)
+        # files = listdir(project_folder)
     files = listdir(folder)
     for file in files:
         if file.startswith("logs_"):
