@@ -86,6 +86,8 @@ class PRResult:
         old_diff_coverages = []
         new_diff_coverages = []
 
+        self.regression_num = None
+
         self.time_taken = parse_time_stamp(self.entries[-1]["timestamp"]) - \
             parse_time_stamp(self.entries[0]["timestamp"])
         phase = "test_gen"  # test_gen, test_refinement, test_exec, classification
@@ -112,7 +114,7 @@ class PRResult:
         ignored_reason_note = ""
         too_long_full_diff = False
         for i, entry in enumerate(self.entries):
-            if entry["message"].startswith("Starting to check PR"):
+            if entry["message"].startswith("Starting to "):
                 self.title = entry["title"]
                 self.url = entry["url"]
             elif "Full diff is too long" in entry["message"]:
@@ -260,43 +262,52 @@ class PRResult:
         if len(new_diff_coverages) > 0:
             self.avg_new_diff_coverage = sum(new_diff_coverages) / len(new_diff_coverages)
 
-        # extract classification details
-        for entry_idx, entry in enumerate(self.entries):
+        # # extract classification details
+        
+        regression_checked = False
+        for entry in self.entries:
             if entry["message"] == "Classification":
-                classification_result = None
-                # find test code, old output, new output by looking further up in the log
-                for idx2 in range(entry_idx, -1, -1):
-                    if self.entries[idx2]["message"] == "Different outputs (also after test reduction)":
-                        classification_result = ClassificationResult(
-                            self.entries[idx2]["test_code"], self.entries[idx2]["old_output"], self.entries[idx2]["new_output"])
-                        break
-                if classification_result is None:
-                    raise Exception(
-                        "Could not find test code, old output, new output for classification entry")
+                if regression_checked == False:
+                    self.regression_num = 0
+                    regression_checked = True
+                if entry["classification"] == "regression":
+                    self.regression_num +=1
+        # for entry_idx, entry in enumerate(self.entries):
+        #     if entry["message"] == "Classification":
+        #         classification_result = None
+        #         # find test code, old output, new output by looking further up in the log
+        #         for idx2 in range(entry_idx, -1, -1):
+        #             if self.entries[idx2]["message"] == "Different outputs (also after test reduction)":
+        #                 classification_result = ClassificationResult(
+        #                     self.entries[idx2]["test_code"], self.entries[idx2]["old_output"], self.entries[idx2]["new_output"])
+        #                 break
+        #         if classification_result is None:
+        #             raise Exception(
+        #                 "Could not find test code, old output, new output for classification entry")
 
-                # extract outcome of classification
-                if entry["is_relevant_change"] in [True, False] and \
-                        entry["is_deterministic"] in [True, False] and \
-                        entry["is_public"] in [True, False] and \
-                        entry["is_legal"] in [True, False] and \
-                        entry["is_surprising"] in [True, False]:
-                    if entry["is_relevant_change"] and \
-                            entry["is_deterministic"] and \
-                            entry["is_public"] and \
-                            entry["is_legal"] and \
-                            entry["is_surprising"]:
-                        # find entry that selected the expected behavior further down in the log
-                        for idx2 in range(entry_idx, len(self.entries)):
-                            if self.entries[idx2]["message"] == "Selected expected behavior":
-                                if self.entries[idx2]["expected_output"] == 1:
-                                    classification_result.classification = Classification.REGRESSION
-                                elif self.entries[idx2]["expected_output"] == 2:
-                                    classification_result.classification = Classification.COINCIDENTAL_FIX
-                                break
-                    else:
-                        classification_result.classification = Classification.INTENDED_CHANGE
+        #         # extract outcome of classification
+        #         if entry["is_relevant_change"] in [True, False] and \
+        #                 entry["is_deterministic"] in [True, False] and \
+        #                 entry["is_public"] in [True, False] and \
+        #                 entry["is_legal"] in [True, False] and \
+        #                 entry["is_surprising"] in [True, False]:
+        #             if entry["is_relevant_change"] and \
+        #                     entry["is_deterministic"] and \
+        #                     entry["is_public"] and \
+        #                     entry["is_legal"] and \
+        #                     entry["is_surprising"]:
+        #                 # find entry that selected the expected behavior further down in the log
+        #                 for idx2 in range(entry_idx, len(self.entries)):
+        #                     if self.entries[idx2]["message"] == "Selected expected behavior":
+        #                         if self.entries[idx2]["expected_output"] == 1:
+        #                             classification_result.classification = Classification.REGRESSION
+        #                         elif self.entries[idx2]["expected_output"] == 2:
+        #                             classification_result.classification = Classification.COINCIDENTAL_FIX
+        #                         break
+        #             else:
+        #                 classification_result.classification = Classification.INTENDED_CHANGE
 
-                self.classification_results.append(classification_result)
+        #         self.classification_results.append(classification_result)
 
     def _extract_coverage_details(self, s):
         has_diff_coverage = False
@@ -332,11 +343,14 @@ class PRResult:
             return self.ignored_reason
         elif s == "checked":
             # print(self.number)
-            return (f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, "
-                    f"{self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, "
-                    f"max_round: {self.max_round}, {self.nb_different_behavior} different outputs, "
-                    f"{self.cg}, {self.some_changes_at_fun_level}, " # (N fail(s) to 1 fix)
-                    f"{self.error_types}"
+            if self.regression_num != None: # this is for classification log files
+                return (f"{self.regression_num} regressions found.")
+            else:
+                return (f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, "
+                        f"{self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {self.nb_test_fixed} fixed, "
+                        f"max_round: {self.max_round}, {self.nb_different_behavior} different outputs, "
+                        f"{self.cg}, {self.some_changes_at_fun_level}, " # (N fail(s) to 1 fix)
+                        f"{self.error_types}"
             )
         elif s == "intended_change":
             return f"{self.nb_generated_tests} generated tests, {self.nb_test_executions} test executions, {self.nb_test_failures} failures ({100 * self.nb_test_failures / self.nb_test_executions:.1f}%), {len(self.classification_results)} differences"
@@ -382,7 +396,7 @@ def parse_log_files(log_files):
         current_pr_number = None
         current_entries = []
         for entry in entries:
-            if entry["message"] == "Starting to check PR":
+            if entry["message"].startswith("Starting to "):
                 current_pr_number = entry["pr_nb"]
                 current_entries = [entry]
             elif entry["pr_nb"] == -1:
@@ -393,7 +407,7 @@ def parse_log_files(log_files):
                     current_entries.append(entry)
                 else:
                     meta_entries.append(entry)
-            elif entry["message"] == "Done with PR":
+            elif entry["message"].startswith("Done with "):
                 current_entries.append(entry)
                 pr_results.append(PRResult(current_pr_number, current_entries))
                 current_pr_number = None

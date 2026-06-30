@@ -112,6 +112,8 @@ def categorize_entry(entry):
         return "Token usage"
     if re.search(r"^(Generated \d+ tests|Generated \d+ more tests|Static error fixed \d+/)", message):
         return "Generated tests"
+    if message == "Classification":
+        return "Classification"
     return "Other"
 
 

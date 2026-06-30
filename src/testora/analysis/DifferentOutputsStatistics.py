@@ -124,14 +124,14 @@ class DifferentOutputsStatistics():
     def _generate_bar_plots(self, output_folder, versions_summary, project_names):
         # Define metrics to plot
         metrics = [
-            ('project_diff_related_pr_num', 'Number of PRs involving behavioral changes'),
-            ('project_different_outputs', 'Number. of Different Output Related Tests')
+            ('project_diff_related_pr_num', 'Number of PRs with\nbehavioral differences'),
+            ('project_different_outputs', 'Number of Different\nOutput Related Tests')
         ]
         colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
         plt.rcParams.update({'font.size': 11})
         
         for metric_key, metric_label in metrics:
-            fig, ax = plt.subplots(figsize=(10, 4))
+            fig, ax = plt.subplots(figsize=(10, 2.4))
             num_versions = len(versions_summary)
             width = 0.2  # width of each bar
             group_width = width * num_versions
@@ -162,9 +162,19 @@ class DifferentOutputsStatistics():
                 for bar in bars:
                     height = bar.get_height()
                     if height > 0:  # Only show label if value > 0
-                        ax.text(bar.get_x() + bar.get_width() / 2., height,
+                        ax.text(bar.get_x() + bar.get_width() / 2., height - 1,
                                f'{int(height)}',
-                               ha='center', va='bottom', fontsize=10)
+                               ha='center', va='top', fontsize=10)
+                    # if height > 0:
+                    #     ax.annotate(
+                    #         f'{int(height)}',
+                    #         xy=(bar.get_x() + bar.get_width() / 2, height),
+                    #         xytext=(0, -4),          # 4 points below the top
+                    #         textcoords='offset points',
+                    #         ha='center',
+                    #         va='top',
+                    #         fontsize=10
+                    #     )
             
             # Customize plot
             ax.set_ylabel(metric_label)

@@ -118,7 +118,7 @@ def plot_all_coverages_combined(all_project_data, project_names, all_version_id,
     # Define colors for each approach
     colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
     
-    fig, ax = plt.subplots(figsize=(9, 3.5))
+    fig, ax = plt.subplots(figsize=(9, 2))
     plt.rcParams.update({'font.size': 11})
     
     # Get the number of approaches (should be 5)
@@ -175,13 +175,14 @@ def plot_all_coverages_combined(all_project_data, project_names, all_version_id,
         for pos, mean_val in zip(positions, arith_means):
             ax.text(
                 pos,
-                mean_val + 1.2,  # Adjust this offset if needed depending on your y-scale
+                mean_val - 1.5,  # Adjust this offset if needed depending on your y-scale
                 f'{mean_val:.1f}',
                 ha='center',
-                va='bottom',
+                va='top',
                 fontsize=9,
                 color='black',
-                zorder=3
+                zorder=3,
+                rotation=30
             )
     
     # Set x-axis
@@ -193,10 +194,11 @@ def plot_all_coverages_combined(all_project_data, project_names, all_version_id,
     ax.set_ylabel("Union Coverage (%)")
     
     # Create custom legend
-    legend_elements = [
-        Line2D([0], [0], color=colors[i], lw=8, label=all_version_id[i]) # , alpha=0.7
-        for i in range(num_approaches)
-    ]
+    # legend_elements = [
+    #     Line2D([0], [0], color=colors[i], lw=8, label=all_version_id[i]) # , alpha=0.7
+    #     for i in range(num_approaches)
+    # ]
+    legend_elements = []
     # Add arithmetic mean marker to legend
     legend_elements.append(
         Line2D([0], [0], marker='x', color='w', markerfacecolor='black', 
