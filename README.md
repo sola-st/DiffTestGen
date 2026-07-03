@@ -27,7 +27,7 @@ To run DiffTestGen, create key files in the main directory:
 2) `.github_token` with a (free to create) GitHub API key. This is required because DiffTestGen interacts with the GitHub API to retrieve details about the PRs to analyze.
 
 ## Running DiffTestGen
-_**Note**: Since DiffTestGen is implemented on top of Testora, some implementation artifacts still retain the Testora name._
+_**Note:** Since DiffTestGen is implemented on top of Testora, some implementation artifacts still retain the Testora name._
 
 Main source file: [testora.RegressionFinder](src/testora/RegressionFinder.py).
 To run the main souce file, we provide two entry files (**select one to run**), each corresponds to a mode, database mode and local mode, respectively:   
@@ -41,7 +41,7 @@ To run the main souce file, we provide two entry files (**select one to run**), 
     ```python -m testora.evaluation.EvalTaskManager --status```
 
     **To download results:**  
-    Once some or all PRs have been analyzed, download the results (i.e., `logs_*.json` files) from the database:
+    Once some or all PRs have been analyzed, download the results from the database:
 
     ```python -m testora.evaluation.EvalTaskManager --fetch```
 
@@ -92,7 +92,10 @@ We provide a Web UI to inspect detailed logs.
     python -m testora.EntryLocalClassification
     ``` -->
 
-
+**Notes:**
+* All result log files are in [data/results/gpt-5-mini-2025-08-07](data/results/gpt-5-mini-2025-08-07) and [data/results/gpt-4o-mini-2024-07-18](data/results/gpt-4o-mini-2024-07-18).
+* Classification log files are in [data/results/classification](data/results/classification).
+* All figures and tables are in [data/results/table_and_plots](data/results/table_and_plots).
 ### RQ1 Effectiveness and RQ2 Component Contributions
 * To run the experiments:
     ```

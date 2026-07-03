@@ -115,8 +115,9 @@ class PRResult:
         too_long_full_diff = False
         for i, entry in enumerate(self.entries):
             if entry["message"].startswith("Starting to "):
-                self.title = entry["title"]
-                self.url = entry["url"]
+                if self.title is None:
+                    self.title = entry["title"]
+                    self.url = entry["url"]
             elif "Full diff is too long" in entry["message"]:
                 too_long_full_diff = True
             elif "Filtered diff is too long" in entry["message"] and too_long_full_diff:
@@ -396,7 +397,7 @@ def parse_log_files(log_files):
         current_pr_number = None
         current_entries = []
         for entry in entries:
-            if entry["message"].startswith("Starting to "):
+            if entry["message"].startswith("Starting to Classify Tests") or entry["message"].startswith("Starting to check PR"):
                 current_pr_number = entry["pr_nb"]
                 current_entries = [entry]
             elif entry["pr_nb"] == -1:
@@ -407,7 +408,7 @@ def parse_log_files(log_files):
                     current_entries.append(entry)
                 else:
                     meta_entries.append(entry)
-            elif entry["message"].startswith("Done with "):
+            elif entry["message"].startswith("Done with Classification") or entry["message"].startswith("Done with PR"):
                 current_entries.append(entry)
                 pr_results.append(PRResult(current_pr_number, current_entries))
                 current_pr_number = None
