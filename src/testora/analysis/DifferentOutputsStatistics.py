@@ -54,6 +54,15 @@ class DifferentOutputsStatistics():
         self.project_max_rounds = 0
         self.project_from_rounds = [0]
 
+    def _extract_pr_title(self, info):
+        for info_block in info:
+            if isinstance(info_block, dict):
+                message = info_block.get("message")
+                title = info_block.get("title")
+                if message and message.startswith("Starting to check PR") and title:
+                    return str(title).strip()
+        return "unknown title"
+
     def _format_summary_table_headers(self, project_names, include_version=False):
         group_count = len(project_names) + 1
         col_format = ("l|" if include_version else "") + "|".join(["rrr"] * group_count) 
@@ -316,6 +325,11 @@ class DifferentOutputsStatistics():
                 "testora_100": {project: set() for project in project_info.keys()},
                 "difftestgen": {project: set() for project in project_info.keys()}
             }
+            no_different_outputs_prs = {
+                "testora": {},
+                "testora_100": {},
+                "difftestgen": {}
+            }
 
             versions_summary = []
             for version_name, approach_name in zip(config_names, approach_names):
@@ -355,6 +369,9 @@ class DifferentOutputsStatistics():
                                 single_pr_json = self.analyze_single_pr(info, target_project, pr, version_name)
                                 single_pr_json["project"] = target_project
                                 single_pr_json["pr_num"] = pr
+                                if single_pr_json["different_outputs"] == 0 and version_name in no_different_outputs_prs:
+                                    pr_title = self._extract_pr_title(info)
+                                    no_different_outputs_prs[version_name][pr] = pr_title
                                 single_iteration.append(single_pr_json)
                             except json.JSONDecodeError:
                                 print(f"Iteration {iteration}: Error reading log file for PR {pr} in {log_folder}")
@@ -431,6 +448,12 @@ class DifferentOutputsStatistics():
                 with open(result_file, "w") as f:
                     json.dump(to_write, f, indent=4)
 
+                if version_name in no_different_outputs_prs:
+                    no_diff_output_file = join(output_folder, f"{version_name}_no_different_outputs_prs.txt")
+                    with open(no_diff_output_file, "w", encoding="utf-8") as f:
+                        for pr_num in sorted(no_different_outputs_prs[version_name].keys()):
+                            f.write(f"{pr_num}: {no_different_outputs_prs[version_name][pr_num]}\n")
+
                 versions_summary.append({
                     "version": approach_name,
                     "project_data": [
@@ -448,6 +471,25 @@ class DifferentOutputsStatistics():
                 })
 
                 self.clear_overall()
+
+            common_no_diff_prs = {}
+            if all(no_different_outputs_prs[version] for version in ["testora", "testora_100", "difftestgen"]):
+                common_pr_numbers = (
+                    set(no_different_outputs_prs["testora"].keys())
+                    & set(no_different_outputs_prs["testora_100"].keys())
+                    & set(no_different_outputs_prs["difftestgen"].keys())
+                )
+                for pr_num in sorted(common_pr_numbers):
+                    common_no_diff_prs[pr_num] = (
+                        no_different_outputs_prs["testora"].get(pr_num)
+                        or no_different_outputs_prs["testora_100"].get(pr_num)
+                        or no_different_outputs_prs["difftestgen"].get(pr_num)
+                    )
+
+            combined_no_diff_output_file = join(output_folder, "all_three_approaches_no_different_outputs_prs.txt")
+            with open(combined_no_diff_output_file, "w", encoding="utf-8") as f:
+                for pr_num in sorted(common_no_diff_prs.keys()):
+                    f.write(f"{pr_num}: {common_no_diff_prs[pr_num]}\n")
 
             self._write_all_versions_summary_table_file(output_folder, versions_summary, list(project_info.keys()))
             self._generate_bar_plots(output_folder, versions_summary, list(project_info.keys()))
