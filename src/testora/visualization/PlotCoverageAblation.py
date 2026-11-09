@@ -39,7 +39,74 @@ def get_overall_coverage_rates(all_data):
         overall_data.append(pr_level_rates)
     
     return overall_data
-            
+
+def plot_coverages_bar_error_project(all_repetition_project_data, all_repetition_data, project_names, all_version_id, result_pdf):
+    """Create a grouped violin plot by project, with a final Overall column on the right."""
+    colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
+    fig, ax = plt.subplots(figsize=(9, 2))
+    plt.rcParams.update({'font.size': 11})
+
+    num_versions = len(all_version_id)
+    group_names = list(project_names) + ["Overall"]
+    num_groups = len(group_names)
+    violin_width = 0.15
+    offsets = np.linspace(-0.3, 0.3, num_versions)
+    group_positions = np.arange(num_groups)
+
+    for version_idx, version_name in enumerate(all_version_id):
+        project_data = []
+        positions = []
+
+        for proj_idx, project_name in enumerate(project_names):
+            pooled_values = []
+            for repetition_data in all_repetition_project_data[project_name]:
+                pooled_values.extend([float(cov.strip('%')) for cov in repetition_data[version_idx]])
+            project_data.append(pooled_values)
+            positions.append(proj_idx + offsets[version_idx])
+
+        pooled_overall_values = []
+        for repetition_data in all_repetition_data:
+            pooled_overall_values.extend([float(cov.strip('%')) for cov in repetition_data[version_idx]])
+        project_data.append(pooled_overall_values)
+        positions.append(num_groups - 1 + offsets[version_idx])
+
+        parts = ax.violinplot(
+            project_data,
+            positions=positions,
+            widths=violin_width,
+            showmeans=False,
+            showmedians=False,
+        )
+        for pc in parts['bodies']:
+            pc.set_facecolor(colors[version_idx])
+            pc.set_alpha(1)
+
+        arith_means = [np.mean(data) if data else 0.0 for data in project_data]
+        ax.scatter(positions, arith_means, color='black', marker='x', zorder=3)
+
+        for pos, mean_val in zip(positions, arith_means):
+            ax.text(
+                pos,
+                mean_val - 1.5,
+                f'{mean_val:.1f}',
+                ha='center',
+                va='top',
+                fontsize=9,
+                color='black',
+                zorder=3,
+                rotation=30,
+            )
+
+    ax.set_ylabel("Union Coverage (%)")
+    ax.set_xticks(group_positions)
+    ax.set_xticklabels(group_names)
+    ax.set_xlim(-0.5, num_groups - 0.5)
+    ax.grid(True, axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(result_pdf, dpi=300, bbox_inches='tight')
+    plt.close()
+
 
 def plot_coverages_violin(overall_data, all_version_id, result_pdf):
     # Convert percentage strings to floats
@@ -225,7 +292,7 @@ def plot_all_coverages_combined(all_project_data, project_names, all_version_id,
 
 
 def main():
-    iteration = 0
+    max_iteration = 3
     subset_mode = False
    # model_version = "gpt-4o-mini-2024-07-18"
     model_version = "gpt-5-mini-2025-08-07"
@@ -233,76 +300,89 @@ def main():
     config_names = ["testora",  "testora_pp", "only_coverage_feedback", "only_cg", "difftestgen"] # "testora_100", 
     axis_names = ["Testora", "Testora++", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"] # "Testora++", 
     results_folder = join("data", "results")
-    output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")  
-    across_projects = []
-    
-    # For combined plot
-    all_project_cleaned_data = {}
-    
-    for i, project in enumerate(target_projects):
-        all_data = []
+    all_repetition_data = []
+    all_repetition_project_data = {project: [] for project in target_projects}
 
-        for name in config_names:
-            output_folder = join(output_base_folder, f"log_{name}")
-            makedirs(output_folder, exist_ok=True)
+    for iteration in range(max_iteration):
+        output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")
+        across_projects = []
 
-            log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{name}", project)
-            # if name == "testora_100":
-            #     log_folder = join(results_folder, model_version, f"iter_{iteration}_100", f"log_testora", project)
-            if subset_mode == True:
-                log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{name}", project)
+        # For combined plot
+        all_project_cleaned_data = {}
+
+        for i, project in enumerate(target_projects):
+            all_data = []
+
+            for name in config_names:
+                output_folder = join(output_base_folder, f"log_{name}")
+                makedirs(output_folder, exist_ok=True)
+
+                log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{name}", project)
+                # if name == "testora_100":
+                #     log_folder = join(results_folder, model_version, f"iter_{iteration}_100", f"log_testora", project)
+                if subset_mode == True:
+                    log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{name}", project)
+                
+                meta_file = join(output_folder, f"{project}_coverage_meta.json")
+                all_from_cur_version = []
+                if exists(meta_file):
+                    # print(f"Meta file {meta_file} already exists. Skipping processing for {name} on {project}.")
+                    with open(meta_file, "r") as f:
+                        all_from_cur_version = json.load(f)
+                else:
+                    init = CoverageComparison(log_folder, name)
+                    all_from_cur_version = init.get_multiple_pr_coverage_info(project)
+                    # write a meta file for a version
+                    with open(meta_file, "w") as f:
+                        json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
+                    print(f"Collected coverage information is written to {meta_file}, relevant pr num: {len(all_from_cur_version)}")
+
+                all_data.append(all_from_cur_version)
+
+            overall_data = get_overall_coverage_rates(all_data)
+            all_repetition_project_data[project].append(overall_data)
+            result_pdf = join(output_base_folder, f"coverage_comparison_ablation_{project}.pdf") 
+            plot_coverages_violin(overall_data, axis_names, result_pdf)
             
-            meta_file = join(output_folder, f"{project}_coverage_meta.json")
-            all_from_cur_version = []
-            if exists(meta_file):
-                # print(f"Meta file {meta_file} already exists. Skipping processing for {name} on {project}.")
-                with open(meta_file, "r") as f:
-                    all_from_cur_version = json.load(f)
+            # Store cleaned data for combined plot
+            cleaned_data = [
+                [float(cov.strip('%')) for cov in pr_level_rates]
+                for pr_level_rates in overall_data
+            ]
+            all_project_cleaned_data[project] = cleaned_data
+
+            if i == 0:
+                across_projects.extend(all_data)
             else:
-                init = CoverageComparison(log_folder, name)
-                all_from_cur_version = init.get_multiple_pr_coverage_info(project)
-                # write a meta file for a version
-                with open(meta_file, "w") as f:
-                    json.dump(all_from_cur_version, f, indent=4, ensure_ascii=False)   
-                print(f"Collected coverage information is written to {meta_file}, relevant pr num: {len(all_from_cur_version)}")
+                for j, approach_data in enumerate(all_data):
+                    across_projects[j].extend(approach_data)
 
-            all_data.append(all_from_cur_version)
-
-        overall_data = get_overall_coverage_rates(all_data)
-        result_pdf = join(output_base_folder, f"coverage_comparison_ablation_{project}.pdf") 
-        plot_coverages_violin(overall_data, axis_names, result_pdf)
-        
-        # Store cleaned data for combined plot
-        cleaned_data = [
+        # for the plot
+        overall_data = get_overall_coverage_rates(across_projects)
+        cleaned_overall = [
             [float(cov.strip('%')) for cov in pr_level_rates]
             for pr_level_rates in overall_data
         ]
-        all_project_cleaned_data[project] = cleaned_data
+        all_project_cleaned_data['Overall'] = cleaned_overall
+        
+        # Create combined plot with all subplots
+        result_pdf_combined = join(output_base_folder, f"coverage_comparison_ablation_combined.pdf")
+        plot_all_coverages_combined(all_project_cleaned_data, target_projects, axis_names, result_pdf_combined)
+        print(f"Combined plot saved to {result_pdf_combined}")
+        
+        # Also keep individual overall plot for backward compatibility
+        result_pdf = join(output_base_folder, f"coverage_comparison_ablation.pdf") 
+        # title = "Coverage Comparison (Ablation study)"
+        plot_coverages_violin(overall_data, axis_names, result_pdf)
 
-        if i == 0:
-            across_projects.extend(all_data)
-        else:
-            for j, approach_data in enumerate(all_data):
-                across_projects[j].extend(approach_data)
+        all_repetition_data.append(overall_data)
 
-    # for the plot
-    overall_data = get_overall_coverage_rates(across_projects)
-    cleaned_overall = [
-        [float(cov.strip('%')) for cov in pr_level_rates]
-        for pr_level_rates in overall_data
-    ]
-    all_project_cleaned_data['Overall'] = cleaned_overall
-    
-    # Create combined plot with all subplots
-    result_pdf_combined = join(output_base_folder, f"coverage_comparison_ablation_combined.pdf")
-    plot_all_coverages_combined(all_project_cleaned_data, target_projects, axis_names, result_pdf_combined)
-    print(f"Combined plot saved to {result_pdf_combined}")
-    
-    # Also keep individual overall plot for backward compatibility
-    result_pdf = join(output_base_folder, f"coverage_comparison_ablation.pdf") 
-    # title = "Coverage Comparison (Ablation study)"
-    plot_coverages_violin(overall_data, axis_names, result_pdf)
-
+    summary_plot_folder = join(results_folder, "table_and_plots", "coverage_meta_info")
+    makedirs(summary_plot_folder, exist_ok=True)
+    # Final summary: project-by-project groups, with Overall as the last column.
+    result_pdf_project = join(summary_plot_folder, "coverage_comparison_ablation_across_repetitions.pdf")
+    plot_coverages_bar_error_project(all_repetition_project_data, all_repetition_data, target_projects, axis_names, result_pdf_project)
+    print(f"Summary plot across repetitions saved to {result_pdf_project}")
 
 if __name__=="__main__":
     main()

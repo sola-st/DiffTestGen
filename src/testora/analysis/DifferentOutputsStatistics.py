@@ -130,6 +130,83 @@ class DifferentOutputsStatistics():
         with open(latex_file, "w") as f:
             f.write(self._format_all_versions_summary_table_latex(versions_summary, project_names))
 
+    def _generate_repetition_error_bar_plots(self, output_folder, all_repetition_summary, project_names):
+        """Create a project-by-project bar plot with error bars across repetitions."""
+        metric_specs = [
+            ('project_diff_related_pr_num', 'Number of PRs with\nbehavioral differences'),
+            ('project_different_outputs', 'Number of Different\nOutput Related Tests')
+        ]
+        colors = ["#4F8A8B", "#01A9B4", "#EA907A", "#FFCB74", "#E36387"]
+        plt.rcParams.update({'font.size': 11})
+
+        version_names = []
+        for repetition_data in all_repetition_summary:
+            for version_data in repetition_data:
+                version_name = version_data["version"]
+                if version_name not in version_names:
+                    version_names.append(version_name)
+
+        groups = list(project_names) + ["Overall"]
+
+        for metric_key, metric_label in metric_specs:
+            fig, ax = plt.subplots(figsize=(10, 2.4))
+            num_versions = len(version_names)
+            width = 0.16
+            group_width = width * num_versions
+            gap = 0.35
+            step = group_width + gap
+            x = np.arange(len(groups)) * step
+            offsets = (np.arange(num_versions) - (num_versions - 1) / 2.0) * width
+
+            for i, version_name in enumerate(version_names):
+                values = []
+                stds = []
+                for group_name in groups:
+                    if group_name == "Overall":
+                        group_values = [
+                            summary_entry["total"][metric_key.replace("project_", "overall_")]
+                            for repetition_data in all_repetition_summary
+                            for summary_entry in repetition_data
+                            if summary_entry["version"] == version_name
+                        ]
+                    else:
+                        group_values = [
+                            next((project_data[metric_key] for project_data in summary_entry["project_data"] if project_data["project"] == group_name), 0)
+                            for repetition_data in all_repetition_summary
+                            for summary_entry in repetition_data
+                            if summary_entry["version"] == version_name
+                        ]
+                    values.append(float(np.mean(group_values)) if group_values else 0.0)
+                    stds.append(float(np.std(group_values, ddof=1)) if len(group_values) > 1 else 0.0)
+
+                bars = ax.bar(x + offsets[i], values, width, yerr=stds, capsize=5, label=version_name, color=colors[i], edgecolor='black')
+
+                for bar, value, std_value in zip(bars, values, stds):
+                    height = bar.get_height()
+                    y_offset = max(std_value, 1.0) * 0.05 if std_value > 0 else 1.0
+                    ax.text(
+                        bar.get_x() + bar.get_width() / 2,
+                        height + y_offset,
+                        f"{int(round(value))}",
+                        ha='center',
+                        va='bottom',
+                        fontsize=9,
+                    )
+
+            ax.set_ylabel(metric_label)
+            ax.set_xticks(x)
+            ax.set_xticklabels(groups)
+            ax.legend(fontsize=9, ncol=min(3, len(version_names)))
+            ax.grid(axis='y', alpha=0.3)
+            ax.margins(y=0.15)
+            # ax.set_title('Mean across repetitions by project')
+
+            plot_file = join(output_folder, f"{metric_key}_project_repetition_error_bar.pdf")
+            plt.tight_layout()
+            plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"Saved project repetition plot: {plot_file}")
+
     def _generate_bar_plots(self, output_folder, versions_summary, project_names):
         # Define metrics to plot
         metrics = [
@@ -316,7 +393,8 @@ class DifferentOutputsStatistics():
             "scipy": 126,
         }
 
-        for iteration in range(1, iteration_max):
+        all_repetition_summary = []
+        for iteration in range(iteration_max):
             output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}", "differ_outputs_meta")
             os.makedirs(output_folder, exist_ok=True)
 
@@ -470,6 +548,7 @@ class DifferentOutputsStatistics():
 
                 self.clear_overall()
 
+            all_repetition_summary.append(versions_summary)
             common_no_diff_prs = {}
             if all(no_different_outputs_prs[version] for version in ["testora", "testora_pp", "difftestgen"]):
                 common_pr_numbers = (
@@ -498,6 +577,10 @@ class DifferentOutputsStatistics():
                 "testora_pp": {},
                 "difftestgen": {}
             }
+
+        summary_plot_folder = join(results_folder, "table_and_plots", "different_outputs_statistics")
+        os.makedirs(summary_plot_folder, exist_ok=True)
+        self._generate_repetition_error_bar_plots(summary_plot_folder, all_repetition_summary, list(project_info.keys()))
 
 
 if __name__=="__main__":
