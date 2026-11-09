@@ -303,11 +303,11 @@ class DifferentOutputsStatistics():
 
     def main(self):
         results_folder = join("data", "results")
-        iteration_max = 1
+        iteration_max = 3
         # model_version = "gpt-4o-mini-2024-07-18"
         model_version = "gpt-5-mini-2025-08-07"
-        config_names = ["testora", "testora_100", "only_coverage_feedback", "only_cg", "difftestgen"]
-        approach_names = ["Testora", "Testora++", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"]
+        config_names = ["testora", "testora_pp", "only_coverage_feedback", "only_cg", "difftestgen"]  
+        approach_names = ["Testora", "Testora++", "Only Coverage Feedback", "Only Access Information", "DiffTestGen"] 
         subset_mode = False
         project_info = {
             "keras": 133,
@@ -316,18 +316,18 @@ class DifferentOutputsStatistics():
             "scipy": 126,
         }
 
-        for iteration in range(iteration_max):
+        for iteration in range(1, iteration_max):
             output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics", f"iter_{iteration}", "differ_outputs_meta")
             os.makedirs(output_folder, exist_ok=True)
 
             self.pr_tracking = {
                 "testora": {project: set() for project in project_info.keys()},
-                "testora_100": {project: set() for project in project_info.keys()},
+                "testora_pp": {project: set() for project in project_info.keys()},
                 "difftestgen": {project: set() for project in project_info.keys()}
             }
             no_different_outputs_prs = {
                 "testora": {},
-                "testora_100": {},
+                "testora_pp": {},
                 "difftestgen": {}
             }
 
@@ -340,8 +340,6 @@ class DifferentOutputsStatistics():
                     self.overall_diff_related_pr_nums.update({target_project: set()})
 
                     log_folder = join(results_folder, model_version, f"iter_{iteration}", f"log_{version_name}", target_project)
-                    if version_name == "testora_100":
-                        log_folder = join(results_folder, model_version, f"iter_{iteration}_100", f"log_testora", target_project)
                     if subset_mode == True:
                         log_folder = join(results_folder, model_version, f"iter_{iteration}_subset", f"log_{version_name}", target_project)
                     
@@ -416,7 +414,7 @@ class DifferentOutputsStatistics():
                 if version_name == "difftestgen":
                     unique_in_difftestgen = {}
                     for project in project_info.keys():
-                        project_prs = self.pr_tracking["difftestgen"][project] - (self.pr_tracking["testora"][project] | self.pr_tracking["testora_100"][project])
+                        project_prs = self.pr_tracking["difftestgen"][project] - (self.pr_tracking["testora"][project] | self.pr_tracking["testora_pp"][project])
                         if project_prs:
                             unique_in_difftestgen[project] = sorted(list(project_prs))
                     if unique_in_difftestgen:
@@ -426,7 +424,7 @@ class DifferentOutputsStatistics():
                     else:
                         print("No unique PRs in DiffTestGen.")
 
-                    for v_name in ["testora", "testora_100"]:
+                    for v_name in ["testora", "testora_pp"]:
                         unique_in_version = {}
                         for project in project_info.keys():
                             project_prs = self.pr_tracking[v_name][project] - self.pr_tracking["difftestgen"][project]
@@ -473,16 +471,16 @@ class DifferentOutputsStatistics():
                 self.clear_overall()
 
             common_no_diff_prs = {}
-            if all(no_different_outputs_prs[version] for version in ["testora", "testora_100", "difftestgen"]):
+            if all(no_different_outputs_prs[version] for version in ["testora", "testora_pp", "difftestgen"]):
                 common_pr_numbers = (
                     set(no_different_outputs_prs["testora"].keys())
-                    & set(no_different_outputs_prs["testora_100"].keys())
+                    & set(no_different_outputs_prs["testora_pp"].keys())
                     & set(no_different_outputs_prs["difftestgen"].keys())
                 )
                 for pr_num in sorted(common_pr_numbers):
                     common_no_diff_prs[pr_num] = (
                         no_different_outputs_prs["testora"].get(pr_num)
-                        or no_different_outputs_prs["testora_100"].get(pr_num)
+                        or no_different_outputs_prs["testora_pp"].get(pr_num)
                         or no_different_outputs_prs["difftestgen"].get(pr_num)
                     )
 
@@ -497,7 +495,7 @@ class DifferentOutputsStatistics():
             # clear before next iteration
             self.pr_tracking = {
                 "testora": {},
-                "testora_100": {},
+                "testora_pp": {},
                 "difftestgen": {}
             }
 

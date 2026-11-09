@@ -71,6 +71,13 @@ for target_project in target_projects:
                 if version_id in version_ids:
                     idx = version_ids.index(version_id)
                     config_name = config_names[idx]
+                    if config_name == "testora":
+                        for block in info:
+                            if block.get("message", "").startswith("Querying gpt-5-mini-2025-08-07"):
+                                if "Answer by giving fifty usage examples" in block.get("content", ""):
+                                    config_name = "testora_pp"
+                                    break
+
                     separated_results_folder = join(base_folder, model_version, f"iter_{iteration}", f"log_{config_name}", target_project)
                     if pr_list:
                         separated_results_folder = join(base_folder, model_version, f"iter_{iteration}_subset", f"log_{config_name}", target_project)

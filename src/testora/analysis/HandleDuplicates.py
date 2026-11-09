@@ -10,7 +10,7 @@ model_version = "gpt-5-mini-2025-08-07"
 project_info = {
     "keras": 133,
     "marshmallow": 53,
-    "pandas": 128,
+    "pandas": 127,
     "scipy": 126,
 }
 
@@ -19,6 +19,7 @@ config_versions = {
     "difftestgen": [5, 8, 8, True, "pr-modified", True, True, True],
     "only_coverage_feedback": [5, 8, 8, False, None, False, False, False], 
     "only_cg": [5, 0, 8, False, None, True, False, False],
+    "testora_pp": [1, 0, 1, False, None, False, False, False]
 }
 
 for config_name, config in config_versions.items():
@@ -50,7 +51,7 @@ for config_name, config in config_versions.items():
                 
                 if relevant_log_files:
                     # print(pr + ": " + ", ".join(relevant_log_files))
-                    log_folder_for_duplicates = join(results_folder, model_version, f"iter_{iteration}", f"log_{config_name}", f"{target_project}_duplicates") 
+                    log_folder_for_duplicates = join(results_folder, model_version, f"iter_{iteration}_duplicates", f"log_{config_name}", f"{target_project}") 
                     os.makedirs(log_folder_for_duplicates, exist_ok=True)
                     for dup_file in relevant_log_files[1:]: # keep the first log file, move the duplicates to a separate folder
                         shutil.move(join(log_folder, dup_file), join(log_folder_for_duplicates, dup_file))

@@ -1,4 +1,5 @@
 import json
+import os
 from os import listdir, rename
 from os.path import join
 
@@ -34,7 +35,7 @@ if __name__ == "__main__":
     # for pro in projects:
         # project_folder = join(folder, pro)
         # files = listdir(project_folder)
-    files = listdir(folder)
-    for file in files:
-        if file.startswith("logs_"):
-            rename_log_file(file, folder)
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            if file.startswith("logs_"):
+                rename_log_file(file, root)
