@@ -5,15 +5,14 @@ import random
 from os.path import exists
 from testora import Config
 from testora.llms.LLMCache import LLMCache, LLMEvent
-from testora.RegressionFinder import classify_regression, get_repo, is_crash
-from testora.evaluation import EvalTaskManager
+from testora.RegressionFinder import get_repo, is_crash
 from testora.execution.TestExecution import TestExecution
 from testora.llms.OpenAIGPT import OpenAIGPT
 from testora.prompts.SelectExpectedBehaviorPrompt import SelectExpectedBehaviorPrompt
 from testora.util.ClassificationResult import Classification
 from testora.util.DocstringRetrieval import retrieve_relevant_docstrings
 from testora.util.Exceptions import TestoraException
-from testora.util.Logs import ClassificationEvent, ErrorEvent, Event, PREvent, PreClassificationEvent, SelectBehaviorEvent, append_event, get_logs_as_json, reset_logs, start_logging, store_logs
+from testora.util.Logs import ClassificationEvent, Event, PREvent, PreClassificationEvent, SelectBehaviorEvent, append_event, start_logging, store_logs
 from testora.util.PullRequest import PullRequest
 from testora.prompts.RegressionClassificationPromptV7 import RegressionClassificationPromptV7 as RegressionClassificationPrompt
 
