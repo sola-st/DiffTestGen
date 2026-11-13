@@ -270,6 +270,64 @@ class PullRequest:
 
         result = list(dict.fromkeys(result))
         return result
+
+    def get_changed_function_names_and_bodies(self):
+        pre_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.pre_commit)
+        post_commit_cloned_repo = self.cloned_repo_manager.get_cloned_repo(self.post_commit)
+        relevant_files = set(self._get_relevant_changed_files())
+        changed_function_names = set()
+        old_context = []
+        new_context = []
+
+        def read_file(cloned_repo, path):
+            file_path = f"{cloned_repo.repo.working_dir}/{path}"
+            if not exists(file_path):
+                return ""
+            with open(file_path, "r") as source_file:
+                return source_file.read()
+
+        for modified_file in self.patch.modified_files:
+            path = modified_file.path
+            if path not in relevant_files or not path.endswith(".py"):
+                continue
+
+            source_path = modified_file.source_file
+            if source_path.startswith("a/"):
+                source_path = source_path[2:]
+            elif source_path == "/dev/null":
+                source_path = path
+
+            target_path = modified_file.target_file
+            if target_path.startswith("b/"):
+                target_path = target_path[2:]
+            elif target_path == "/dev/null":
+                target_path = path
+
+            old_names, old_bodies, _ = get_function_names_code(
+                read_file(pre_commit_cloned_repo, source_path),
+                self.old_file_path_to_change_hunks.get(path, []),
+            )
+            new_names, new_bodies, _ = get_function_names_code(
+                read_file(post_commit_cloned_repo, target_path),
+                self.new_file_path_to_change_hunks.get(path, []),
+            )
+
+            module_name = path.replace("/", ".").removesuffix(".py")
+            changed_function_names.update(
+                f"{module_name}.{name}" for name in (old_names or []) + (new_names or [])
+            )
+            if old_bodies:
+                old_context.append(
+                    f"The following are the affected functions from file <{source_path}>:\n"
+                    + "\n\n".join(sorted(old_bodies))
+                )
+            if new_bodies:
+                new_context.append(
+                    f"The following are the affected functions from file <{target_path}>:\n"
+                    + "\n\n".join(sorted(new_bodies))
+                )
+
+        return sorted(changed_function_names), "\n".join(old_context), "\n".join(new_context)
     
     def get_changed_function_names_and_context(self):
         self.changed_function_qualified_names_old = [] # all: public + private + unsure

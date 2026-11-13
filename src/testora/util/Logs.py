@@ -54,6 +54,12 @@ class ClassificationEvent(Event):
     new_is_crash: bool
 
 
+class BehaviorChangeClassificationEvent(Event):
+    behavior_change: str
+    summary: str
+    evidence: List[str]
+
+
 class SelectBehaviorEvent(Event):
     expected_output: int
 
