@@ -1,3 +1,4 @@
+import csv
 import json
 from os import makedirs
 from os.path import join, exists
@@ -291,7 +292,10 @@ def plot_all_coverages_combined(all_project_data, project_names, all_version_id,
     plt.close()
 
 
-def main():
+def main(generate_plots=True, generate_csv=True):
+    if not generate_plots and not generate_csv:
+        return
+
     max_iteration = 3
     subset_mode = False
    # model_version = "gpt-4o-mini-2024-07-18"
@@ -302,6 +306,7 @@ def main():
     results_folder = join("data", "results")
     all_repetition_data = []
     all_repetition_project_data = {project: [] for project in target_projects}
+    coverage_by_project_pr = {project: {} for project in target_projects}
 
     for iteration in range(max_iteration):
         output_base_folder = join(results_folder, "table_and_plots", "coverage_meta_info", f"iter_{iteration}")
@@ -340,49 +345,79 @@ def main():
                 all_data.append(all_from_cur_version)
 
             overall_data = get_overall_coverage_rates(all_data)
-            all_repetition_project_data[project].append(overall_data)
-            result_pdf = join(output_base_folder, f"coverage_comparison_ablation_{project}.pdf") 
-            plot_coverages_violin(overall_data, axis_names, result_pdf)
-            
-            # Store cleaned data for combined plot
-            cleaned_data = [
+            if generate_csv:
+                for approach_idx, (pr_records, coverage_rates) in enumerate(zip(all_data, overall_data)):
+                    for pr_record, coverage in zip(pr_records, coverage_rates):
+                        pr_num = str(list(pr_record.keys())[-1])
+                        coverage_by_project_pr[project].setdefault(pr_num, {})[
+                            (approach_idx, iteration)
+                        ] = coverage
+
+            if generate_plots:
+                all_repetition_project_data[project].append(overall_data)
+
+                result_pdf = join(output_base_folder, f"coverage_comparison_ablation_{project}.pdf")
+                plot_coverages_violin(overall_data, axis_names, result_pdf)
+
+                cleaned_data = [
+                    [float(cov.strip('%')) for cov in pr_level_rates]
+                    for pr_level_rates in overall_data
+                ]
+                all_project_cleaned_data[project] = cleaned_data
+
+                if i == 0:
+                    across_projects.extend(all_data)
+                else:
+                    for j, approach_data in enumerate(all_data):
+                        across_projects[j].extend(approach_data)
+
+        if generate_plots:
+            overall_data = get_overall_coverage_rates(across_projects)
+            cleaned_overall = [
                 [float(cov.strip('%')) for cov in pr_level_rates]
                 for pr_level_rates in overall_data
             ]
-            all_project_cleaned_data[project] = cleaned_data
+            all_project_cleaned_data['Overall'] = cleaned_overall
 
-            if i == 0:
-                across_projects.extend(all_data)
-            else:
-                for j, approach_data in enumerate(all_data):
-                    across_projects[j].extend(approach_data)
+            result_pdf_combined = join(output_base_folder, "coverage_comparison_ablation_combined.pdf")
+            plot_all_coverages_combined(all_project_cleaned_data, target_projects, axis_names, result_pdf_combined)
+            print(f"Combined plot saved to {result_pdf_combined}")
 
-        # for the plot
-        overall_data = get_overall_coverage_rates(across_projects)
-        cleaned_overall = [
-            [float(cov.strip('%')) for cov in pr_level_rates]
-            for pr_level_rates in overall_data
-        ]
-        all_project_cleaned_data['Overall'] = cleaned_overall
-        
-        # Create combined plot with all subplots
-        result_pdf_combined = join(output_base_folder, f"coverage_comparison_ablation_combined.pdf")
-        plot_all_coverages_combined(all_project_cleaned_data, target_projects, axis_names, result_pdf_combined)
-        print(f"Combined plot saved to {result_pdf_combined}")
-        
-        # Also keep individual overall plot for backward compatibility
-        result_pdf = join(output_base_folder, f"coverage_comparison_ablation.pdf") 
-        # title = "Coverage Comparison (Ablation study)"
-        plot_coverages_violin(overall_data, axis_names, result_pdf)
-
-        all_repetition_data.append(overall_data)
+            result_pdf = join(output_base_folder, "coverage_comparison_ablation.pdf")
+            plot_coverages_violin(overall_data, axis_names, result_pdf)
+            all_repetition_data.append(overall_data)
 
     summary_plot_folder = join(results_folder, "table_and_plots", "coverage_meta_info")
     makedirs(summary_plot_folder, exist_ok=True)
     # Final summary: project-by-project groups, with Overall as the last column.
-    result_pdf_project = join(summary_plot_folder, "coverage_comparison_ablation_across_repetitions.pdf")
-    plot_coverages_bar_error_project(all_repetition_project_data, all_repetition_data, target_projects, axis_names, result_pdf_project)
-    print(f"Summary plot across repetitions saved to {result_pdf_project}")
+    if generate_plots:
+        result_pdf_project = join(summary_plot_folder, "coverage_comparison_ablation_across_repetitions.pdf")
+        plot_coverages_bar_error_project(all_repetition_project_data, all_repetition_data, target_projects, axis_names, result_pdf_project)
+        print(f"Summary plot across repetitions saved to {result_pdf_project}")
+
+    if generate_csv:
+        csv_path = join(summary_plot_folder, "pr_coverage.csv")
+        with open(csv_path, "w", newline="", encoding="utf-8") as csv_file:
+            fieldnames = ["Project", "PR", "Approach", "Repetitions", "Coverage"]
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for project in target_projects:
+                for pr_num in sorted(coverage_by_project_pr[project], key=int):
+                    for approach_idx, approach_name in enumerate(axis_names):
+                        for repetition in range(max_iteration):
+                            first_pr_row = approach_idx == 0 and repetition == 0
+                            writer.writerow({
+                                "Project": project.capitalize() if first_pr_row else "",
+                                "PR": pr_num if first_pr_row else "",
+                                "Approach": approach_name if repetition == 0 else "",
+                                "Repetitions": repetition,
+                                "Coverage": coverage_by_project_pr[project][pr_num].get(
+                                    (approach_idx, repetition), ""
+                                ),
+                            })
+        print(f"Per-PR coverage CSV saved to {csv_path}")
 
 if __name__=="__main__":
-    main()
+    generate_plots = True
+    generate_csv = True
+    main(generate_plots=generate_plots, generate_csv=generate_csv)

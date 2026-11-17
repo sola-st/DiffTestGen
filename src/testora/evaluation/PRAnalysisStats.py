@@ -184,10 +184,25 @@ class PRAnalysisStats:
         print(f"\\newcommand{{\\totalTokensPerPR}}{{{round(avg_input_tokens + avg_output_tokens)}}}")
 
     def print_and_plot_time_results(self, time_costs):
+        phase_times = [
+            sum(time_costs.test_gen),
+            sum(time_costs.test_refinement),
+            sum(time_costs.test_exec),
+        ]
+        total_time = sum(phase_times)
+        phase_percentages = [
+            phase_time / total_time * 100 if total_time else 0.0
+            for phase_time in phase_times
+        ]
+
         fig, ax = plt.subplots(figsize=(5, 3.5))
         ax.boxplot([time_costs.test_gen, time_costs.test_refinement, time_costs.test_exec])
         ax.set_xticks([1, 2, 3])
-        ax.set_xticklabels(["Test\n generation", "Test\n refinement", "Test\n execution"])
+        ax.set_xticklabels([
+            f"Test generation\n({phase_percentages[0]:.1f}%)",
+            f"Test refinement\n({phase_percentages[1]:.1f}%)",
+            f"Test execution\n({phase_percentages[2]:.1f}%)",
+        ])
         ax.set_ylabel("Time (minutes)")
         target_file = f"{self.output_folder}/time_costs.pdf"
         plt.tight_layout()
@@ -195,6 +210,9 @@ class PRAnalysisStats:
 
         avg_time_per_PR = sum(time_costs.test_gen + time_costs.test_refinement + time_costs.test_exec) / len(time_costs.test_gen) if time_costs.test_gen else 0.0
         print("\\newcommand{\\minutesPerPR}{" + str(round(avg_time_per_PR, 2)) + "}")
+        print(f"\\newcommand{{\\testGenTimePercentage}}{{{phase_percentages[0]:.1f}\\%}}")
+        print(f"\\newcommand{{\\testRefinementTimePercentage}}{{{phase_percentages[1]:.1f}\\%}}")
+        print(f"\\newcommand{{\\testExecTimePercentage}}{{{phase_percentages[2]:.1f}\\%}}")
 
     def main(self):
         general_table_rows = []

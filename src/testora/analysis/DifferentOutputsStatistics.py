@@ -1,4 +1,5 @@
 from os.path import exists, join
+import csv
 import json
 import os
 import matplotlib.pyplot as plt
@@ -62,6 +63,74 @@ class DifferentOutputsStatistics():
                 if message and message.startswith("Starting to check PR") and title:
                     return str(title).strip()
         return "unknown title"
+
+    @staticmethod
+    def _has_behavioral_changes(info):
+        """Return whether a log contains at least one different-output result."""
+        return any(
+            isinstance(block, dict)
+            and isinstance(block.get("message"), str)
+            and block["message"].startswith("Different outputs")
+            for block in info
+        )
+
+    def write_pr_repetition_csv(self, results_folder, model_version, project_info, subset_mode=False):
+        """Write per-PR behavioral-change results for Testora++ and DiffTestGen."""
+        approaches = [("testora_pp", "Testora++"), ("difftestgen", "Difftestgen")]
+        rows = []
+
+        for project, num in project_info.items():
+            pr_file = join("data", "meta", "pr_nums_checks", f"{project}_PRs_subset{num}.txt")
+            if subset_mode:
+                pr_file = join("data", "meta", f"subset_{project}.txt")
+            with open(pr_file, "r", encoding="utf-8") as f:
+                pr_list = [int(line.strip()) for line in f if line.strip()]
+
+            for pr in pr_list:
+                for config_name, approach_name in approaches:
+                    for iteration in range(3):
+                        log_folder = join(
+                            results_folder,
+                            model_version,
+                            f"iter_{iteration}{'_subset' if subset_mode else ''}",
+                            f"log_{config_name}",
+                            project,
+                        )
+                        log_path = None
+                        if os.path.isdir(log_folder):
+                            log_path = next(
+                                (join(log_folder, name) for name in os.listdir(log_folder)
+                                 if str(pr) in name),
+                                None,
+                            )
+                        change_found = ""
+                        if log_path is not None:
+                            try:
+                                with open(log_path, "r", encoding="utf-8") as f:
+                                    info = json.load(f)
+                                change_found = self._has_behavioral_changes(info)
+                            except (json.JSONDecodeError, OSError) as error:
+                                print(f"Could not read {log_path}: {error}")
+                        rows.append({
+                            "Project": project.capitalize(),
+                            "PR": pr,
+                            "Approach": approach_name,
+                            "Repetitions": iteration,
+                            "change found": change_found,
+                        })
+
+        output_folder = join(results_folder, "table_and_plots", "different_outputs_statistics")
+        os.makedirs(output_folder, exist_ok=True)
+        csv_path = join(output_folder, "pr_behavioral_changes.csv")
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=["Project", "PR", "Approach", "Repetitions", "change found"],
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"Saved per-PR repetition CSV: {csv_path}")
+        return csv_path
 
     def _format_summary_table_headers(self, project_names, include_version=False):
         group_count = len(project_names) + 1
@@ -378,7 +447,7 @@ class DifferentOutputsStatistics():
         return single_pr_json
 
 
-    def main(self):
+    def main(self, generate_existing=True, generate_csv=False):
         results_folder = join("data", "results")
         iteration_max = 3
         # model_version = "gpt-4o-mini-2024-07-18"
@@ -392,6 +461,11 @@ class DifferentOutputsStatistics():
             "pandas": 127,
             "scipy": 126,
         }
+
+        if generate_csv:
+            self.write_pr_repetition_csv(results_folder, model_version, project_info, subset_mode)
+        if not generate_existing:
+            return
 
         all_repetition_summary = []
         for iteration in range(iteration_max):
@@ -584,4 +658,7 @@ class DifferentOutputsStatistics():
 
 
 if __name__=="__main__":
-    DifferentOutputsStatistics().main()
+    # Select which outputs to generate here.
+    generate_existing = True
+    generate_csv = True
+    DifferentOutputsStatistics().main(generate_existing=generate_existing, generate_csv=generate_csv)
