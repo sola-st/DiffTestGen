@@ -200,7 +200,7 @@ class DifferentOutputsStatistics():
             f.write(self._format_all_versions_summary_table_latex(versions_summary, project_names))
 
     def _generate_repetition_error_bar_plots(self, output_folder, all_repetition_summary, project_names):
-        """Create a project-by-project bar plot with error bars across repetitions."""
+        """Create mean ± standard deviation and mean with min-to-max plots."""
         metric_specs = [
             ('project_diff_related_pr_num', 'Number of PRs with\nbehavioral differences'),
             ('project_different_outputs', 'Number of Different\nOutput Related Tests')
@@ -245,14 +245,15 @@ class DifferentOutputsStatistics():
                             for summary_entry in repetition_data
                             if summary_entry["version"] == version_name
                         ]
-                    values.append(float(np.mean(group_values)) if group_values else 0.0)
+                    mean_value = float(np.mean(group_values)) if group_values else 0.0
+                    values.append(mean_value)
                     stds.append(float(np.std(group_values, ddof=1)) if len(group_values) > 1 else 0.0)
 
                 bars = ax.bar(x + offsets[i], values, width, yerr=stds, capsize=5, label=version_name, color=colors[i], edgecolor='black')
 
                 for bar, value, std_value in zip(bars, values, stds):
                     height = bar.get_height()
-                    y_offset = max(std_value, 1.0) * 0.05 if std_value > 0 else 1.0
+                    y_offset = max(std_value, 1.0) * 0.05
                     ax.text(
                         bar.get_x() + bar.get_width() / 2,
                         height + y_offset,
@@ -263,6 +264,7 @@ class DifferentOutputsStatistics():
                     )
 
             ax.set_ylabel(metric_label)
+            # ax.set_title('Bars show mean across repetitions; error bars show ±1 standard deviation')
             ax.set_xticks(x)
             ax.set_xticklabels(groups)
             ax.legend(fontsize=9, ncol=min(3, len(version_names)))
@@ -275,6 +277,60 @@ class DifferentOutputsStatistics():
             plt.savefig(plot_file, dpi=300, bbox_inches='tight')
             plt.close()
             print(f"Saved project repetition plot: {plot_file}")
+
+            # Also plot the same means with asymmetric errors reaching the observed min and max.
+            fig, ax = plt.subplots(figsize=(10, 2.4))
+            for i, version_name in enumerate(version_names):
+                values = []
+                lower_errors = []
+                upper_errors = []
+                for group_name in groups:
+                    if group_name == "Overall":
+                        group_values = [
+                            summary_entry["total"][metric_key.replace("project_", "overall_")]
+                            for repetition_data in all_repetition_summary
+                            for summary_entry in repetition_data
+                            if summary_entry["version"] == version_name
+                        ]
+                    else:
+                        group_values = [
+                            next((project_data[metric_key] for project_data in summary_entry["project_data"] if project_data["project"] == group_name), 0)
+                            for repetition_data in all_repetition_summary
+                            for summary_entry in repetition_data
+                            if summary_entry["version"] == version_name
+                        ]
+                    mean_value = float(np.mean(group_values)) if group_values else 0.0
+                    values.append(mean_value)
+                    min_value = float(np.min(group_values)) if group_values else 0.0
+                    max_value = float(np.max(group_values)) if group_values else 0.0
+                    lower_errors.append(mean_value - min_value)
+                    upper_errors.append(max_value - mean_value)
+
+                bars = ax.bar(
+                    x + offsets[i], values, width,
+                    yerr=np.array([lower_errors, upper_errors]), capsize=5,
+                    label=version_name, color=colors[i], edgecolor='black'
+                )
+                for bar, value, lower_error, upper_error in zip(bars, values, lower_errors, upper_errors):
+                    ax.text(
+                        bar.get_x() + bar.get_width() / 2,
+                        bar.get_height() + max(lower_error, upper_error, 1.0) * 0.05,
+                        f"{int(round(value))}",
+                        ha='center', va='bottom', fontsize=9,
+                    )
+
+            ax.set_ylabel(metric_label)
+            # ax.set_title('Bars show mean across repetitions; error bars show minimum to maximum')
+            ax.set_xticks(x)
+            ax.set_xticklabels(groups)
+            ax.legend(fontsize=9, ncol=min(3, len(version_names)))
+            ax.grid(axis='y', alpha=0.3)
+            ax.margins(y=0.15)
+            min_max_plot_file = join(output_folder, f"{metric_key}_project_repetition_min_max_error_bar.pdf")
+            plt.tight_layout()
+            plt.savefig(min_max_plot_file, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"Saved project repetition min-max plot: {min_max_plot_file}")
 
     def _generate_bar_plots(self, output_folder, versions_summary, project_names):
         # Define metrics to plot
@@ -660,5 +716,5 @@ class DifferentOutputsStatistics():
 if __name__=="__main__":
     # Select which outputs to generate here.
     generate_existing = True
-    generate_csv = True
+    generate_csv = False
     DifferentOutputsStatistics().main(generate_existing=generate_existing, generate_csv=generate_csv)

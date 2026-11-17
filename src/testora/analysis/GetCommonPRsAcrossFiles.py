@@ -21,6 +21,20 @@ def _read_difftestgen_only_prs(file_path: Path) -> Dict[str, Set[int]]:
     }
 
 
+def _read_testora_not_difftestgen_prs(file_path: Path) -> Dict[str, Dict[str, Set[int]]]:
+    with open(file_path, "r", encoding="utf-8") as file:
+        data = json.load(file)
+    testora_only_block = ast.literal_eval(data[0]["in_testora_not_dtg"])
+    testora_pp_only_block = ast.literal_eval(data[0]["in_testora_pp_not_dtg"])
+    return {
+        project: {
+            "testora": set(testora_only_block.get(project, set())),
+            "testora_pp": set(testora_pp_only_block.get(project, set())),
+        }
+        for project in set(testora_only_block) | set(testora_pp_only_block)
+    }
+
+
 def _count_different_outputs(log_folder: Path, pr_num: int) -> int:
     log_files = sorted(log_folder.glob(f"{pr_num}_*.json"))
     if not log_files:
@@ -142,3 +156,61 @@ pr_records.insert(0, summary_record)
 with open(output_file, "w", encoding="utf-8") as file:
     json.dump(pr_records, file, indent=4)
 print(f"Wrote {len(pr_records)} PR records to {output_file}")
+
+
+# 3 Find the union of PRs in testora or testora_pp, but not in difftestgen,
+# across all repetitions.
+testora_only_by_iteration = []
+for iteration in range(iteration_max):
+    difftestgen_file = join(file_folder, f"iter_{iteration}/differ_outputs_meta/difftestgen.json")
+    testora_only_by_iteration.append(
+        _read_testora_not_difftestgen_prs(Path(difftestgen_file))
+    )
+
+testora_only_pr_sources = {}
+for iteration, prs_by_project in enumerate(testora_only_by_iteration):
+    for project, prs_by_source in prs_by_project.items():
+        for source, pr_nums in prs_by_source.items():
+            for pr_num in pr_nums:
+                pr_record = testora_only_pr_sources.setdefault(
+                    (project, pr_num), {"sources": set(), "sources_by_iteration": {}}
+                )
+                pr_record["sources"].add(source)
+                pr_record["sources_by_iteration"].setdefault(iteration, set()).add(source)
+
+all_testora_only_prs = {pr_num for _, pr_num in testora_only_pr_sources}
+output_file = join(
+    file_folder,
+    "union_only_in_testora_or_testora_pp_not_difftestgen_prs_across_repetitions.txt",
+)
+with open(output_file, "w", encoding="utf-8") as file:
+    file.writelines(f"{record}\n" for record in sorted(all_testora_only_prs))
+print(f"Wrote {len(all_testora_only_prs)} testora/testora_pp-only PRs to {output_file}")
+
+details = []
+for (project, pr_num), record in sorted(testora_only_pr_sources.items()):
+    sources = sorted(record["sources"])
+    details.append({
+        "project": project,
+        "pr_num": pr_num,
+        "source": "both" if len(sources) == 2 else sources[0],
+        "iterations": [
+            {
+                "iteration": iteration,
+                "source": (
+                    "both"
+                    if len(iteration_sources) == 2
+                    else next(iter(iteration_sources))
+                ),
+            }
+            for iteration, iteration_sources in sorted(record["sources_by_iteration"].items())
+        ],
+    })
+
+details_output_file = join(
+    file_folder,
+    "union_only_in_testora_or_testora_pp_not_difftestgen_prs_across_repetitions.json",
+)
+with open(details_output_file, "w", encoding="utf-8") as file:
+    json.dump(details, file, indent=4)
+print(f"Wrote details for {len(details)} testora/testora_pp-only PRs to {details_output_file}")
