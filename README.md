@@ -27,7 +27,9 @@ To run DiffTestGen, create key files in the main directory:
 2) `.github_token` with a (free to create) GitHub API key. This is required because DiffTestGen interacts with the GitHub API to retrieve details about the PRs to analyze.
 
 ## Running DiffTestGen
-_**Note:** Since DiffTestGen is implemented on top of Testora, some implementation artifacts still retain the Testora name._
+_**Note 1:** Since DiffTestGen is implemented on top of Testora, some implementation artifacts still retain the Testora name._
+
+_**Note 2:** For all the experiments and results across repetitions, they are marked with iter_\* (iteration)._
 
 Main source file: [testora.RegressionFinder](src/testora/RegressionFinder.py).
 To run the main souce file, we provide two entry files (**select one to run**), each corresponds to a mode, database mode and local mode, respectively:   
@@ -106,22 +108,25 @@ We provide a Web UI to inspect detailed logs.
 * To analysis and visualize the results:  
     **1) On Testora data**  
     * [PRs with different outputs] Run [src/testora/analysis/DifferentOutputsStatistics](src/testora/analysis/DifferentOutputsStatistics)
-        * --> Figure 5a, last column of Table IV
+        * --> Figure 5a, last column of Table V
     * [Union coverage] Run [src/testora/visualization/PlotCoverageAblation.py](src/testora/visualization/PlotCoverageAblation.py)
         * --> Figure 5b
     * [Number of generated tests] Run [src/testora/analysis/GeneratedTestsStatistics.py](src/testora/analysis/GeneratedTestsStatistics.py)
-        * --> Table IV (exclude last column)
+        * --> Table V (exclude last column)
 
     **2) On ChaCo data** 
     * [PRs with different outputs] Run [src/testora/analysis/DifferentOutputsStatisticsChaCo](src/testora/analysis/DifferentOutputsStatisticsChaCo)
-        * --> To form the $Num_{PR}$ part of Table V
+        * --> To form the $Num_{PR}$ part of Table VI
     * [Union coverage] Run [src/testora/visualization/PlotCoverageAblation.py](src/testora/visualization/PlotCoverageChaCo.py)
-        * --> To form the $Cov_{union}$ part of Table V 
-    
+        * --> To form the $Cov_{union}$ part of Table VI 
+
+* To get the statistical results for the repetitions: Run [src/testora/analysis/StatisticalAnalysis.py](src/testora/analysis/StatisticalAnalysis.py)
+    * --> The output information forms Table IV
+ 
 ### 
 ### RQ3: Efficiency
 * Set the _name_ and _base\_dir_ at the top part of [src/testora/evaluation/PRAnalysisStats.py](src/testora/evaluation/PRAnalysisStats.py) and run it to get the corresponding cost meta information.  
-    * --> The output information forms TABLE VI
+    * --> The output information forms TABLE VII
 
 <!-- For Testora, DifftestGen:
 ```
@@ -136,9 +141,9 @@ base_dir = f"data/results/gpt-5-mini-2025-08-07/iter_0_100/log_{name}/"
 ``` -->
 
 ### RQ4: Usefulness
-* To get the $Num_{PR}$ and $Num_{test}$ in Table VII:  
-    * Run [src/testora/analysis/DifferentOutputsStatistics](src/testora/analysis/DifferentOutputsStatistics) on the 70 PRs (recorded in [data/meta/pr_classifier](data/meta/pr_classifier))
+* To get the $Num_{PR}$ and $Num_{test}$ in Table VIII:  
+    * Run [src/testora/analysis/DifferentOutputsStatistics](src/testora/analysis/DifferentOutputsStatistics) on the 117 PRs (recorded in [data/meta/pr_classifier](data/meta/pr_classifier))
 
-* To run the classification and get the $Num_{test}^{clarify}$ and $Num_{PR}^{regression}$ in Table VII:  
+* To run the classification and get the $Num_{test}^{clarify}$ and $Num_{PR}^{regression}$ in Table VIII:  
     * ```python -m testora.EntryLocalClassification```         
     * Run [src/testora/analysis/ClassificationStatistics.py](src/testora/analysis/ClassificationStatistics.py)
